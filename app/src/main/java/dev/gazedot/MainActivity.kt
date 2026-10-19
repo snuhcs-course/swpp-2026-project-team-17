@@ -258,13 +258,16 @@ class MainActivity : ComponentActivity() {
             .85 to .5, .85 to .85, .5 to .85, .15 to .85, .15 to .5)
         private var index = 0
         private var since = SystemClock.uptimeMillis()
+        private val blinkBreakDurationMs = 2_000L
+        private var blinkBreakUntil = 0L
         private val samples = mutableListOf<EyeFeatures>()
         private val anchors = mutableListOf<Anchor>()
         private var hint = "머리는 고정하고 파란 점을 바라보세요"
         private val tick = object : Runnable {
             override fun run() {
                 if (calibration !== this@CalibrationView) return
-                if (SystemClock.uptimeMillis() - since > 9000) {
+                val now = SystemClock.uptimeMillis()
+                if (!isTakingBlinkBreak(now) && now - since > 9000) {
                     finish(null, "눈 표본이 부족합니다. 조명·거리·안경 반사를 확인하고 다시 보정하세요.")
                     return
                 }
@@ -273,9 +276,20 @@ class MainActivity : ComponentActivity() {
         }
         init { setBackgroundColor(Color.rgb(15, 23, 42)); post(tick) }
         override fun onDetachedFromWindow() { removeCallbacks(tick); super.onDetachedFromWindow() }
+        private fun isTakingBlinkBreak(now: Long): Boolean {
+            if (blinkBreakUntil == 0L) return false
+            if (now < blinkBreakUntil) return true
+            blinkBreakUntil = 0L
+            // Start point five's settling and timeout clocks after the break, even without eye detection.
+            since = now
+            hint = "${index + 1} / 9 · 파란 점을 계속 바라보세요"
+            return false
+        }
         fun onFrame(f: EyeFeatures?) {
             if (index >= targets.size || width == 0 || height == 0) return
-            val elapsed = SystemClock.uptimeMillis() - since
+            val now = SystemClock.uptimeMillis()
+            if (isTakingBlinkBreak(now)) return
+            val elapsed = now - since
             if (f == null) { hint = "눈 검출 대기 · 눈을 뜨고 얼굴을 카메라로 향해 주세요"; return }
             hint = "${index + 1} / 9 · 파란 점을 계속 바라보세요"
             if (elapsed < 1000) return
@@ -294,6 +308,7 @@ class MainActivity : ComponentActivity() {
                 anchors += Anchor(eye, (location[0] + width * xy.first) / bounds.width(),
                     (location[1] + height * xy.second) / bounds.height())
                 index++; samples.clear(); since = SystemClock.uptimeMillis()
+                if (index == 4) blinkBreakUntil = since + blinkBreakDurationMs
                 if (index == targets.size) {
                     val model = GazeModel.fit(anchors)
                     finish(model, if (model == null) "보정 실패 · 시선 변화가 불충분하거나 오차가 큽니다. 기기를 고정하고 다시 시도하세요."
@@ -318,6 +333,18 @@ class MainActivity : ComponentActivity() {
             val target = targets.getOrNull(index) ?: return
             val d = resources.displayMetrics.density
             paint.color = Color.WHITE; paint.textSize = 15 * d; paint.textAlign = Paint.Align.CENTER
+            if (blinkBreakUntil != 0L) {
+                val secondsLeft = ((blinkBreakUntil - SystemClock.uptimeMillis() + 999) / 1000).coerceAtLeast(1)
+                canvas.drawText("시선 보정 4/9 완료 · 잠시 쉬어가기", width / 2f, 55 * d, paint)
+                paint.textSize = 20 * d
+                canvas.drawText("눈을 편하게 깜빡여 주세요", width / 2f, height / 2f, paint)
+                paint.textSize = 14 * d
+                canvas.drawText("${secondsLeft}초 후 나머지 5개를 이어서 진행합니다", width / 2f, height / 2f + 32 * d, paint)
+                paint.textSize = 12 * d
+                canvas.drawText("머리와 기기는 그대로 유지해 주세요", width / 2f, height - 70 * d, paint)
+                canvas.drawText("중단하려면 뒤로 가기", width / 2f, height - 45 * d, paint)
+                return
+            }
             canvas.drawText("시선 보정 ${index + 1}/9", width / 2f, 55 * d, paint)
             paint.textSize = 12 * d
             canvas.drawText(hint, width / 2f, height - 70 * d, paint)
