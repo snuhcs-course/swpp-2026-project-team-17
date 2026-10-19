@@ -156,7 +156,8 @@ class TrackingService : LifecycleService() {
                     it.first + 0.28 * (position.first - it.first) to it.second + 0.28 * (position.second - it.second)
                 } ?: position
                 overlay?.show(smoothed)
-                TrackerState.publish(features, message)
+                TrackerState.publish(features, message,
+                    smoothed?.let { ScreenGaze(it.first, it.second, now) })
             }
         } catch (e: Exception) {
             main.post { if (!closing) fail("영상 처리 실패: ${e.message}") }

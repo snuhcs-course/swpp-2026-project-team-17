@@ -18,6 +18,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var calibrationButton: Button
     private lateinit var stopButton: Button
     private var calibration: CalibrationView? = null
+    private var tutorial: PostCalibrationTutorialView? = null
     private val handler = Handler(Looper.getMainLooper())
     private val overlayPermission = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         if (Settings.canDrawOverlays(this)) startTracking()
@@ -41,6 +42,8 @@ class MainActivity : ComponentActivity() {
                     calibration = null
                     TrackerState.status = "보정 취소됨"
                     showHome()
+                } else if (tutorial != null) {
+                    showHome()
                 } else {
                     isEnabled = false
                     onBackPressedDispatcher.onBackPressed()
@@ -51,7 +54,10 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         TrackerState.listener = {
-            if (calibration != null && !TrackerState.running) {
+            if (tutorial != null) {
+                if (!TrackerState.running) showHome()
+                else tutorial?.onGaze(if (TrackerState.features != null && TrackerState.model != null) TrackerState.gaze else null)
+            } else if (calibration != null && !TrackerState.running) {
                 calibration = null; showHome()
             } else if (calibration != null) calibration?.onFrame(TrackerState.features)
             else if (::status.isInitialized) {
@@ -62,6 +68,7 @@ class MainActivity : ComponentActivity() {
     }
     override fun onPause() {
         super.onPause()
+        if (tutorial != null) showHome()
         if (calibration != null) {
             calibration = null
             TrackerState.model = null
@@ -70,9 +77,11 @@ class MainActivity : ComponentActivity() {
         }
     }
     override fun onStop() { TrackerState.listener = null; super.onStop() }
-    override fun onDestroy() { handler.removeCallbacksAndMessages(null); super.onDestroy() }
+    override fun onDestroy() { tutorial?.close(); handler.removeCallbacksAndMessages(null); super.onDestroy() }
 
     private fun showHome() {
+        tutorial?.close()
+        tutorial = null
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val density = resources.displayMetrics.density
         val screenWidthDp = resources.displayMetrics.widthPixels / density
@@ -295,7 +304,15 @@ class MainActivity : ComponentActivity() {
         }
         private fun finish(model: GazeModel?, message: String) {
             TrackerState.model = model; TrackerState.status = message
-            calibration = null; showHome()
+            // Match the exact normalization dimensions used for the calibration anchors above.
+            val bounds = if (Build.VERSION.SDK_INT >= 30) windowManager.maximumWindowMetrics.bounds else Rect(0, 0, width, height)
+            calibration = null
+            if (model != null && TrackerState.running) {
+                tutorial = PostCalibrationTutorialView(this@MainActivity, bounds.width(), bounds.height()) {
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                }
+                setContentView(tutorial)
+            } else showHome()
         }
         override fun onDraw(canvas: Canvas) {
             val target = targets.getOrNull(index) ?: return
