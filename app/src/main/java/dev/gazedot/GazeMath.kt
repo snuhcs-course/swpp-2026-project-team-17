@@ -2,11 +2,11 @@ package dev.gazedot
 
 import kotlin.math.*
 
+/** x/y start as iris features and are replaced by iTracker's cm output before calibration/publishing. */
 data class EyeFeatures(val x: Double, val y: Double, val faceX: Double, val faceY: Double, val scale: Double)
 data class Anchor(val eye: EyeFeatures, val x: Double, val y: Double)
 
-/** Calibration maps iris displacement inside the eye to display coordinates.
- * This is a calibrated approximation, not a pretrained screen-gaze model. */
+/** Personal calibration maps the pretrained gaze estimate to normalized display coordinates. */
 class GazeModel private constructor(
     private val meanX: Double, private val meanY: Double,
     private val stdX: Double, private val stdY: Double,

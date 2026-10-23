@@ -26,6 +26,7 @@ class TrackingService : LifecycleService() {
     private val main = Handler(Looper.getMainLooper())
     @Volatile private var closing = false
     private var landmarker: FaceLandmarker? = null
+    private var gazeEstimator: ITrackerEstimator? = null
     private var cameraProvider: ProcessCameraProvider? = null
     private var analysis: ImageAnalysis? = null
     private var overlay: DotOverlay? = null
@@ -96,6 +97,7 @@ class TrackingService : LifecycleService() {
                             .setRunningMode(RunningMode.VIDEO).setNumFaces(1)
                             .setMinFaceDetectionConfidence(0.6f).setMinFacePresenceConfidence(0.6f)
                             .setMinTrackingConfidence(0.6f).build())
+                    gazeEstimator = ITrackerEstimator(this)
                     main.post { if (!closing) bindCamera() }
                 } catch (e: Exception) { main.post { fail("모델 초기화 실패: ${e.message}") } }
             }
@@ -140,7 +142,12 @@ class TrackingService : LifecycleService() {
             upright = Bitmap.createBitmap(raw, 0, 0, raw.width, raw.height, matrix, true)
             val image = BitmapImageBuilder(upright).build()
             val result = try { landmarker?.detectForVideo(image, now) } finally { image.close() }
-            val features = result?.faceLandmarks()?.firstOrNull()?.let { LandmarkFeatures.extract(it, upright.width, upright.height) }
+            val features = result?.faceLandmarks()?.firstOrNull()?.let { landmarks ->
+                val eyes = LandmarkFeatures.extract(landmarks, upright.width, upright.height) ?: return@let null
+                val gaze = gazeEstimator?.estimate(upright, landmarks) ?: return@let null
+                // Keep the existing eye-validity/pose checks and calibrate the pretrained model's cm output.
+                eyes.copy(x = gaze.first, y = gaze.second)
+            }
             main.post {
                 if (closing) return@post
                 lastResult = SystemClock.uptimeMillis()
@@ -185,7 +192,10 @@ class TrackingService : LifecycleService() {
         analysis?.clearAnalyzer()
         analysis?.let { cameraProvider?.unbind(it) }
         overlay?.close()
-        worker.execute { landmarker?.close(); landmarker = null }
+        worker.execute {
+            gazeEstimator?.close(); gazeEstimator = null
+            landmarker?.close(); landmarker = null
+        }
         worker.shutdown()
         TrackerState.running = false; TrackerState.model = null
         TrackerState.publish(null, if (TrackerState.status.startsWith("추적 중")) "추적 중지됨" else TrackerState.status)

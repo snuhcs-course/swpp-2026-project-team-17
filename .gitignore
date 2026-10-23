@@ -8,3 +8,6 @@ local.properties
 build-log*.txt
 *.jks
 *.keystore
+# GazeCapture's research-only weights must be obtained from upstream by each user.
+/app/src/main/assets/itracker.onnx
+/app/src/main/assets/itracker.onnx.tmp

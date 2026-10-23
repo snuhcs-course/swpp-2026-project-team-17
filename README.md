@@ -2,6 +2,8 @@
 
 전면 카메라에서 눈·홍채 위치를 검출하고 **사용자별 9점 보정**을 거쳐 화면의 추정 시선 위치에 빨간 점을 표시합니다. 홈 화면이나 다른 앱으로 이동한 뒤에도 카메라 포그라운드 서비스와 터치가 통과하는 오버레이가 동작합니다.
 
+시선 추정 입력은 이제 공식 GazeCapture의 사전학습 iTracker 모델로 계산합니다. 파인튜닝 없이 기기 안에서 실행하며 9점 개인 보정은 유지합니다. 적용 구조, 재변환 방법, 실기기 검증 범위와 연구용 라이선스는 [GazeCapture 도입 문서](docs/gazecapture.md)를 참고하세요.
+
 ## 현재 상태
 
 Android Studio에서 저장소 루트 폴더를 열 수 있습니다. APK는 로컬에서 빌드하며 빌드 산출물은 저장소에 포함하지 않습니다.
@@ -27,13 +29,14 @@ Android Studio에서 저장소 루트 폴더를 열 수 있습니다. APK는 로
 
 - CameraX ImageAnalysis: 전면 카메라, RGBA 프레임, 센서 회전 보정, 최신 프레임만 처리, 추론 최대 약 15fps.
 - MediaPipe Face Landmarker: CPU에서 얼굴·눈·홍채 랜드마크 478개 검출.
-- 양쪽 눈의 모서리 축을 기준으로 홍채의 상대 수평/수직 변위를 계산. 눈이 감기거나 랜드마크가 없으면 점을 숨김.
-- 9개 목표의 표본 중앙값으로 정규화된 ridge 선형 회귀를 학습해 화면 좌표로 변환.
+- 양쪽 눈의 랜드마크로 눈 감김과 검출 유효성을 검사. 눈이 감기거나 랜드마크가 없으면 점을 숨김.
+- GazeCapture의 사전학습 iTracker 모델을 ONNX Runtime으로 실행. 얼굴·양쪽 눈 이미지와 얼굴 위치 격자로 카메라 기준 cm 좌표를 추정.
+- 9개 목표에서 얻은 iTracker 출력의 중앙값으로 정규화된 ridge 선형 회귀를 학습해 실제 화면 좌표로 변환.
 - 보정 시 시선 변화가 너무 작거나 적합 오차가 크면 실패 처리. 얼굴 위치·거리 변화가 큰 경우 점을 숨김. 미세한 고개 회전까지 완전히 보정하는 모델은 아님.
 - 화면 좌표에 지수 평활화 적용. 800ms 넘게 결과가 없으면 점을 숨김.
 - 전체 화면 오버레이는 터치를 받지 않고 창 불투명도를 0.7로 설정해 Android의 터치 통과 조건을 고려함.
 
-**홍채 검출 모델 자체가 화면 시선 좌표를 출력하는 것은 아닙니다.** 이 앱은 개인 보정 기반의 초기 시선 추정 실험입니다. 작은 버튼을 정확하게 선택할 수 있다는 보장이 없으며 기기, 조명, 안경, 눈 형태, 머리 위치에 영향을 받습니다. 보정 데이터의 적합 오차는 실제 사용 정확도가 아닙니다. 별도의 목표점 검증이 필요합니다.
+**iTracker의 출력은 화면 픽셀이 아닌 카메라 기준 cm 좌표입니다.** 9점 개인 보정을 거쳐 화면 좌표로 변환합니다. 작은 버튼을 정확하게 선택할 수 있다는 보장이 없으며 기기, 조명, 안경, 눈 형태, 머리 위치에 영향을 받습니다. 보정 데이터의 적합 오차는 실제 사용 정확도가 아닙니다. 별도의 목표점 검증이 필요합니다.
 
 카메라를 사용하는 다른 앱과 동시에 전면 카메라를 공유하지 못할 수 있습니다. 제조사의 배터리 관리, 카메라 정책, 분할 화면·폴더블 화면 전환에 따라 실기기 확인이 필요합니다.
 
@@ -65,11 +68,16 @@ Gradle 8.13 / AGP 8.9.2 / Kotlin 2.1.20 / CameraX 1.4.2 / MediaPipe Tasks Vision
 - `MainActivity.kt`: 권한, 상태 화면, 9점 보정 UI.
 - `TrackingService.kt`: 카메라 포그라운드 서비스, 추론, 생명주기·종료.
 - `LandmarkFeatures.kt`: 홍채의 눈 내부 상대좌표 추출.
+- `ITrackerEstimator.kt`, `ITrackerPreprocessing.kt`: 사전학습 시선 추정과 얼굴·눈·격자 입력 준비.
 - `GazeMath.kt`: 보정 회귀, 품질·얼굴 위치 검사.
 - `DotOverlay.kt`: 다른 앱 위의 빨간 점.
 - `GazeMathTest.kt`: 미관측 좌표 예측, 무효 보정·얼굴 이동·이상값 검사.
+- `ITrackerPreprocessingTest.kt`: 눈 입력 순서, RGB/CHW, 패딩, 얼굴 격자 검사.
+- `tools/export_gazecapture.py`: 공식 체크포인트의 재현 가능한 ONNX 변환 및 수치 검증.
 
 ## 모델 출처
+
+GazeCapture / iTracker 공식 PyTorch 체크포인트와 라이선스, 고정 버전·체크섬은 [도입 문서](docs/gazecapture.md)에 기록했습니다. GazeCapture 모델은 **연구 전용**이며, 아래 MediaPipe 모델의 Apache-2.0 이용 조건과 다릅니다.
 
 Google MediaPipe Face Landmarker float16 v1:
 https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task

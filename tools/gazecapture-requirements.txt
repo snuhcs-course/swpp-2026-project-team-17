@@ -1,0 +1,7 @@
+# Python 3.12; conversion tools only. No Python runtime is packaged in the Android app.
+torch==2.6.0
+onnx==1.17.0
+onnxruntime==1.23.2
+scipy==1.15.3
+numpy==1.26.4
+Pillow==11.1.0
