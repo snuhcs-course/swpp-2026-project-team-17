@@ -88,7 +88,7 @@ internal class PostCalibrationTutorialView(
         val location = IntArray(2)
         button.getLocationOnScreen(location)
         val visible = Rect()
-        val inside = gaze != null && TrackerState.running && button.isShown &&
+        val inside = gaze != null && gaze.fresh(SystemClock.uptimeMillis()) && TrackerState.running && button.isShown &&
             button.getLocalVisibleRect(visible) &&
             visible.contains((gaze.x * displayWidth - location[0]).toInt(),
                 (gaze.y * displayHeight - location[1]).toInt()) &&

@@ -35,11 +35,14 @@ class MainActivity : ComponentActivity() {
         else @Suppress("DEPRECATION") run {
             window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
         }
+        if (TrackerState.model == null) TrackerState.model = ModelStore.load(this)
         showHome()
         onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (calibration != null) {
+                    calibration?.close()
                     calibration = null
+                    TrackerState.cancelCalibration()
                     TrackerState.status = "보정 취소됨"
                     showHome()
                 } else if (tutorial != null) {
@@ -53,35 +56,57 @@ class MainActivity : ComponentActivity() {
     }
     override fun onStart() {
         super.onStart()
+        TrackerState.settingsStarted()
+    }
+    override fun onResume() {
+        super.onResume()
+        TrackerState.interactionAllowed = false
+        TrackerState.cancelActions?.invoke()
         TrackerState.listener = {
             if (tutorial != null) {
                 if (!TrackerState.running) showHome()
-                else tutorial?.onGaze(if (TrackerState.features != null && TrackerState.model != null) TrackerState.gaze else null)
+                else tutorial?.onGaze(TrackerState.gaze)
             } else if (calibration != null && !TrackerState.running) {
-                calibration = null; showHome()
-            } else if (calibration != null) calibration?.onFrame(TrackerState.features)
+                calibration?.close()
+                calibration = null
+                TrackerState.cancelCalibration()
+                showHome()
+            } else if (calibration != null) calibration?.onFrame(TrackerState.sample)
             else if (::status.isInitialized) {
                 status.text = TrackerState.status
                 updateHomeButtons()
             }
         }
+        if (calibration == null && tutorial == null) {
+            status.text = TrackerState.status
+            updateHomeButtons()
+        }
     }
     override fun onPause() {
+        TrackerState.listener = null
         super.onPause()
         if (tutorial != null) showHome()
         if (calibration != null) {
+            calibration?.close()
             calibration = null
-            TrackerState.model = null
+            TrackerState.cancelCalibration()
             TrackerState.status = "보정이 중단되었습니다. 다시 9점 보정을 시작하세요."
             showHome()
         }
     }
-    override fun onStop() { TrackerState.listener = null; super.onStop() }
-    override fun onDestroy() { tutorial?.close(); handler.removeCallbacksAndMessages(null); super.onDestroy() }
+    override fun onStop() { TrackerState.settingsStopped(); super.onStop() }
+    override fun onDestroy() {
+        calibration?.close()
+        tutorial?.close()
+        handler.removeCallbacksAndMessages(null)
+        super.onDestroy()
+    }
 
     private fun showHome() {
         tutorial?.close()
         tutorial = null
+        TrackerState.cancelActions?.invoke()
+        TrackerState.clearCoordinates()
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val density = resources.displayMetrics.density
         val screenWidthDp = resources.displayMetrics.widthPixels / density
@@ -193,12 +218,12 @@ class MainActivity : ComponentActivity() {
         }
         addStep("1", "카메라 시작", "카메라 및 오버레이 권한을 허용해 주세요.", 2, "카메라 시작") { startTracking() }
         addStep("2", "시선 보정", "기기를 움직이지 말고 얼굴을 카메라에서 약\n30~50cm 떨어진 위치에 맞춰 주세요.", 26, "보정 시작") {
-            if (!TrackerState.running || TrackerState.features == null) {
+            if (!TrackerState.running || !TrackerState.hasFreshFeatures(SystemClock.uptimeMillis())) {
                 status.text = "카메라를 먼저 시작하고 ‘눈 검출됨’ 상태를 기다려 주세요."
             } else {
-                TrackerState.model = null
+                val session = TrackerState.beginCalibration()
                 window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-                calibration = CalibrationView()
+                calibration = CalibrationView(session)
                 setContentView(calibration)
             }
         }
@@ -213,6 +238,17 @@ class MainActivity : ComponentActivity() {
         root.addView(stopButton, FrameLayout.LayoutParams(dp(186), dp(46), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply {
             bottomMargin = dp(72)
         })
+        root.addView(TextView(this).apply {
+            text = "설정 · 개발자 기능"
+            textSize = sp(14f)
+            setTextColor(blue)
+            gravity = Gravity.CENTER
+            style(this, 500)
+            setOnClickListener { startActivity(Intent(this@MainActivity, DeveloperSettingsActivity::class.java)) }
+            isFocusable = true
+        }, FrameLayout.LayoutParams(dp(186), dp(48), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply {
+            bottomMargin = dp(16)
+        })
         setContentView(root)
         updateHomeButtons()
 
@@ -221,7 +257,7 @@ class MainActivity : ComponentActivity() {
     private fun updateHomeButtons() {
         if (!::cameraButton.isInitialized || !::calibrationButton.isInitialized || !::stopButton.isInitialized) return
         cameraButton.isEnabled = !TrackerState.running
-        calibrationButton.isEnabled = TrackerState.running && TrackerState.features != null
+        calibrationButton.isEnabled = TrackerState.running && TrackerState.hasFreshFeatures(SystemClock.uptimeMillis())
         stopButton.isEnabled = TrackerState.running
         val disabled = Color.rgb(153, 158, 165)
         listOf(cameraButton, calibrationButton, stopButton).forEach { button ->
@@ -252,7 +288,7 @@ class MainActivity : ComponentActivity() {
         } catch (e: Exception) { status.text = "시작 실패: ${e.message}" }
     }
 
-    private inner class CalibrationView : View(this@MainActivity) {
+    private inner class CalibrationView(private val session: Long) : View(this@MainActivity) {
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         private val targets = listOf(.5 to .5, .15 to .15, .5 to .15, .85 to .15,
             .85 to .5, .85 to .85, .5 to .85, .15 to .85, .15 to .5)
@@ -262,10 +298,12 @@ class MainActivity : ComponentActivity() {
         private var blinkBreakUntil = 0L
         private val samples = mutableListOf<EyeFeatures>()
         private val anchors = mutableListOf<Anchor>()
+        private var lastSampleAt = 0L
+        private var closed = false
         private var hint = "머리는 고정하고 파란 점을 바라보세요"
         private val tick = object : Runnable {
             override fun run() {
-                if (calibration !== this@CalibrationView) return
+                if (closed || calibration !== this@CalibrationView) return
                 val now = SystemClock.uptimeMillis()
                 if (!isTakingBlinkBreak(now) && now - since > 9000) {
                     finish(null, "눈 표본이 부족합니다. 조명·거리·안경 반사를 확인하고 다시 보정하세요.")
@@ -275,7 +313,14 @@ class MainActivity : ComponentActivity() {
             }
         }
         init { setBackgroundColor(Color.rgb(15, 23, 42)); post(tick) }
-        override fun onDetachedFromWindow() { removeCallbacks(tick); super.onDetachedFromWindow() }
+        fun close() {
+            closed = true
+            removeCallbacks(tick)
+            samples.clear()
+            anchors.clear()
+            blinkBreakUntil = 0L
+        }
+        override fun onDetachedFromWindow() { close(); super.onDetachedFromWindow() }
         private fun isTakingBlinkBreak(now: Long): Boolean {
             if (blinkBreakUntil == 0L) return false
             if (now < blinkBreakUntil) return true
@@ -285,12 +330,15 @@ class MainActivity : ComponentActivity() {
             hint = "${index + 1} / 9 · 파란 점을 계속 바라보세요"
             return false
         }
-        fun onFrame(f: EyeFeatures?) {
-            if (index >= targets.size || width == 0 || height == 0) return
+        fun onFrame(sample: GazeSample?) {
+            if (closed || index >= targets.size || width == 0 || height == 0) return
             val now = SystemClock.uptimeMillis()
             if (isTakingBlinkBreak(now)) return
             val elapsed = now - since
+            // Keep collecting open-eye features even when the old model rejects this pose.
+            val f = sample?.calibrationFeatures(now, lastSampleAt)
             if (f == null) { hint = "눈 검출 대기 · 눈을 뜨고 얼굴을 카메라로 향해 주세요"; return }
+            lastSampleAt = sample.timestampMs
             hint = "${index + 1} / 9 · 파란 점을 계속 바라보세요"
             if (elapsed < 1000) return
             samples += f
@@ -304,9 +352,10 @@ class MainActivity : ComponentActivity() {
                 }
                 val xy = targets[index]
                 val location = IntArray(2); getLocationOnScreen(location)
-                val bounds = if (Build.VERSION.SDK_INT >= 30) windowManager.maximumWindowMetrics.bounds else Rect(0, 0, width, height)
-                anchors += Anchor(eye, (location[0] + width * xy.first) / bounds.width(),
-                    (location[1] + height * xy.second) / bounds.height())
+                val bounds = DisplaySpace.bounds(this@MainActivity)
+                val point = DisplayCoordinates(bounds.width(), bounds.height())
+                    .normalize(location[0] + width * xy.first, location[1] + height * xy.second)
+                anchors += Anchor(eye, point.first, point.second)
                 index++; samples.clear(); since = SystemClock.uptimeMillis()
                 if (index == 4) blinkBreakUntil = since + blinkBreakDurationMs
                 if (index == targets.size) {
@@ -318,11 +367,17 @@ class MainActivity : ComponentActivity() {
             invalidate()
         }
         private fun finish(model: GazeModel?, message: String) {
-            TrackerState.model = model; TrackerState.status = message
+            val saved = runCatching {
+                TrackerState.finishCalibration(session, model) {
+                    ModelStore.saveCalibration(this@MainActivity, anchors)
+                }
+            }
+            TrackerState.status = saved.exceptionOrNull()?.let { "보정 저장 실패: ${it.message}" } ?: message
             // Match the exact normalization dimensions used for the calibration anchors above.
-            val bounds = if (Build.VERSION.SDK_INT >= 30) windowManager.maximumWindowMetrics.bounds else Rect(0, 0, width, height)
+            val bounds = DisplaySpace.bounds(this@MainActivity)
+            close()
             calibration = null
-            if (model != null && TrackerState.running) {
+            if (saved.getOrDefault(false) && TrackerState.running) {
                 tutorial = PostCalibrationTutorialView(this@MainActivity, bounds.width(), bounds.height()) {
                     window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 }

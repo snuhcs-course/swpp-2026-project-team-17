@@ -41,9 +41,8 @@ internal class TutorialDwell {
 internal data class TutorialButtonBounds(val left: Int, val top: Int, val width: Int, val height: Int) {
     fun contains(gaze: ScreenGaze, displayWidth: Int, displayHeight: Int): Boolean {
         if (displayWidth <= 0 || displayHeight <= 0 || width <= 0 || height <= 0 ||
-            !gaze.x.isFinite() || !gaze.y.isFinite() || gaze.x !in 0.0..1.0 || gaze.y !in 0.0..1.0) return false
-        val x = gaze.x * displayWidth - left
-        val y = gaze.y * displayHeight - top
+            !gaze.valid || gaze.x !in 0.0..1.0 || gaze.y !in 0.0..1.0) return false
+        val (x, y) = DisplayCoordinates(displayWidth, displayHeight).inView(gaze, left, top)
         if (x < 0 || x >= width || y < 0 || y >= height) return false
         val radius = minOf(width, height) / 2.0
         val dx = x - x.coerceIn(radius, width - radius)
