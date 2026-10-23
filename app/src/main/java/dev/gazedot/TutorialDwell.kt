@@ -4,17 +4,19 @@ package dev.gazedot
 internal class TutorialDwell {
     private var startedAt: Long? = null
     private var lastSampleAt: Long? = null
+    private var lastReceivedAt: Long? = null
     var progress = 0f
         private set
 
     fun reset() {
         startedAt = null
         lastSampleAt = null
+        lastReceivedAt = null
         progress = 0f
     }
 
     fun expire(now: Long) {
-        if (lastSampleAt?.let { now - it > MAX_SAMPLE_GAP_MS } == true) reset()
+        if (lastReceivedAt?.let { now - it > MAX_SAMPLE_GAP_MS } == true) reset()
     }
 
     fun update(inside: Boolean, sampleAt: Long, now: Long): Boolean {
@@ -23,10 +25,13 @@ internal class TutorialDwell {
             reset()
             return false
         }
-        expire(sampleAt)
-        if (startedAt == null) startedAt = sampleAt
+        expire(now)
+        if (lastSampleAt?.let { sampleAt - it > MAX_SAMPLE_GAP_MS } == true) reset()
+        // Validate capture age separately from the time spent receiving valid gaze results.
+        if (startedAt == null) startedAt = now
         lastSampleAt = sampleAt
-        progress = ((sampleAt - startedAt!!) / DURATION_MS.toFloat()).coerceIn(0f, 1f)
+        lastReceivedAt = now
+        progress = ((now - startedAt!!) / DURATION_MS.toFloat()).coerceIn(0f, 1f)
         return progress >= 1f
     }
 
@@ -39,11 +44,12 @@ internal class TutorialDwell {
 
 /** Bounds are actual screen pixels, including the view's window/inset offset. */
 internal data class TutorialButtonBounds(val left: Int, val top: Int, val width: Int, val height: Int) {
-    fun contains(gaze: ScreenGaze, displayWidth: Int, displayHeight: Int): Boolean {
+    fun contains(gaze: ScreenGaze, displayWidth: Int, displayHeight: Int, rounded: Boolean = true): Boolean {
         if (displayWidth <= 0 || displayHeight <= 0 || width <= 0 || height <= 0 ||
             !gaze.valid || gaze.x !in 0.0..1.0 || gaze.y !in 0.0..1.0) return false
         val (x, y) = DisplayCoordinates(displayWidth, displayHeight).inView(gaze, left, top)
         if (x < 0 || x >= width || y < 0 || y >= height) return false
+        if (!rounded) return true
         val radius = minOf(width, height) / 2.0
         val dx = x - x.coerceIn(radius, width - radius)
         val dy = y - y.coerceIn(radius, height - radius)

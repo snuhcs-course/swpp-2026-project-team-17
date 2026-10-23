@@ -24,6 +24,36 @@ class ControlAccessibilityService : AccessibilityService() {
             TrackerState.cancelPendingClick?.invoke()
         }
     }
+    /** Local identity only: labels/text are neither read nor sent to the cloud. */
+    @Suppress("DEPRECATION")
+    fun dwellTargetKey(point: Pair<Double, Double>): String? {
+        if (!allowed()) return null
+        val root = rootInActiveWindow ?: return null
+        val bounds = DisplaySpace.bounds(this)
+        val x = (point.first * bounds.width()).toInt()
+        val y = (point.second * bounds.height()).toInt()
+        var bestArea = Long.MAX_VALUE
+        var key: String? = null
+        var visits = 0
+        val screen = "${root.packageName}|${root.windowId}"
+        fun visit(node: AccessibilityNodeInfo, depth: Int) {
+            if (++visits > 350 || depth > 20 || !node.isVisibleToUser) return
+            val rect = android.graphics.Rect()
+            node.getBoundsInScreen(rect)
+            if (node.isEnabled && (node.isClickable || node.isEditable) && rect.contains(x, y)) {
+                val area = rect.width().toLong() * rect.height()
+                if (area < bestArea) {
+                    bestArea = area
+                    key = "$screen|${node.viewIdResourceName}|${node.className}|$rect"
+                }
+            }
+            for (i in 0 until node.childCount) {
+                val child = node.getChild(i) ?: continue
+                try { visit(child, depth + 1) } finally { child.recycle() }
+            }
+        }
+        return try { visit(root, 0); key } finally { root.recycle() }
+    }
     /** Labels/bounds only; never export password nodes or editable field contents. */
     @Suppress("DEPRECATION")
     fun cloudSnapshot(): UiSnapshot? {
@@ -70,10 +100,13 @@ class ControlAccessibilityService : AccessibilityService() {
         if(!allowed() || busy) return false
         return gesture(Path().apply { moveTo(x,y) },80)
     }
-    fun scroll(down: Boolean, width: Int, height: Int): Boolean {
+    fun scroll(direction: ScrollDirection, width: Int, height: Int): Boolean {
         if(!allowed() || busy) return false
-        val from=if(down) .72f else .32f; val to=if(down) .32f else .72f
-        return gesture(Path().apply { moveTo(width*.5f,height*from); lineTo(width*.5f,height*to) },380)
+        val (from, to) = ScrollSettings.swipe(direction, width, height)
+        return gesture(Path().apply {
+            moveTo(from.first.toFloat(), from.second.toFloat())
+            lineTo(to.first.toFloat(), to.second.toFloat())
+        }, ScrollSettings.DURATION_MS)
     }
     private fun gesture(path: Path, duration: Long): Boolean {
         val description=GestureDescription.Builder().addStroke(GestureDescription.StrokeDescription(path,0,duration)).build()

@@ -58,24 +58,16 @@ class CloudProtocolTest {
         assertNull(CloudPolicy.choose(CloudChoice("far",.99,""),screen,.5 to .5))
         assertNull(CloudPolicy.choose(CloudChoice("near",.1,""),screen,.5 to .5))
     }
-    @Test fun clickUsesFrozenSuggestionButScrollUsesOriginalGaze() {
+    @Test fun dwellClicksSuggestionButScrollUsesOriginalGaze() {
         val engine=InteractionEngine()
-        var actions: List<EyeAction> = emptyList()
-        for(t in 0L..300L step 50L) engine.update(t,EyeState.OPEN,.5 to .5,.6 to .5)
-        for(t in 350L..1400L step 50L) {
-            val next=engine.update(t,EyeState.CLOSED,null)
-            if(next.isNotEmpty()) actions=next
-        }
-        assertEquals(EyeAction.Arm(.6 to .5),actions.single())
-        for(t in 1450L..1700L step 50L) engine.update(t,EyeState.OPEN,.1 to .1,.2 to .2)
-        for(t in 1750L..2800L step 50L) {
-            val next=engine.update(t,EyeState.CLOSED,null)
-            if(next.isNotEmpty()) actions=next
-        }
-        assertEquals(EyeAction.Click(.6 to .5),actions.single())
+        val actions=(0L..1000L step 50L).flatMap { engine.update(it,EyeState.OPEN,.5 to .5,.6 to .5) }
+        assertEquals(listOf(EyeAction.Click(.6 to .5)),actions)
         engine.reset()
-        val scroll=mutableListOf<EyeAction>()
-        for(t in 3000L..4100L step 50L) scroll+=engine.update(t,EyeState.OPEN,.5 to 1.2,.5 to .5)
-        assertTrue(scroll.any { it is EyeAction.Scroll && it.down })
+        engine.update(3000,EyeState.OPEN,.5 to .9)
+        for(t in 3050L..3150L step 50) engine.update(t,EyeState.RIGHT_WINK,null)
+        engine.update(3200,EyeState.OPEN,.5 to .9)
+        val scroll=(3250L..4300L step 50L).flatMap { engine.update(it,EyeState.OPEN,.5 to .9,.5 to .1) }
+        assertTrue(scroll.any { it is EyeAction.Scroll && it.direction == ScrollDirection.DOWN })
+        assertFalse(scroll.any { it is EyeAction.Click })
     }
 }

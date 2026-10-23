@@ -26,7 +26,7 @@ class ScreenGazeIntegrationTest {
         }
     }
 
-    @Test fun bridgeDoesNotPredictAgainOrUseRawArmedOrCloudCandidateCoordinates() {
+    @Test fun bridgeDoesNotPredictAgainOrUseRawOrCloudCandidateCoordinates() {
         val pipeline = GazePipeline()
         var output = .2 to .3
         val changing = object : GazePredictor { override fun predict(f: EyeFeatures) = output }
@@ -34,7 +34,7 @@ class ScreenGazeIntegrationTest {
         output = .8 to .7
         val sample = pipeline.process(1_050, 1_050, open, changing, false, .9 to .9)
         assertNotEquals(sample.rawPoint, sample.point)
-        val gaze = sample.copy(armedPoint = .1 to .1).toScreenGaze()!!
+        val gaze = sample.copy(dwellProgress = .8f).toScreenGaze()!!
         assertEquals(sample.point, gaze.x to gaze.y)
         assertNotEquals(.9 to .9, gaze.x to gaze.y)
     }

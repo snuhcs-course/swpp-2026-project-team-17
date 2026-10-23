@@ -36,7 +36,6 @@ class TrackingService : LifecycleService() {
     private val cloud = CloudAssistant {
         DisplaySpace.bounds(this).let { it.width() to it.height() }
     }
-    private var armedScreen: String? = null
     private val worker = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
     @Volatile private var closing = false
@@ -109,10 +108,14 @@ class TrackingService : LifecycleService() {
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA or (if (TrackerState.microphoneReady) ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0))
             else startForeground(1, notification)
             voice = VoiceInput(this)
-            TrackerState.cancelPendingClick = { pipeline.cancelInteraction(); armedScreen=null }
+            TrackerState.cancelPendingClick = { pipeline.cancelPendingClick() }
             TrackerState.cancelActions = {
-                resetTracking()
-                TrackerState.actionStatus = "화면 변경 · 클릭 대기 취소"
+                pipeline.cancelInteraction()
+                cloud.invalidate()
+                TrackerState.localDwellProgress = 0f
+                TrackerState.localScrollMode = false
+                if (::voice.isInitialized) voice.cancel()
+                TrackerState.actionStatus = ""
             }
             TrackerState.configKey = ModelStore.config(this)
             TrackerState.model = ModelStore.load(this)
@@ -206,12 +209,13 @@ class TrackingService : LifecycleService() {
                 TrackerState.frameAt = now
                 TrackerState.eyeState = observation.state
                 val model = TrackerState.model ?: BasicGazePredictor
-                if (model !== lastModel) { cloud.invalidate(); armedScreen = null; lastModel = model }
+                if (model !== lastModel) { cloud.invalidate(); lastModel = model }
                 val candidate = if (TrackerState.interactionAllowed && !TrackerState.collecting)
                     cloud.target(observation.features, now) else null
                 val enabled = TrackerState.controls && TrackerState.interactionAllowed && !TrackerState.collecting &&
                     !TrackerState.speaking && ControlAccessibilityService.instance != null
-                val sample = pipeline.process(now, at, observation, model, enabled, candidate?.center)
+                val sample = pipeline.process(now, at, observation, model, enabled, candidate?.center,
+                    ControlAccessibilityService.instance?.let { service -> { p -> service.dwellTargetKey(p) } })
                 val features = sample.features
                 if (sample.quality in listOf(TrackingQuality.LOST, TrackingQuality.OUT_OF_RANGE, TrackingQuality.STALE)) cloud.invalidate()
                 sample.actions.forEach(::perform)
@@ -228,14 +232,19 @@ class TrackingService : LifecycleService() {
                 val label = when {
                     TrackerState.collecting -> ""
                     TrackerState.speaking -> TrackerState.actionStatus
-                    pipeline.armed != null -> "클릭 대기 · 다시 1초 감으면 확정 / 6초 후 취소"
-                    TrackerState.controls -> TrackerState.actionStatus
+                    enabled && sample.scrollMode -> "스크롤 모드 · 위/아래/좌/우 1/3 응시 · 윙크하면 종료"
+                    enabled -> TrackerState.actionStatus
                     CloudSession.enabled -> "GPT-5.4 실험 · ${CloudSession.calls}/20 호출"
                     else -> ""
                 }
-                val visible = if (TrackerState.collecting) null else sample.armedPoint ?: sample.point
-                overlay?.show(visible, pipeline.armed != null, label, if(TrackerState.collecting) null else candidate?.center)
+                val visible = if (TrackerState.collecting) null else sample.point
                 TrackerState.publishSample(sample, message + (features?.distanceCm?.takeIf { it.isFinite() }?.let { " · 거리 추정 %.0fcm".format(it) } ?: " · 거리 추정 불가"))
+                // UI listeners may select Stop or start calibration while handling this frame.
+                if (!closing && TrackerState.running) overlay?.show(
+                    if (TrackerState.collecting) null else visible,
+                    if (enabled) sample.dwellProgress else TrackerState.localDwellProgress,
+                    label, if(TrackerState.collecting) null else candidate?.center,
+                    scrollMode = if (enabled) sample.scrollMode else TrackerState.localScrollMode)
             }
         } catch (e: Exception) {
             main.post { if (!closing) fail("영상 처리 실패: ${e.message}") }
@@ -250,31 +259,30 @@ class TrackingService : LifecycleService() {
         val service = ControlAccessibilityService.instance ?: return
         val bounds = DisplaySpace.bounds(this)
         when(action) {
-            is EyeAction.Arm -> {
-                armedScreen=service.cloudSnapshot()?.fingerprint
-                TrackerState.actionStatus = "클릭 대기"
-            }
             is EyeAction.Click -> {
-                if(armedScreen!=null && service.cloudSnapshot()?.fingerprint!=armedScreen) {
-                    armedScreen=null; TrackerState.actionStatus="화면 후보 변경 · 클릭 취소"; return
-                }
-                armedScreen=null
                 val ok = service.tap((action.point.first * bounds.width()).toFloat(), (action.point.second * bounds.height()).toFloat())
                 TrackerState.actionStatus = if(ok) "클릭 요청" else "클릭을 실행하지 못했습니다"
             }
             is EyeAction.Scroll -> {
-                val ok = service.scroll(action.down, bounds.width(), bounds.height())
-                TrackerState.actionStatus = if(ok) (if(action.down) "아래로 스크롤" else "위로 스크롤") else "스크롤을 실행하지 못했습니다"
+                val ok = service.scroll(action.direction, bounds.width(), bounds.height())
+                TrackerState.actionStatus = if(ok) when (action.direction) {
+                    ScrollDirection.UP -> "위로 스크롤"
+                    ScrollDirection.DOWN -> "아래로 스크롤"
+                    ScrollDirection.LEFT -> "왼쪽으로 스크롤"
+                    ScrollDirection.RIGHT -> "오른쪽으로 스크롤"
+                } else "스크롤을 실행하지 못했습니다"
+            }
+            is EyeAction.ScrollMode -> {
+                TrackerState.actionStatus = if (action.enabled) "스크롤 모드 켜짐" else "스크롤 모드 꺼짐"
             }
             EyeAction.Dictate -> voice.start()
-            EyeAction.Cancel -> { armedScreen = null; TrackerState.actionStatus = "클릭 대기 취소" }
+            EyeAction.Cancel -> { TrackerState.actionStatus = "" }
         }
     }
 
     private fun resetTracking() {
         trackingEpoch++
         pipeline.reset()
-        armedScreen = null
         cloud.invalidate()
         TrackerState.clearCoordinates()
         if (::voice.isInitialized) voice.cancel()

@@ -20,11 +20,7 @@ object LandmarkFeatures {
         }
         val r=eye(33,133,468,159,145) ?: return lost
         val l=eye(362,263,473,386,374) ?: return lost
-        val state=when {
-            r[2]<.11 && l[2]<.11 -> EyeState.CLOSED
-            r[2]>.15 && l[2]>.15 -> EyeState.OPEN
-            else -> EyeState.UNCERTAIN
-        }
+        val state = eyeState(l[2], r[2])
         val a=pt(33); val b=pt(263); val n=pt(1)
         val span=hypot(b.first-a.first,b.second-a.second)
         if (span < 24) return lost
@@ -38,5 +34,14 @@ object LandmarkFeatures {
             (n.first-(a.first+b.first)/2)/span,(n.second-(a.second+b.second)/2)/span,
             atan2(b.second-a.second,b.first-a.first), distance ?: Double.NaN, pose?.first ?: Double.NaN, pose?.second ?: Double.NaN)
         return EyeObservation(state,f,l[2],r[2])
+    }
+
+    fun eyeState(leftOpen: Double, rightOpen: Double): EyeState = when {
+        !leftOpen.isFinite() || !rightOpen.isFinite() -> EyeState.LOST
+        leftOpen < .11 && rightOpen < .11 -> EyeState.CLOSED
+        leftOpen < .11 && rightOpen > .15 -> EyeState.LEFT_WINK
+        rightOpen < .11 && leftOpen > .15 -> EyeState.RIGHT_WINK
+        leftOpen > .15 && rightOpen > .15 -> EyeState.OPEN
+        else -> EyeState.UNCERTAIN
     }
 }

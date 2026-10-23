@@ -116,7 +116,7 @@ class DeveloperSettingsActivity : ComponentActivity() {
         text("모델: ${TrackerState.modelLabel}", 14f)
         button("학습된 모델 JSON 불러오기") { importModel.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) }
         button("접근성 서비스 설정 열기") { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
-        text("카메라를 시작하면 눈 조작이 자동으로 준비됩니다. 접근성 권한을 허용한 뒤 연습 화면이나 다른 앱에서 사용하세요.\n1초 눈 감기 두 번: 클릭 · 화면 위/아래 보기: 스크롤 · 빠르게 두 번 깜빡임: 받아쓰기", 15f)
+        text("카메라를 시작하면 눈 조작이 자동으로 준비됩니다. 접근성 권한을 허용한 뒤 연습 화면이나 다른 앱에서 사용하세요.\n같은 대상을 1초 응시: 클릭 · 한쪽 눈 윙크: 스크롤 모드 켜기/끄기 · 빠르게 양눈 두 번 깜빡임: 받아쓰기", 15f)
         val options = getSharedPreferences("options", MODE_PRIVATE)
         text("빠른 두 번 깜빡임으로 받아쓰기를 시작합니다. 기기 내 인식을 우선 사용하며, 미지원 기기는 시스템 음성 인식을 사용합니다. 시스템 제공자가 음성을 서버로 전송할 수 있습니다.", 13f)
         button("클릭·스크롤·받아쓰기 연습 화면") { startActivity(Intent(this, PracticeActivity::class.java)) }
@@ -172,8 +172,8 @@ class DeveloperSettingsActivity : ComponentActivity() {
             else exportData.launch("notouch-distance-training-v3.csv")
         }
         text("동작 방법", 20f)
-        text("1초 눈 감기 → 클릭 대기(주황색). 눈을 뜬 뒤 다시 1초 감기 → 고정된 위치 클릭. 6초 동안 확정하지 않으면 취소됩니다.", 15f)
-        text("화면 밖 위·아래를 0.65초 이상 보면 스크롤합니다. 빠른 두 번 깜빡임은 선택된 입력칸에 한 문장 음성 입력을 시작합니다. 클릭 대기·음성 입력 중에는 스크롤하지 않습니다.", 15f)
+        text("같은 버튼이나 위치를 1초 동안 바라보면 한 번 클릭합니다. 진행률은 포인터 둘레에 표시됩니다. 다시 선택하려면 시선을 벗겼다가 돌아오세요.", 15f)
+        text("왼쪽 또는 오른쪽 눈을 한 번 윙크하면 스크롤 모드가 켜집니다. 모드가 켜지면 커서 중앙이 파란색으로 바뀝니다. 위·아래·왼쪽·오른쪽 1/3을 보면 해당 방향으로 천천히 스크롤하고 중앙에서는 멈춥니다. 다시 윙크하면 꺼집니다. 스크롤 모드에서는 클릭하지 않습니다. 모드가 꺼진 상태에서 양눈을 빠르게 두 번 깜빡이면 선택된 입력칸에 한 문장 음성 입력을 시작합니다.", 15f)
         text("모델 파일 없이 기본 홍채 포인터가 작동합니다. 기본 모드는 대략적인 방향 추정입니다. 선택 보정이나 학습 모델로 정확도를 개선할 수 있습니다.", 15f)
         text("기본 모드는 영상 전송 없이 동작합니다. GPT 실험을 켜면 얼굴·눈 사진과 수치 특징, 화면 후보 정보가 선택한 기능에 따라 OpenAI로 전송됩니다. 홍채 무늬 등록·정밀 3D 각도 측정·외장 IR 입력·시선 자판은 아직 미구현입니다.", 14f)
         button("홈으로 돌아가기") { finish() }

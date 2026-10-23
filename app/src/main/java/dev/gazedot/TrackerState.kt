@@ -8,6 +8,8 @@ object TrackerState {
     var controls = false
     var collecting = false
     var interactionAllowed = false
+    var localDwellProgress = 0f
+    var localScrollMode = false
     private var settingsScreens = 0
     fun settingsStarted() {
         settingsScreens++
@@ -33,6 +35,8 @@ object TrackerState {
     fun hasFreshFeatures(now: Long) = features != null && now - frameAt in 0..250
 
     fun clearCoordinates() {
+        localDwellProgress = 0f
+        localScrollMode = false
         frameAt = 0L
         eyeState = EyeState.LOST
         features = null

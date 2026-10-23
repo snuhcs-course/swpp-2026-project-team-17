@@ -90,6 +90,7 @@ class TrackerStateIntegrationTest {
     }
 
     @Test fun deliveryAndShutdownClearAllCoordinatesWithoutChangingSelectedModel() {
+        TrackerState.localScrollMode = true
         val eye = EyeFeatures(0.0, .02, .5, .5, .3)
         val sample = GazePipeline().process(1_000, 1_000,
             EyeObservation(EyeState.OPEN, eye, .2, .2), previous, false)
@@ -102,6 +103,7 @@ class TrackerStateIntegrationTest {
         assertEquals(sample.point, TrackerState.gaze!!.let { it.x to it.y })
         assertEquals(1, delivered)
         TrackerState.clearCoordinates()
+        assertFalse(TrackerState.localScrollMode)
         assertNull(TrackerState.gaze)
         assertNull(TrackerState.sample)
         assertNull(TrackerState.features)

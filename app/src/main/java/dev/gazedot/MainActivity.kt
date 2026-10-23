@@ -20,6 +20,19 @@ class MainActivity : ComponentActivity() {
     private var calibration: CalibrationView? = null
     private var tutorial: PostCalibrationTutorialView? = null
     private val handler = Handler(Looper.getMainLooper())
+    private val homeTargets = mutableListOf<View>()
+    private val homeDwell = TutorialDwell()
+    private var homeTarget: View? = null
+    private var selectedHomeTarget: View? = null
+    private val homeFreshness = object : Runnable {
+        override fun run() {
+            if (calibration == null && tutorial == null) {
+                homeDwell.expire(SystemClock.uptimeMillis())
+                TrackerState.localDwellProgress = homeDwell.progress
+            }
+            handler.postDelayed(this, 50)
+        }
+    }
     private val overlayPermission = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         if (Settings.canDrawOverlays(this)) startTracking()
         else status.text = "다른 앱 위에 표시 권한을 허용한 뒤 다시 시작하세요."
@@ -65,7 +78,7 @@ class MainActivity : ComponentActivity() {
         TrackerState.listener = {
             if (tutorial != null) {
                 if (!TrackerState.running) showHome()
-                else tutorial?.onGaze(TrackerState.gaze)
+                else tutorial?.onFrame(TrackerState.sample, TrackerState.eyeState)
             } else if (calibration != null && !TrackerState.running) {
                 calibration?.close()
                 calibration = null
@@ -75,14 +88,20 @@ class MainActivity : ComponentActivity() {
             else if (::status.isInitialized) {
                 status.text = TrackerState.status
                 updateHomeButtons()
+                onHomeGaze(TrackerState.gaze)
             }
         }
         if (calibration == null && tutorial == null) {
             status.text = TrackerState.status
             updateHomeButtons()
         }
+        handler.removeCallbacks(homeFreshness)
+        handler.post(homeFreshness)
     }
     override fun onPause() {
+        handler.removeCallbacks(homeFreshness)
+        homeDwell.reset()
+        TrackerState.localDwellProgress = 0f
         TrackerState.listener = null
         super.onPause()
         if (tutorial != null) showHome()
@@ -107,6 +126,10 @@ class MainActivity : ComponentActivity() {
         tutorial = null
         TrackerState.cancelActions?.invoke()
         TrackerState.clearCoordinates()
+        homeTargets.clear()
+        homeDwell.reset()
+        homeTarget = null
+        selectedHomeTarget = null
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val density = resources.displayMetrics.density
         val screenWidthDp = resources.displayMetrics.widthPixels / density
@@ -152,6 +175,7 @@ class MainActivity : ComponentActivity() {
             setPadding(dp(16), 0, dp(16), 0)
             style(this, 700)
             setOnClickListener { action() }
+            homeTargets += this
         }
         fun addStep(
             number: String,
@@ -218,14 +242,7 @@ class MainActivity : ComponentActivity() {
         }
         addStep("1", "카메라 시작", "카메라 및 오버레이 권한을 허용해 주세요.", 2, "카메라 시작") { startTracking() }
         addStep("2", "시선 보정", "기기를 움직이지 말고 얼굴을 카메라에서 약\n30~50cm 떨어진 위치에 맞춰 주세요.", 26, "보정 시작") {
-            if (!TrackerState.running || !TrackerState.hasFreshFeatures(SystemClock.uptimeMillis())) {
-                status.text = "카메라를 먼저 시작하고 ‘눈 검출됨’ 상태를 기다려 주세요."
-            } else {
-                val session = TrackerState.beginCalibration()
-                window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-                calibration = CalibrationView(session)
-                setContentView(calibration)
-            }
+            startCalibration()
         }
         addStep("3", "시선 테스트", "회색 점이 시선을 잘 따라오는지 확인해 주세요.\n잘 맞지 않는다면 다시 보정해 주세요.", 26)
 
@@ -246,6 +263,7 @@ class MainActivity : ComponentActivity() {
             style(this, 500)
             setOnClickListener { startActivity(Intent(this@MainActivity, DeveloperSettingsActivity::class.java)) }
             isFocusable = true
+            homeTargets += this
         }, FrameLayout.LayoutParams(dp(186), dp(48), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply {
             bottomMargin = dp(16)
         })
@@ -263,6 +281,33 @@ class MainActivity : ComponentActivity() {
         listOf(cameraButton, calibrationButton, stopButton).forEach { button ->
             val drawable = button.background.mutate() as android.graphics.drawable.GradientDrawable
             drawable.setColor(if (button.isEnabled) Color.rgb(6, 108, 236) else disabled)
+        }
+    }
+
+    private fun onHomeGaze(gaze: ScreenGaze?) {
+        val now = SystemClock.uptimeMillis()
+        val valid = TrackerState.running && gaze?.fresh(now) == true
+        val bounds = DisplaySpace.bounds(this)
+        val target = if (!valid) null else homeTargets.firstOrNull { view ->
+            val visible = Rect()
+            val location = IntArray(2)
+            view.getLocationOnScreen(location)
+            view.isShown && view.isEnabled && view.getGlobalVisibleRect(visible) &&
+                visible.contains((gaze!!.x * bounds.width()).toInt(), (gaze.y * bounds.height()).toInt()) &&
+                TutorialButtonBounds(location[0], location[1], view.width, view.height)
+                    .contains(gaze, bounds.width(), bounds.height())
+        }
+        // Invalid input interrupts timing, but cannot release the post-click latch.
+        if (valid && target !== selectedHomeTarget) selectedHomeTarget = null
+        if (target !== homeTarget) { homeDwell.reset(); homeTarget = target }
+        val selected = homeDwell.update(target != null && target !== selectedHomeTarget,
+            gaze?.uptimeMillis ?: 0L, now)
+        TrackerState.localDwellProgress = homeDwell.progress
+        if (selected && target != null) {
+            selectedHomeTarget = target
+            homeDwell.reset()
+            TrackerState.localDwellProgress = 0f
+            target.performClick()
         }
     }
 
@@ -286,6 +331,20 @@ class MainActivity : ComponentActivity() {
             startForegroundService(Intent(this, TrackingService::class.java))
             status.text = "시작 중…"
         } catch (e: Exception) { status.text = "시작 실패: ${e.message}" }
+    }
+
+    private fun startCalibration() {
+        if (!TrackerState.running || !TrackerState.hasFreshFeatures(SystemClock.uptimeMillis())) {
+            if (::status.isInitialized) status.text = "카메라를 먼저 시작하고 눈 검출을 기다려 주세요."
+            return
+        }
+        tutorial?.close()
+        tutorial = null
+        homeDwell.reset()
+        val session = TrackerState.beginCalibration()
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        calibration = CalibrationView(session)
+        setContentView(calibration)
     }
 
     private inner class CalibrationView(private val session: Long) : View(this@MainActivity) {
@@ -378,9 +437,9 @@ class MainActivity : ComponentActivity() {
             close()
             calibration = null
             if (saved.getOrDefault(false) && TrackerState.running) {
-                tutorial = PostCalibrationTutorialView(this@MainActivity, bounds.width(), bounds.height()) {
-                    window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-                }
+                tutorial = PostCalibrationTutorialView(this@MainActivity, bounds.width(), bounds.height(),
+                    onRecalibrate = { startCalibration() },
+                    onFinished = { window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) })
                 setContentView(tutorial)
             } else showHome()
         }

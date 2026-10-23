@@ -24,7 +24,7 @@ class CloudSettingsActivity : ComponentActivity() {
         fun text(s: String)=TextView(this).apply { text=s; textSize=16f; setPadding(0,12,0,12); root.addView(this) }
         fun button(s: String, action: ()->Unit) { root.addView(Button(this).apply { text=s; setOnClickListener { action() } }) }
         text("GPT-5.4 실험 · 두 기능 독립 비교")
-        text("1번: 전면 카메라 얼굴·눈 사진과 머리/홍채 수치로 실험용 시선 샘플을 요청합니다. 이 결과는 빨간 포인터를 이동시키지 않습니다.\n2번: 시선 좌표와 현재 앱의 버튼 이름·위치로 클릭 후보를 추천합니다. 파란 원이 후보이며 긴 깜빡임으로 고정·확정합니다.")
+        text("1번: 전면 카메라 얼굴·눈 사진과 머리/홍채 수치로 실험용 시선 샘플을 요청합니다. 이 결과는 빨간 포인터를 이동시키지 않습니다.\n2번: 시선 좌표와 현재 앱의 버튼 이름·위치로 클릭 후보를 추천합니다. 파란 원이 후보이며 같은 대상을 1초 동안 바라보면 선택합니다.")
         text("활성화하면 해당 정보가 NoTouch 서버를 거쳐 OpenAI API로 전송되고 별도 API 요금이 발생합니다. 입력칸 내용·비밀번호·화면 캡처는 보내지 않습니다. OpenAI 키는 서버에만 보관합니다. 여기는 별도의 NoTouch 접속 토큰을 입력하며 추적 종료 시 메모리에서 제거합니다.")
         val address=EditText(this).apply {
             hint="서버 주소 https://your-project.vercel.app"; setSingleLine()

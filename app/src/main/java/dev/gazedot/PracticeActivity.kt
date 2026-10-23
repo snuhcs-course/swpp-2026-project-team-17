@@ -10,11 +10,11 @@ class PracticeActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val d=resources.displayMetrics.density
         val root=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setPadding((24*d).toInt(),(100*d).toInt(),(24*d).toInt(),(48*d).toInt()) }
-        val title=TextView(this).apply { text="눈 조작 연습\n앱에서 조작을 켠 뒤 테스트하세요"; textSize=23f }; root.addView(title)
+        val title=TextView(this).apply { text="눈 조작 연습\n1초 응시: 클릭 · 윙크: 스크롤 모드"; textSize=23f }; root.addView(title)
         var count=0
         root.addView(Button(this).apply { text="클릭 횟수: 0"; setOnClickListener { text="클릭 횟수: ${++count}" } })
         root.addView(EditText(this).apply { hint="이 입력칸을 선택하고 빠르게 두 번 깜빡인 뒤 말하세요"; minLines=3; setSingleLine(false) })
-        repeat(24) { n -> root.addView(TextView(this).apply { text="스크롤 연습 ${n+1}\n화면 밖 위·아래를 바라보세요"; textSize=18f; setPadding(0,35,0,35) }) }
+        repeat(24) { n -> root.addView(TextView(this).apply { text="스크롤 연습 ${n+1}\n윙크로 모드를 켠 뒤 위/아래 1/3을 바라보세요"; textSize=18f; setPadding(0,35,0,35) }) }
         setContentView(ScrollView(this).apply { addView(root) })
     }
     override fun onResume() { super.onResume(); TrackerState.interactionAllowed=true }

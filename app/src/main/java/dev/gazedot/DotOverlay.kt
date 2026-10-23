@@ -11,7 +11,8 @@ class DotOverlay(context: Context) {
     private val dot = object : View(context) {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         var position: Pair<Double, Double>? = null
-        var armed = false
+        var progress = 0f
+        var scrollMode = false
         var label = ""
         var suggestion: Pair<Double, Double>? = null
         override fun onDraw(canvas: Canvas) {
@@ -34,11 +35,12 @@ class DotOverlay(context: Context) {
             val y = (p.second.coerceIn(.015,.985) * displayBounds.height() - viewOrigin[1]).toFloat()
             paint.color = Color.WHITE
             canvas.drawCircle(x, y, 10 * resources.displayMetrics.density, paint)
-            paint.color = if(armed) Color.rgb(255,170,0) else Color.RED
+            paint.color = if (scrollMode) Color.rgb(6, 108, 236) else Color.RED
             canvas.drawCircle(x, y, 7 * resources.displayMetrics.density, paint)
-            if(armed) {
-                paint.style=Paint.Style.STROKE; paint.strokeWidth=3*d
-                canvas.drawCircle(x,y,18*d,paint); paint.style=Paint.Style.FILL
+            if(progress > 0f) {
+                paint.style=Paint.Style.STROKE; paint.strokeWidth=3*d; paint.color=Color.rgb(6,108,236)
+                canvas.drawArc(x-18*d,y-18*d,x+18*d,y+18*d,-90f,360f*progress,false,paint)
+                paint.style=Paint.Style.FILL
             }
         }
     }
@@ -61,8 +63,10 @@ class DotOverlay(context: Context) {
         }
         manager.addView(dot, params)
     }
-    fun show(position: Pair<Double, Double>?, armed: Boolean=false, label: String="", suggestion: Pair<Double,Double>?=null) {
-        dot.position = position; dot.armed=armed; dot.label=label; dot.suggestion=suggestion; dot.invalidate()
+    fun show(position: Pair<Double, Double>?, progress: Float=0f, label: String="", suggestion: Pair<Double,Double>?=null,
+        scrollMode: Boolean = false) {
+        dot.position = position; dot.progress=progress.coerceIn(0f,1f); dot.label=label
+        dot.suggestion=suggestion; dot.scrollMode=scrollMode; dot.invalidate()
     }
     fun close() { if (dot.isAttachedToWindow) manager.removeView(dot) }
 }
