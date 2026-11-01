@@ -1,0 +1,152 @@
+{
+  "schema_version": 2,
+  "record_type": "notouch_gaze_evaluation_session",
+  "session_id": "eval-synthetic-0001",
+  "participant_id": "SYNTHETIC",
+  "session_label": "S1",
+  "mode": "blind_measurement",
+  "final_state": "incomplete",
+  "end_reason": "back",
+  "start_wall_time_utc": "2026-11-01T00:00:00Z",
+  "end_wall_time_utc": "2026-11-01T00:00:00Z",
+  "start_uptime_ms": 1000000,
+  "end_uptime_ms": 1007600,
+  "planned_end_uptime_ms": 1080000,
+  "protocol": {
+    "id": "notouch-gaze-eval-iter3",
+    "version": "1.0.0",
+    "sha256": "d4b670a17a813dd3fc5b3878aa3ed8440da81eff0a7fe77b86daeb94a22aaed3",
+    "sha256_basis": "docs/evaluation/iteration3/protocol.json bytes with CRLF converted to LF",
+    "grid_norm": [0.2, 0.4, 0.6, 0.8],
+    "presentation_ms": 2500,
+    "settling_ms": 1000,
+    "measurement_ms": 1500,
+    "presentations_planned": 32,
+    "presentations_completed": 3,
+    "case_ids": ["pass1-r0c0", "pass1-r0c1", "pass1-r0c2", "pass1-r0c3", "pass1-r1c3", "pass1-r1c2", "pass1-r1c1", "pass1-r1c0", "pass1-r2c0", "pass1-r2c1", "pass1-r2c2", "pass1-r2c3", "pass1-r3c3", "pass1-r3c2", "pass1-r3c1", "pass1-r3c0", "pass2-r3c0", "pass2-r3c1", "pass2-r3c2", "pass2-r3c3", "pass2-r2c3", "pass2-r2c2", "pass2-r2c1", "pass2-r2c0", "pass2-r1c0", "pass2-r1c1", "pass2-r1c2", "pass2-r1c3", "pass2-r0c3", "pass2-r0c2", "pass2-r0c1", "pass2-r0c0"]
+  },
+  "build": {
+    "git_commit": "synthetic-fixture",
+    "git_dirty_at_build": "false",
+    "git_base_main": "synthetic-fixture",
+    "build_type": "synthetic"
+  },
+  "app": {
+    "application_id": "dev.gazedot",
+    "version_name": "synthetic",
+    "version_code": 0
+  },
+  "libraries": {
+    "mediapipe_tasks_vision": "synthetic",
+    "camerax": "synthetic",
+    "face_landmarker_task_sha256": "synthetic"
+  },
+  "device": {
+    "manufacturer": "synthetic",
+    "model": "fixture",
+    "api_level": 35,
+    "android_release": "15"
+  },
+  "display": {
+    "basis": "DisplaySpace.bounds",
+    "width_px": 1080,
+    "height_px": 2400,
+    "rotation": 0,
+    "density": 2.75,
+    "evaluation_view": {
+      "left_px": 0,
+      "top_px": 0,
+      "width_px": 1080,
+      "height_px": 2400
+    }
+  },
+  "predictor": {
+    "kind": "GazeModel",
+    "source": "personal_9_point_calibration",
+    "label": "synthetic",
+    "config_key": "synthetic|fixture|1080x2400|0|features-v2",
+    "calibration_serial": 1,
+    "calibration_completed_uptime_ms": 995000,
+    "calibration_age_ms_at_start": 5000,
+    "evaluation_runs_on_this_calibration_before": 0,
+    "verified_against_saved_calibration": true,
+    "saved_calibration_sha256": "8bf132384dd3d0a169f6774f333f132a3a1c16f902baad03b04c68a7d3c8886d",
+    "fit_error": 0.0013426750446270488,
+    "snapshot_file": "model_snapshot.json"
+  },
+  "conditions": {
+    "viewing_distance_cm": 40.0,
+    "lighting": "synthetic",
+    "glasses": "none",
+    "notes": "synthetic fixture",
+    "declared": "synthetic"
+  },
+  "pipeline": {
+    "frame_interval_min_ms": 33,
+    "stale_result_ms": 250,
+    "filter": "GazeStabilizer",
+    "filter_reset_at_run_start": true,
+    "actions_dispatched": false,
+    "cloud_enabled": false,
+    "pointer_visible": false
+  },
+  "coordinates": {
+    "frame": "full-display normalized: px / DisplaySpace.bounds; shared by calibration anchors, targets and predictions",
+    "raw": "GazeSample.rawPoint, predictor output before filtering, unclamped",
+    "point": "GazeSample.point, GazeStabilizer output used by interaction logic, unclamped (primary)",
+    "display": "PointerDisplay.clamp(point) to [0.015, 0.985], rendering only; pointer_shown says whether it was drawn"
+  },
+  "timing": {
+    "accepted_uptime_ms": "SystemClock.uptimeMillis when the camera worker accepted the frame; GazePipeline timestamp and schedule key",
+    "result_uptime_ms": "SystemClock.uptimeMillis when the main thread handled the result; GazePipeline nowMs",
+    "landmarker_ms": "System.nanoTime duration of FaceLandmarker.detectForVideo only",
+    "delivery_ms": "System.nanoTime from posting the result on the worker to the main-thread handler starting",
+    "latency_ms": "System.nanoTime from frame acceptance to publication of the processed result, or to explicit discard"
+  },
+  "counters": {
+    "frames_received": 133,
+    "frames_cadence_skipped": 22,
+    "frames_ignored_service_closing": 0,
+    "attempts_accepted": 111,
+    "attempts_recorded": 111,
+    "attempts_unrecorded": 0,
+    "attempts_by_outcome": {
+      "processed": 109,
+      "stale_delivery": 1,
+      "discarded_epoch": 1,
+      "discarded_closing": 0,
+      "discarded_model_changed": 0,
+      "processing_error": 0
+    },
+    "detector": {
+      "landmarker_not_ready": 1,
+      "no_face": 2,
+      "face_detected": 108
+    },
+    "valid_attempts": 99,
+    "invalid_by_reason": {
+      "closed": 5,
+      "discarded_epoch": 1,
+      "lost": 3,
+      "out_of_range": 2,
+      "stale_delivery": 1
+    },
+    "pipeline_resets": 3
+  },
+  "logging": {
+    "attempt_rows_enqueued": 111,
+    "attempt_rows_written": 111,
+    "event_rows_enqueued": 3,
+    "event_rows_written": 3,
+    "rows_dropped_queue_full": 0,
+    "rows_dropped_write_error": 0,
+    "rows_lost_total": 0,
+    "write_error": false
+  },
+  "files": {
+    "attempts": "attempts.csv",
+    "events": "events.csv",
+    "model_snapshot": "model_snapshot.json",
+    "checksums": "SHA256SUMS"
+  }
+}

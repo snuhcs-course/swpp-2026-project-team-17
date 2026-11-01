@@ -95,7 +95,8 @@ class ControlAccessibilityService : AccessibilityService() {
         TrackerState.controls=false; TrackerState.cancelActions?.invoke()
         handler.removeCallbacksAndMessages(null); super.onDestroy()
     }
-    private fun allowed()=TrackerState.running && TrackerState.controls && TrackerState.interactionAllowed && !TrackerState.collecting
+    private fun allowed()=TrackerState.running && TrackerState.controls && TrackerState.interactionAllowed && !TrackerState.collecting &&
+        !EvaluationState.active
     fun tap(x: Float, y: Float): Boolean {
         if(!allowed() || busy) return false
         return gesture(Path().apply { moveTo(x,y) },80)

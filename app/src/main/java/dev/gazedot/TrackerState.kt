@@ -25,6 +25,20 @@ object TrackerState {
     var configKey = ""
     var cancelActions: (() -> Unit)? = null
     var cancelPendingClick: (() -> Unit)? = null
+    /** Set by TrackingService: clears the gaze filter and interaction state; the argument names the cause. */
+    var resetPipeline: ((String) -> Unit)? = null
+    /** The model produced by the last successful calibration in the current tracking run, if any. */
+    var calibratedModel: GazePredictor? = null
+        private set
+    var calibrationSerial = 0
+        private set
+    var calibratedAtMs = 0L
+    /** Calibration serial already used by an evaluation run; each run needs a fresh calibration. */
+    var evaluatedCalibrationSerial = 0
+
+    /** Gaze actions are dispatched only outside settings, calibration, dictation and evaluation. */
+    fun actionsEnabled(accessibilityConnected: Boolean) =
+        controls && interactionAllowed && !collecting && !speaking && !EvaluationState.active && accessibilityConnected
     var features: EyeFeatures? = null
     var sample: GazeSample? = null
     var gaze: ScreenGaze? = null
@@ -47,6 +61,7 @@ object TrackerState {
     fun trackingStopped() {
         running = false
         controls = false
+        calibratedModel = null
         cancelCalibration()
         collecting = false
         clearCoordinates()
@@ -69,6 +84,8 @@ object TrackerState {
             if (result == null) return false
             save()
             model = result
+            calibratedModel = result
+            calibrationSerial++
             return true
         } finally {
             cancelCalibration()

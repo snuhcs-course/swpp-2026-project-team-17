@@ -7,3 +7,10 @@ gradlew text eol=lf
 *.png binary
 *.zip binary
 *.onnx binary
+# Gaze evaluation (Iteration 3): hashed manifests and recorded/derived data keep their exact bytes on every OS.
+docs/evaluation/iteration3/protocol.json text eol=lf
+docs/evaluation/iteration3/data/raw/** -text
+docs/evaluation/iteration3/data/raw/README.md text eol=lf
+docs/evaluation/iteration3/data/derived/** text eol=lf
+docs/evaluation/iteration3/data/*.sha256 text eol=lf
+tools/gaze_eval/testdata/** -text

@@ -18,3 +18,7 @@ node_modules/
 !.env.example
 .device-token.txt
 .token-hash.txt
+
+# Gaze evaluation (Iteration 3): phone exports before import, and local scratch analysis output.
+/docs/evaluation/iteration3/data/incoming/
+/docs/evaluation/iteration3/data/scratch/

@@ -1,0 +1,4 @@
+schema_version,session_id,main_seq,event_uptime_ms,elapsed_ms,event,detail
+2,eval-synthetic-0001,0,1000000,0,pipeline_reset,run_start
+2,eval-synthetic-0001,31,1002217,2217,pipeline_reset,stale_delivery
+2,eval-synthetic-0001,51,1003242,3242,pipeline_reset,watchdog_no_result

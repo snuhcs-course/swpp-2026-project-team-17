@@ -4,6 +4,13 @@ import android.content.Context
 import android.graphics.*
 import android.view.*
 
+/** Rendering-only clamp that keeps the pointer visible at screen edges. Never applied to gaze data. */
+object PointerDisplay {
+    const val MIN = .015
+    const val MAX = .985
+    fun clamp(p: Pair<Double, Double>) = p.first.coerceIn(MIN, MAX) to p.second.coerceIn(MIN, MAX)
+}
+
 class DotOverlay(context: Context) {
     private val manager = context.getSystemService(WindowManager::class.java)
     private val displayBounds = DisplaySpace.bounds(context)
@@ -30,9 +37,9 @@ class DotOverlay(context: Context) {
                 paint.color=Color.WHITE
                 canvas.drawText(label.take(44),width/2f,64*d,paint)
             }
-            val p = position ?: return
-            val x = (p.first.coerceIn(.015,.985) * displayBounds.width() - viewOrigin[0]).toFloat()
-            val y = (p.second.coerceIn(.015,.985) * displayBounds.height() - viewOrigin[1]).toFloat()
+            val p = PointerDisplay.clamp(position ?: return)
+            val x = (p.first * displayBounds.width() - viewOrigin[0]).toFloat()
+            val y = (p.second * displayBounds.height() - viewOrigin[1]).toFloat()
             paint.color = Color.WHITE
             canvas.drawCircle(x, y, 10 * resources.displayMetrics.density, paint)
             paint.color = if (scrollMode) Color.rgb(6, 108, 236) else Color.RED

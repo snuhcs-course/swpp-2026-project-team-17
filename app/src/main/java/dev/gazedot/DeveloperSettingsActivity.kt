@@ -120,6 +120,10 @@ class DeveloperSettingsActivity : ComponentActivity() {
         val options = getSharedPreferences("options", MODE_PRIVATE)
         text("빠른 두 번 깜빡임으로 받아쓰기를 시작합니다. 기기 내 인식을 우선 사용하며, 미지원 기기는 시스템 음성 인식을 사용합니다. 시스템 제공자가 음성을 서버로 전송할 수 있습니다.", 13f)
         button("클릭·스크롤·받아쓰기 연습 화면") { startActivity(Intent(this, PracticeActivity::class.java)) }
+        // Iteration 3 accuracy evaluation is an internal tool: debuggable builds only.
+        if (evaluationEntryEnabled(applicationInfo.flags)) {
+            button("시선 정확도 평가 (Iteration 3 · 새 9점 보정 직후)") { startActivity(Intent(this, EvaluationActivity::class.java)) }
+        }
         button("홈 화면에서 빨간 점 확인") {
             if (!TrackerState.running) status.text = "카메라를 먼저 시작하세요."
             else startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME))

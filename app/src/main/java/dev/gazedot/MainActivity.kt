@@ -436,6 +436,7 @@ class MainActivity : ComponentActivity() {
             val bounds = DisplaySpace.bounds(this@MainActivity)
             close()
             calibration = null
+            if (saved.getOrDefault(false)) TrackerState.calibratedAtMs = SystemClock.uptimeMillis()
             if (saved.getOrDefault(false) && TrackerState.running) {
                 tutorial = PostCalibrationTutorialView(this@MainActivity, bounds.width(), bounds.height(),
                     onRecalibrate = { startCalibration() },

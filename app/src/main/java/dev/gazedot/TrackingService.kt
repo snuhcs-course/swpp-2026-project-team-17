@@ -68,7 +68,7 @@ class TrackingService : LifecycleService() {
             if (closing) return
             if (!Settings.canDrawOverlays(this@TrackingService)) { fail("다른 앱 위에 표시 권한이 해제되었습니다"); return }
             if (SystemClock.uptimeMillis() - lastResult > 800) {
-                resetTracking()
+                resetTracking("watchdog_no_result")
                 TrackerState.publish(null, "카메라 신호 대기 · 다른 카메라 앱을 닫아 주세요")
             }
             main.postDelayed(this, 400)
@@ -77,11 +77,11 @@ class TrackingService : LifecycleService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
-        if (intent?.action == ACTION_STOP) { closing = true; resetTracking(); stopSelf(); return START_NOT_STICKY }
+        if (intent?.action == ACTION_STOP) { closing = true; resetTracking("notification_stop"); stopSelf(); return START_NOT_STICKY }
         if (intent?.action == ACTION_PAUSE) {
             CloudSession.disable(); cloud.invalidate()
             TrackerState.controls = false
-            resetTracking()
+            resetTracking("notification_pause")
             TrackerState.actionStatus = "조작 일시정지 · 앱에서 다시 켤 수 있습니다"
             return START_NOT_STICKY
         }
@@ -117,6 +117,7 @@ class TrackingService : LifecycleService() {
                 if (::voice.isInitialized) voice.cancel()
                 TrackerState.actionStatus = ""
             }
+            TrackerState.resetPipeline = { reason -> resetTracking(reason) }
             TrackerState.configKey = ModelStore.config(this)
             TrackerState.model = ModelStore.load(this)
             overlay = DotOverlay(this)
@@ -172,7 +173,7 @@ class TrackingService : LifecycleService() {
                 camera.cameraControl.setZoomRatio(1f)
                 camera.cameraInfo.cameraState.observe(this) { state ->
                     if (state.error != null && !closing) {
-                        resetTracking()
+                        resetTracking("camera_error")
                         TrackerState.publish(null, "카메라 사용 불가 · 다른 카메라 앱을 닫고 다시 시도해 주세요")
                     }
                 }
@@ -182,26 +183,47 @@ class TrackingService : LifecycleService() {
 
     private fun process(frame: ImageProxy) {
         var raw: Bitmap? = null; var upright: Bitmap? = null
+        // Evaluation logging observes this path only; it stays null outside an evaluation run.
+        var attempt: EvaluationAttempt? = null
         try {
             val now = SystemClock.uptimeMillis()
+            val acceptedNanos = System.nanoTime()
             val epoch = trackingEpoch
-            if (closing || now - lastFrame < 33) return
+            val log = EvaluationLog.sessionAt(now)
+            log?.frameReceived()
+            if (closing || now - lastFrame < FRAME_INTERVAL_MS) { log?.frameSkipped(closing); return }
             lastFrame = now
+            attempt = log?.beginAttempt(now, acceptedNanos)
             raw = frame.toBitmap()
             val matrix = Matrix().apply { postRotate(frame.imageInfo.rotationDegrees.toFloat()) }
             upright = Bitmap.createBitmap(raw, 0, 0, raw.width, raw.height, matrix, true)
             val image = BitmapImageBuilder(upright).build()
+            val detectStart = System.nanoTime()
             val result = try { landmarker?.detectForVideo(image, now) } finally { image.close() }
+            val detectNanos = System.nanoTime() - detectStart
             val observation = result?.faceLandmarks()?.firstOrNull()?.let { LandmarkFeatures.observe(it, upright.width, upright.height,
                     cameraGeometry?.let { g -> DepthGeometry.focalPixels(g[0],g[1],g[2],raw.width,raw.height,frame.imageInfo.rotationDegrees) },
                     result.facialTransformationMatrixes().orElse(emptyList()).firstOrNull()) }
                 ?: EyeObservation(EyeState.LOST, null, 0.0, 0.0)
-            cloud.offer(upright, observation.features, now)
+            attempt?.observed(when {
+                result == null -> EvaluationDetector.NOT_READY
+                result.faceLandmarks().isEmpty() -> EvaluationDetector.NO_FACE
+                else -> EvaluationDetector.FACE
+            }, observation, if (result != null) detectNanos else null, System.nanoTime())
+            // Evaluation keeps cloud experiments inactive: nothing is offered for upload.
+            if (!EvaluationState.active) cloud.offer(upright, observation.features, now)
+            val logged = attempt
             main.post {
-                if (closing || epoch != trackingEpoch) return@post
+                logged?.reachedMain(System.nanoTime())
+                if (closing || epoch != trackingEpoch) {
+                    logged?.discarded(if (closing) EvaluationOutcome.DISCARDED_CLOSING else EvaluationOutcome.DISCARDED_EPOCH,
+                        SystemClock.uptimeMillis())
+                    return@post
+                }
                 val at = SystemClock.uptimeMillis()
-                if (at - now > 250) {
-                    resetTracking()
+                if (at - now > STALE_RESULT_MS) {
+                    logged?.discarded(EvaluationOutcome.STALE_DELIVERY, at)
+                    resetTracking("stale_delivery")
                     TrackerState.publish(null, "영상 처리가 지연됩니다 · 조작 일시 대기")
                     return@post
                 }
@@ -210,10 +232,13 @@ class TrackingService : LifecycleService() {
                 TrackerState.eyeState = observation.state
                 val model = TrackerState.model ?: BasicGazePredictor
                 if (model !== lastModel) { cloud.invalidate(); lastModel = model }
-                val candidate = if (TrackerState.interactionAllowed && !TrackerState.collecting)
+                // A run measures exactly one predictor; the evaluation screen ends the run if it changes.
+                val measured = logged?.takeIf { model === it.session.predictor }
+                if (logged != null && measured == null) logged.discarded(EvaluationOutcome.DISCARDED_MODEL_CHANGED, at)
+                val evaluating = EvaluationState.active
+                val candidate = if (TrackerState.interactionAllowed && !TrackerState.collecting && !evaluating)
                     cloud.target(observation.features, now) else null
-                val enabled = TrackerState.controls && TrackerState.interactionAllowed && !TrackerState.collecting &&
-                    !TrackerState.speaking && ControlAccessibilityService.instance != null
+                val enabled = TrackerState.actionsEnabled(ControlAccessibilityService.instance != null)
                 val sample = pipeline.process(now, at, observation, model, enabled, candidate?.center,
                     ControlAccessibilityService.instance?.let { service -> { p -> service.dwellTargetKey(p) } })
                 val features = sample.features
@@ -230,23 +255,27 @@ class TrackingService : LifecycleService() {
                         else "시선 추적 중 · ${TrackerState.modelLabel}"
                 }
                 val label = when {
-                    TrackerState.collecting -> ""
+                    TrackerState.collecting || evaluating -> ""
                     TrackerState.speaking -> TrackerState.actionStatus
                     enabled && sample.scrollMode -> "스크롤 모드 · 위/아래/좌/우 1/3 응시 · 윙크하면 종료"
                     enabled -> TrackerState.actionStatus
                     CloudSession.enabled -> "GPT-5.4 실험 · ${CloudSession.calls}/20 호출"
                     else -> ""
                 }
-                val visible = if (TrackerState.collecting) null else sample.point
+                // Blind evaluation withholds the pointer from the participant; the sample itself is unchanged.
+                val visible = if (TrackerState.collecting || EvaluationState.hidesPointer) null else sample.point
                 TrackerState.publishSample(sample, message + (features?.distanceCm?.takeIf { it.isFinite() }?.let { " · 거리 추정 %.0fcm".format(it) } ?: " · 거리 추정 불가"))
                 // UI listeners may select Stop or start calibration while handling this frame.
-                if (!closing && TrackerState.running) overlay?.show(
+                val drawn = !closing && TrackerState.running && overlay != null
+                if (drawn) overlay?.show(
                     if (TrackerState.collecting) null else visible,
                     if (enabled) sample.dwellProgress else TrackerState.localDwellProgress,
                     label, if(TrackerState.collecting) null else candidate?.center,
                     scrollMode = if (enabled) sample.scrollMode else TrackerState.localScrollMode)
+                measured?.processed(at, sample, drawn && visible != null, System.nanoTime())
             }
         } catch (e: Exception) {
+            attempt?.failed()
             main.post { if (!closing) fail("영상 처리 실패: ${e.message}") }
         } finally {
             if (upright !== raw) upright?.recycle()
@@ -280,7 +309,9 @@ class TrackingService : LifecycleService() {
         }
     }
 
-    private fun resetTracking() {
+    private fun resetTracking(reason: String) {
+        // Replay needs every filter reset of a run, in main-thread order.
+        EvaluationLog.current?.pipelineReset(SystemClock.uptimeMillis(), reason)
         trackingEpoch++
         pipeline.reset()
         cloud.invalidate()
@@ -291,7 +322,7 @@ class TrackingService : LifecycleService() {
 
     private fun fail(message: String) {
         if (closing) return
-        resetTracking()
+        resetTracking("service_failure")
         closing = true
         TrackerState.publish(null, message)
         stopSelf()
@@ -302,6 +333,8 @@ class TrackingService : LifecycleService() {
     }
     override fun onDestroy() {
         closing = true
+        // A run cannot continue without its camera; it is finalized as incomplete.
+        EvaluationLog.finish(EvaluationEndReason.SERVICE_STOPPED, SystemClock.uptimeMillis())
         cloud.close(); CloudSession.disable()
         main.removeCallbacksAndMessages(null)
         displayManager.unregisterDisplayListener(displayListener)
@@ -313,6 +346,7 @@ class TrackingService : LifecycleService() {
         if (::voice.isInitialized) voice.cancel()
         TrackerState.cancelActions = null
         TrackerState.cancelPendingClick = null
+        TrackerState.resetPipeline = null
         TrackerState.microphoneReady = false
         TrackerState.controls = false
         overlay?.close()
@@ -322,5 +356,11 @@ class TrackingService : LifecycleService() {
         stopForeground(STOP_FOREGROUND_REMOVE)
         super.onDestroy()
     }
-    companion object { const val ACTION_STOP = "dev.gazedot.STOP"; const val ACTION_PAUSE = "dev.gazedot.PAUSE" }
+    companion object {
+        const val ACTION_STOP = "dev.gazedot.STOP"; const val ACTION_PAUSE = "dev.gazedot.PAUSE"
+        /** Minimum spacing between frames accepted for processing; later frames are skipped. */
+        const val FRAME_INTERVAL_MS = 33L
+        /** Results reaching the main thread later than this reset tracking instead of being processed. */
+        const val STALE_RESULT_MS = 250L
+    }
 }

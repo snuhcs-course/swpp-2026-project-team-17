@@ -25,6 +25,7 @@
         <activity android:name=".DeveloperSettingsActivity" android:exported="false" />
         <activity android:name=".PracticeActivity" android:exported="false" />
         <activity android:name=".CloudSettingsActivity" android:exported="false" />
+        <activity android:name=".EvaluationActivity" android:exported="false" />
         <service android:name=".ControlAccessibilityService" android:exported="true"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE" android:label="NoTouch 눈 조작">
             <intent-filter><action android:name="android.accessibilityservice.AccessibilityService" /></intent-filter>

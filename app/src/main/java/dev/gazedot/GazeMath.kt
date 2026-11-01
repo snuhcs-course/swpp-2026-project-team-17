@@ -30,6 +30,14 @@ object BasicGazePredictor : GazePredictor {
 }
 data class Anchor(val eye: EyeFeatures, val x: Double, val y: Double)
 
+/** Read-only copy of a fitted [GazeModel], recorded by evaluation sessions for replay checks. */
+data class GazeModelParameters(
+    val meanX: Double, val meanY: Double, val stdX: Double, val stdY: Double,
+    val wx: List<Double>, val wy: List<Double>,
+    val referenceFaceX: Double, val referenceFaceY: Double, val referenceScale: Double,
+    val fitError: Double,
+)
+
 /** Calibration maps iris displacement inside the eye to display coordinates.
  * This is a calibrated approximation, not a pretrained screen-gaze model. */
 class GazeModel private constructor(
@@ -48,6 +56,9 @@ class GazeModel private constructor(
         // Preserve outside-screen estimates for scroll intent; clamp only when drawing.
         return dot(wx, v) to dot(wy, v)
     }
+
+    fun parameters() = GazeModelParameters(meanX, meanY, stdX, stdY, wx.toList(), wy.toList(),
+        reference.faceX, reference.faceY, reference.scale, fitError)
 
     companion object {
         fun fit(anchors: List<Anchor>): GazeModel? {

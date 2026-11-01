@@ -22,10 +22,22 @@ object ModelStore {
         TrackerState.modelLabel="개발 데이터 학습 모델"
         return model
     }
-    fun saveCalibration(c: Context, anchors: List<Anchor>) {
+    /** The saved personal calibration exactly as stored, or null. Evaluation snapshots it for replay. */
+    fun savedCalibration(c: Context): String? = prefs(c).getString("calibration",null)
+    fun calibrationJson(config: String, anchors: List<Anchor>): String {
         val rows=JSONArray()
         anchors.forEach { rows.put(JSONObject().put("features",JSONArray(it.eye.vector().toList())).put("x",it.x).put("y",it.y)) }
-        val text=JSONObject().put("config",config(c)).put("anchors",rows).toString()
+        return JSONObject().put("config",config).put("anchors",rows).toString()
+    }
+    fun calibrationAnchors(obj: JSONObject): List<Anchor> {
+        val a=obj.getJSONArray("anchors")
+        return (0 until a.length()).map { i ->
+            val row=a.getJSONObject(i); val v=row.getJSONArray("features")
+            Anchor(EyeFeatures.from(DoubleArray(10) { v.getDouble(it) }),row.getDouble("x"),row.getDouble("y"))
+        }
+    }
+    fun saveCalibration(c: Context, anchors: List<Anchor>) {
+        val text=calibrationJson(config(c),anchors)
         val pref=prefs(c)
         val previousCalibration=pref.getString("calibration",null)
         val previousTrained=pref.getString("trained",null)
@@ -56,11 +68,7 @@ object ModelStore {
         return runCatching {
             val obj=JSONObject(pref.getString("calibration",null) ?: return null)
             if(obj.getString("config")!=config(c)) return null
-            val a=obj.getJSONArray("anchors")
-            val model=GazeModel.fit((0 until a.length()).map { i ->
-                val row=a.getJSONObject(i); val v=row.getJSONArray("features")
-                Anchor(EyeFeatures.from(DoubleArray(10) { v.getDouble(it) }),row.getDouble("x"),row.getDouble("y"))
-            })
+            val model=GazeModel.fit(calibrationAnchors(obj))
             if(model!=null) TrackerState.modelLabel="저장된 개인 보정"
             model
         }.getOrNull()
