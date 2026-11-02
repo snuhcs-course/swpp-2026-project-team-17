@@ -1,6 +1,8 @@
 package dev.gazedot
 
 import android.app.*
+import android.Manifest
+import android.content.pm.PackageManager
 import android.content.*
 import android.content.pm.ServiceInfo
 import android.content.res.Configuration
@@ -10,7 +12,6 @@ import android.hardware.display.DisplayManager
 import android.os.*
 import android.provider.Settings
 import android.view.Surface
-import android.view.WindowManager
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
@@ -22,6 +23,9 @@ import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarker
 import java.util.concurrent.Executors
 
 class TrackingService : LifecycleService() {
+    private val pipeline = GazePipeline()
+    private lateinit var voice: VoiceInput
+    @Volatile private var trackingEpoch = 0L
     private val worker = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
     @Volatile private var closing = false
@@ -29,7 +33,6 @@ class TrackingService : LifecycleService() {
     private var cameraProvider: ProcessCameraProvider? = null
     private var analysis: ImageAnalysis? = null
     private var overlay: DotOverlay? = null
-    private var smoothed: Pair<Double, Double>? = null
     private var lastFrame = 0L
     private var lastResult = 0L
     private var initialRotation = Surface.ROTATION_0
@@ -38,9 +41,7 @@ class TrackingService : LifecycleService() {
     private val displayManager by lazy { getSystemService(DisplayManager::class.java) }
     private fun rotation() = displayManager.getDisplay(android.view.Display.DEFAULT_DISPLAY)?.rotation ?: 0
     private fun sizeKey(): String {
-        val wm = getSystemService(WindowManager::class.java)
-        if (Build.VERSION.SDK_INT >= 30) return wm.maximumWindowMetrics.bounds.let { "${it.width()}x${it.height()}" }
-        return resources.displayMetrics.let { "${it.widthPixels}x${it.heightPixels}" }
+        return DisplaySpace.bounds(this).let { "${it.width()}x${it.height()}" }
     }
     private val displayListener = object : DisplayManager.DisplayListener {
         override fun onDisplayAdded(id: Int) = Unit
@@ -57,7 +58,7 @@ class TrackingService : LifecycleService() {
             if (closing) return
             if (!Settings.canDrawOverlays(this@TrackingService)) { fail("다른 앱 위에 표시 권한이 해제되었습니다"); return }
             if (SystemClock.uptimeMillis() - lastResult > 800) {
-                smoothed = null; overlay?.show(null)
+                resetTracking()
                 TrackerState.publish(null, "카메라 신호 대기 · 다른 카메라 앱을 닫아 주세요")
             }
             main.postDelayed(this, 400)
@@ -66,27 +67,53 @@ class TrackingService : LifecycleService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
-        if (intent?.action == ACTION_STOP) { stopSelf(); return START_NOT_STICKY }
-        if (TrackerState.running) return START_NOT_STICKY
+        if (intent?.action == ACTION_STOP) { closing = true; resetTracking(); stopSelf(); return START_NOT_STICKY }
+        if (intent?.action == ACTION_PAUSE) {
+            TrackerState.controls = false
+            resetTracking()
+            TrackerState.actionStatus = "조작 일시정지 · 앱에서 다시 켤 수 있습니다"
+            return START_NOT_STICKY
+        }
+        if (TrackerState.running) {
+            TrackerState.controls = true
+            pipeline.cancelInteraction()
+            TrackerState.actionStatus = "눈 조작 준비 · 연습 화면 또는 다른 앱에서 사용하세요"
+            return START_NOT_STICKY
+        }
         try {
             val notifications = getSystemService(NotificationManager::class.java)
             notifications.createNotificationChannel(NotificationChannel("tracking", "시선 추적", NotificationManager.IMPORTANCE_LOW))
             val open = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
             val stop = PendingIntent.getService(this, 1, Intent(this, TrackingService::class.java).setAction(ACTION_STOP), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+            val pause = PendingIntent.getService(this, 2, Intent(this, TrackingService::class.java).setAction(ACTION_PAUSE), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
             val notification = Notification.Builder(this, "tracking")
-                .setSmallIcon(android.R.drawable.ic_menu_view).setContentTitle("GazeDot 시선 추적 중")
-                .setContentText("전면 카메라 사용 중 · 탭하여 보정 / 중지")
+                .setSmallIcon(android.R.drawable.ic_menu_view).setContentTitle("NoTouch 시선 추적 중")
+                .setContentText("카메라 사용 중 · 눈 조작 / 음성 입력 준비")
                 .setContentIntent(open).setOngoing(true)
+                .addAction(Notification.Action.Builder(null, "조작 일시정지", pause).build())
                 .addAction(Notification.Action.Builder(null, "중지", stop).build()).build()
-            if (Build.VERSION.SDK_INT >= 30) startForeground(1, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA)
+            TrackerState.microphoneReady = checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+            if (Build.VERSION.SDK_INT >= 30) startForeground(1, notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA or (if (TrackerState.microphoneReady) ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0))
             else startForeground(1, notification)
+            voice = VoiceInput(this)
+            TrackerState.cancelPendingClick = { pipeline.cancelPendingClick() }
+            TrackerState.cancelActions = {
+                pipeline.cancelInteraction()
+                TrackerState.localDwellProgress = 0f
+                TrackerState.localScrollMode = false
+                if (::voice.isInitialized) voice.cancel()
+                TrackerState.actionStatus = ""
+            }
             overlay = DotOverlay(this)
             initialRotation = rotation(); initialSize = sizeKey()
             displayManager.registerDisplayListener(displayListener, main)
             ContextCompat.registerReceiver(this, screenReceiver, IntentFilter(Intent.ACTION_SCREEN_OFF), ContextCompat.RECEIVER_NOT_EXPORTED)
             receiverRegistered = true
+            TrackerState.controls = true
             TrackerState.running = true
             TrackerState.publish(null, "카메라·눈 검출 모델 준비 중…")
+            TrackerState.actionStatus = "눈 조작 준비 · 접근성 권한을 허용하고 연습 화면에서 확인하세요"
             main.postDelayed(watchdog, 3000)
             worker.execute {
                 try {
@@ -121,7 +148,7 @@ class TrackingService : LifecycleService() {
                 val camera = provider.bindToLifecycle(this, CameraSelector.DEFAULT_FRONT_CAMERA, analyzer)
                 camera.cameraInfo.cameraState.observe(this) { state ->
                     if (state.error != null && !closing) {
-                        overlay?.show(null)
+                        resetTracking()
                         TrackerState.publish(null, "카메라 사용 불가 · 다른 카메라 앱을 닫고 다시 시도해 주세요")
                     }
                 }
@@ -133,6 +160,7 @@ class TrackingService : LifecycleService() {
         var raw: Bitmap? = null; var upright: Bitmap? = null
         try {
             val now = SystemClock.uptimeMillis()
+            val epoch = trackingEpoch
             if (closing || now - lastFrame < 66) return
             lastFrame = now
             raw = frame.toBitmap()
@@ -140,24 +168,50 @@ class TrackingService : LifecycleService() {
             upright = Bitmap.createBitmap(raw, 0, 0, raw.width, raw.height, matrix, true)
             val image = BitmapImageBuilder(upright).build()
             val result = try { landmarker?.detectForVideo(image, now) } finally { image.close() }
-            val features = result?.faceLandmarks()?.firstOrNull()?.let { LandmarkFeatures.extract(it, upright.width, upright.height) }
+            val observation = result?.faceLandmarks()?.firstOrNull()?.let {
+                EyeObservations.observe(it, upright.width, upright.height)
+            } ?: EyeObservation(EyeState.LOST, null, 0.0, 0.0)
             main.post {
-                if (closing) return@post
-                lastResult = SystemClock.uptimeMillis()
-                val model = TrackerState.model
-                val position = if (features != null) model?.predict(features) else null
-                val message = when {
-                    features == null -> "눈을 찾지 못했습니다 · 눈을 뜨고 카메라를 향해 주세요"
-                    model == null -> "눈 검출됨 · 9점 보정을 시작해 주세요"
-                    position == null -> "얼굴 위치가 달라졌습니다 · 원래 위치로 돌아오거나 재보정하세요"
-                    else -> "추적 중 · 홈으로 나가도 빨간 점이 표시됩니다"
+                if (closing || epoch != trackingEpoch) return@post
+                val at = SystemClock.uptimeMillis()
+                if (at - now > 250) {
+                    resetTracking()
+                    TrackerState.publish(null, "영상 처리가 지연됩니다 · 조작 일시 대기")
+                    return@post
                 }
-                smoothed = if (position == null) null else smoothed?.let {
-                    it.first + 0.28 * (position.first - it.first) to it.second + 0.28 * (position.second - it.second)
-                } ?: position
-                overlay?.show(smoothed)
-                TrackerState.publish(features, message,
-                    smoothed?.let { ScreenGaze(it.first, it.second, now) })
+                lastResult = at
+                TrackerState.frameAt = now
+                TrackerState.eyeState = observation.state
+                val model = TrackerState.model
+                val enabled = TrackerState.controls && TrackerState.interactionAllowed && !TrackerState.collecting &&
+                    !TrackerState.speaking && ControlAccessibilityService.instance != null
+                val sample = pipeline.process(now, at, observation, model, enabled,
+                    ControlAccessibilityService.instance?.let { service -> { p -> service.dwellTargetKey(p) } })
+                sample.actions.forEach(::perform)
+                val message = when (sample.quality) {
+                    TrackingQuality.LOST -> "얼굴 검출 대기"
+                    TrackingQuality.CLOSED -> "눈 감김 감지"
+                    TrackingQuality.UNCERTAIN -> "눈 상태 확인 중"
+                    TrackingQuality.STALE -> "영상 처리가 지연됩니다 · 조작 일시 대기"
+                    TrackingQuality.OUT_OF_RANGE -> if (model == null) "눈 검출됨 · 9점 보정을 시작해 주세요"
+                        else "얼굴 위치가 달라졌습니다 · 원래 위치로 돌아오거나 재보정하세요"
+                    TrackingQuality.TRACKING -> "추적 중 · 홈으로 나가도 빨간 점이 표시됩니다"
+                }
+                val label = when {
+                    TrackerState.collecting -> ""
+                    TrackerState.speaking -> TrackerState.actionStatus
+                    enabled && sample.scrollMode -> "스크롤 모드 · 위/아래/좌/우 1/3 응시 · 윙크하면 종료"
+                    enabled -> TrackerState.actionStatus
+                    else -> ""
+                }
+                val visible = if (TrackerState.collecting) null else sample.point
+                TrackerState.publishSample(sample, message)
+                // UI listeners may select Stop or start calibration while handling this frame.
+                if (!closing && TrackerState.running) overlay?.show(
+                    if (TrackerState.collecting) null else visible,
+                    if (enabled) sample.dwellProgress else TrackerState.localDwellProgress,
+                    label,
+                    scrollMode = if (enabled) sample.scrollMode else TrackerState.localScrollMode)
             }
         } catch (e: Exception) {
             main.post { if (!closing) fail("영상 처리 실패: ${e.message}") }
@@ -168,8 +222,43 @@ class TrackingService : LifecycleService() {
         }
     }
 
+    private fun perform(action: EyeAction) {
+        val service = ControlAccessibilityService.instance ?: return
+        val bounds = DisplaySpace.bounds(this)
+        when(action) {
+            is EyeAction.Click -> {
+                val ok = service.tap((action.point.first * bounds.width()).toFloat(), (action.point.second * bounds.height()).toFloat())
+                TrackerState.actionStatus = if(ok) "클릭 요청" else "클릭을 실행하지 못했습니다"
+            }
+            is EyeAction.Scroll -> {
+                val ok = service.scroll(action.direction, bounds.width(), bounds.height())
+                TrackerState.actionStatus = if(ok) when (action.direction) {
+                    ScrollDirection.UP -> "위로 스크롤"
+                    ScrollDirection.DOWN -> "아래로 스크롤"
+                    ScrollDirection.LEFT -> "왼쪽으로 스크롤"
+                    ScrollDirection.RIGHT -> "오른쪽으로 스크롤"
+                } else "스크롤을 실행하지 못했습니다"
+            }
+            is EyeAction.ScrollMode -> {
+                TrackerState.actionStatus = if (action.enabled) "스크롤 모드 켜짐" else "스크롤 모드 꺼짐"
+            }
+            EyeAction.Dictate -> voice.start()
+            EyeAction.Cancel -> { TrackerState.actionStatus = "" }
+        }
+    }
+
+    private fun resetTracking() {
+        trackingEpoch++
+        pipeline.reset()
+        TrackerState.clearCoordinates()
+        if (::voice.isInitialized) voice.cancel()
+        overlay?.show(null)
+    }
+
     private fun fail(message: String) {
         if (closing) return
+        resetTracking()
+        closing = true
         TrackerState.publish(null, message)
         stopSelf()
     }
@@ -184,13 +273,20 @@ class TrackingService : LifecycleService() {
         if (receiverRegistered) unregisterReceiver(screenReceiver)
         analysis?.clearAnalyzer()
         analysis?.let { cameraProvider?.unbind(it) }
+        pipeline.reset()
+        TrackerState.trackingStopped()
+        TrackerState.model = null
+        if (::voice.isInitialized) voice.cancel()
+        TrackerState.cancelActions = null
+        TrackerState.cancelPendingClick = null
+        TrackerState.microphoneReady = false
+        TrackerState.controls = false
         overlay?.close()
         worker.execute { landmarker?.close(); landmarker = null }
         worker.shutdown()
-        TrackerState.running = false; TrackerState.model = null
         TrackerState.publish(null, if (TrackerState.status.startsWith("추적 중")) "추적 중지됨" else TrackerState.status)
         stopForeground(STOP_FOREGROUND_REMOVE)
         super.onDestroy()
     }
-    companion object { const val ACTION_STOP = "dev.gazedot.STOP" }
+    companion object { const val ACTION_STOP = "dev.gazedot.STOP"; const val ACTION_PAUSE = "dev.gazedot.PAUSE" }
 }

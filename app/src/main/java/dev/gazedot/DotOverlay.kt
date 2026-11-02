@@ -6,16 +6,35 @@ import android.view.*
 
 class DotOverlay(context: Context) {
     private val manager = context.getSystemService(WindowManager::class.java)
+    private val displayBounds = DisplaySpace.bounds(context)
+    private val viewOrigin = IntArray(2)
     private val dot = object : View(context) {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         var position: Pair<Double, Double>? = null
+        var progress = 0f
+        var scrollMode = false
+        var label = ""
         override fun onDraw(canvas: Canvas) {
+            val d=resources.displayMetrics.density
+            getLocationOnScreen(viewOrigin)
+            if(label.isNotBlank()) {
+                paint.color=Color.BLACK; paint.textSize=14*d; paint.textAlign=Paint.Align.CENTER
+                canvas.drawRoundRect(8*d,38*d,width-8*d,80*d,12*d,12*d,paint)
+                paint.color=Color.WHITE
+                canvas.drawText(label.take(44),width/2f,64*d,paint)
+            }
             val p = position ?: return
-            val x = p.first.toFloat() * width; val y = p.second.toFloat() * height
+            val x = (p.first.coerceIn(0.0,1.0) * displayBounds.width() - viewOrigin[0]).toFloat()
+            val y = (p.second.coerceIn(0.0,1.0) * displayBounds.height() - viewOrigin[1]).toFloat()
             paint.color = Color.WHITE
             canvas.drawCircle(x, y, 10 * resources.displayMetrics.density, paint)
-            paint.color = Color.RED
+            paint.color = if (scrollMode) Color.rgb(6, 108, 236) else Color.RED
             canvas.drawCircle(x, y, 7 * resources.displayMetrics.density, paint)
+            if(progress > 0f) {
+                paint.style=Paint.Style.STROKE; paint.strokeWidth=3*d; paint.color=Color.rgb(6,108,236)
+                canvas.drawArc(x-18*d,y-18*d,x+18*d,y+18*d,-90f,360f*progress,false,paint)
+                paint.style=Paint.Style.FILL
+            }
         }
     }
     init {
@@ -37,6 +56,10 @@ class DotOverlay(context: Context) {
         }
         manager.addView(dot, params)
     }
-    fun show(position: Pair<Double, Double>?) { dot.position = position; dot.invalidate() }
+    fun show(position: Pair<Double, Double>?, progress: Float=0f, label: String="",
+        scrollMode: Boolean = false) {
+        dot.position = position; dot.progress=progress.coerceIn(0f,1f); dot.label=label
+        dot.scrollMode=scrollMode; dot.invalidate()
+    }
     fun close() { if (dot.isAttachedToWindow) manager.removeView(dot) }
 }
