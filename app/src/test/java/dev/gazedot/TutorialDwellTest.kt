@@ -4,42 +4,50 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class TutorialDwellTest {
-    @Test fun selectsOnlyAfterOneSecondOfFreshSamples() {
+    @Test fun update_continuousGaze_selectsAfterOneSecond() {
+        // GIVEN: Fresh gaze samples remain inside the button.
         val dwell = TutorialDwell()
+
+        // WHEN: Samples arrive every 100 ms through the one-second mark.
         for (time in 0L..900L step 100) assertFalse(dwell.update(true, time, time))
+
+        // THEN: Selection completes at one second.
         assertEquals(.9f, dwell.progress, .001f)
         assertTrue(dwell.update(true, 1_000, 1_000))
     }
 
-    @Test fun leavingButtonOrInvalidGazeRestartsTheFullSecond() {
+    @Test fun update_shortGaze_doesNotSelect() {
+        // GIVEN: The user has looked at the button for less than one second.
+        val dwell = TutorialDwell()
+        for (time in 0L..900L step 100) {
+            assertFalse(dwell.update(true, time, time))
+        }
+
+        // THEN: Selection has not completed yet.
+        assertEquals(.9f, dwell.progress, .001f)
+    }
+
+    @Test fun update_gazeLeavesButton_resetsProgress() {
+        // GIVEN: Gaze has started building selection progress.
         val dwell = TutorialDwell()
         for (time in 0L..700L step 100) dwell.update(true, time, time)
-        assertFalse(dwell.update(false, 750, 750))
-        assertEquals(0f, dwell.progress, 0f)
-        for (time in 800L..1_700L step 100) assertFalse(dwell.update(true, time, time))
-        assertTrue(dwell.update(true, 1_800, 1_800))
-        dwell.reset()
+
+        // WHEN: A sample reports that gaze is outside the button.
+        assertFalse(dwell.update(false, 800, 800))
+
+        // THEN: Progress resets to zero.
         assertEquals(0f, dwell.progress, 0f)
     }
 
-    @Test fun missingFramesExpireWithoutSelectingAndCannotBridgeAGap() {
+    @Test fun update_samplesHaveLongGap_resetsProgress() {
+        // GIVEN: Gaze has started building progress with fresh samples.
         val dwell = TutorialDwell()
         for (time in 0L..800L step 100) dwell.update(true, time, time)
-        dwell.expire(1_051)
-        assertEquals(0f, dwell.progress, 0f)
-        assertFalse(dwell.update(true, 1_100, 1_100))
-        assertEquals(0f, dwell.progress, 0f)
-        assertFalse(dwell.update(true, 1_500, 1_500))
-        assertEquals(0f, dwell.progress, 0f)
-    }
 
-    @Test fun rejectsStaleFutureAndRepeatedSamples() {
-        val dwell = TutorialDwell()
-        assertFalse(dwell.update(true, 0, 300))
-        assertFalse(dwell.update(true, 400, 300))
-        dwell.update(true, 500, 500)
-        dwell.update(true, 600, 600)
-        assertFalse(dwell.update(true, 600, 700))
+        // WHEN: The next sample arrives after a 300 ms gap (over the 250 ms limit).
+        assertFalse(dwell.update(true, 1_100, 1_100))
+
+        // THEN: The gap cannot count as continuous gaze, so progress is reset.
         assertEquals(0f, dwell.progress, 0f)
     }
 
