@@ -17,6 +17,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity android:name=".EvaluationActivity" android:exported="false" />
         <service android:name=".TrackingService" android:exported="false"
             android:foregroundServiceType="camera" android:stopWithTask="false" />
     </application>

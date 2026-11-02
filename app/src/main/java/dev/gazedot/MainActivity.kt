@@ -213,6 +213,15 @@ class MainActivity : ComponentActivity() {
         root.addView(stopButton, FrameLayout.LayoutParams(dp(186), dp(46), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply {
             bottomMargin = dp(72)
         })
+        // Iteration 3 gaze evaluation is an internal tool: debuggable builds only.
+        if (evaluationEntryEnabled(applicationInfo.flags)) {
+            val evaluation = TextView(this).apply {
+                text = "시선 정확도 평가 (개발용)"; textSize = sp(13f); setTextColor(blue); gravity = Gravity.CENTER
+                style(this, 600)
+                setOnClickListener { startActivity(Intent(this@MainActivity, EvaluationActivity::class.java)) }
+            }
+            root.addView(evaluation, FrameLayout.LayoutParams(-1, dp(44), Gravity.BOTTOM).apply { bottomMargin = dp(20) })
+        }
         setContentView(root)
         updateHomeButtons()
 
@@ -321,6 +330,12 @@ class MainActivity : ComponentActivity() {
             TrackerState.model = model; TrackerState.status = message
             // Match the exact normalization dimensions used for the calibration anchors above.
             val bounds = if (Build.VERSION.SDK_INT >= 30) windowManager.maximumWindowMetrics.bounds else Rect(0, 0, width, height)
+            if (model != null) {
+                // Frozen fit inputs for gaze evaluation; the model itself is used exactly as before.
+                val location = IntArray(2); getLocationOnScreen(location)
+                TrackerState.calibrationCompleted(CalibrationRecord(model, anchors, bounds.width(), bounds.height(),
+                    display?.rotation ?: -1, location[0], location[1], width, height, SystemClock.uptimeMillis()))
+            }
             calibration = null
             if (model != null && TrackerState.running) {
                 tutorial = PostCalibrationTutorialView(this@MainActivity, bounds.width(), bounds.height()) {

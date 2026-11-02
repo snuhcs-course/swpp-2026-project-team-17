@@ -1,0 +1,123 @@
+{
+  "snapshot_schema_version": 1,
+  "pipeline_variant": "home_screen_candidate",
+  "predictor_kind": "GazeModel",
+  "predictor_source": "candidate_9_point_calibration",
+  "calibration_serial": 1,
+  "calibration_basis": {
+    "width_px": 1080,
+    "height_px": 2400,
+    "rotation": 0,
+    "view_left_px": 0,
+    "view_top_px": 0,
+    "view_width_px": 1080,
+    "view_height_px": 2400
+  },
+  "calibration_inputs_sha256": "b49789aeb0bcee7aae8ad0378af3720003af7f497b2373b467b9f8eebaa09759",
+  "anchors": [{
+    "eye": {
+      "x": 0.0,
+      "y": 0.0,
+      "face_x": 0.5,
+      "face_y": 0.5,
+      "scale": 0.3
+    },
+    "x": 0.5,
+    "y": 0.5
+  }, {
+    "eye": {
+      "x": -0.017499999999999998,
+      "y": -0.013999999999999999,
+      "face_x": 0.5,
+      "face_y": 0.5,
+      "scale": 0.3
+    },
+    "x": 0.15,
+    "y": 0.15
+  }, {
+    "eye": {
+      "x": 0.0,
+      "y": -0.013999999999999999,
+      "face_x": 0.5,
+      "face_y": 0.5,
+      "scale": 0.3
+    },
+    "x": 0.5,
+    "y": 0.15
+  }, {
+    "eye": {
+      "x": 0.017499999999999998,
+      "y": -0.013999999999999999,
+      "face_x": 0.5,
+      "face_y": 0.5,
+      "scale": 0.3
+    },
+    "x": 0.85,
+    "y": 0.15
+  }, {
+    "eye": {
+      "x": 0.017499999999999998,
+      "y": 0.0,
+      "face_x": 0.5,
+      "face_y": 0.5,
+      "scale": 0.3
+    },
+    "x": 0.85,
+    "y": 0.5
+  }, {
+    "eye": {
+      "x": 0.017499999999999998,
+      "y": 0.013999999999999999,
+      "face_x": 0.5,
+      "face_y": 0.5,
+      "scale": 0.3
+    },
+    "x": 0.85,
+    "y": 0.85
+  }, {
+    "eye": {
+      "x": 0.0,
+      "y": 0.013999999999999999,
+      "face_x": 0.5,
+      "face_y": 0.5,
+      "scale": 0.3
+    },
+    "x": 0.5,
+    "y": 0.85
+  }, {
+    "eye": {
+      "x": -0.017499999999999998,
+      "y": 0.013999999999999999,
+      "face_x": 0.5,
+      "face_y": 0.5,
+      "scale": 0.3
+    },
+    "x": 0.15,
+    "y": 0.85
+  }, {
+    "eye": {
+      "x": -0.017499999999999998,
+      "y": 0.0,
+      "face_x": 0.5,
+      "face_y": 0.5,
+      "scale": 0.3
+    },
+    "x": 0.15,
+    "y": 0.5
+  }],
+  "parameters": {
+    "mean_x": 0.0,
+    "mean_y": 0.0,
+    "std_x": 0.014288690166235204,
+    "std_y": 0.011430952132988163,
+    "wx": [0.5000000000000001, 0.28482438869571847, -3.0737071556621177E-18],
+    "wy": [0.5, 0.0, 0.2848243886957184],
+    "reference_x": 0.0,
+    "reference_y": 0.0,
+    "reference_face_x": 0.5,
+    "reference_face_y": 0.5,
+    "reference_scale": 0.3,
+    "fit_error": 0.0013426750446270004
+  },
+  "replay_note": "Replay refits GazeModel.fit(anchors) and requires every parameter to match exactly."
+}

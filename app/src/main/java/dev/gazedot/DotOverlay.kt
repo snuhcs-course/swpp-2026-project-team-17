@@ -38,5 +38,17 @@ class DotOverlay(context: Context) {
         manager.addView(dot, params)
     }
     fun show(position: Pair<Double, Double>?) { dot.position = position; dot.invalidate() }
+
+    /** Screen pixel where onDraw centers the dot for [p] (same float arithmetic). Evaluation diagnostics only. */
+    fun drawnAt(p: Pair<Double, Double>): Pair<Double, Double> {
+        val origin = IntArray(2).also { dot.getLocationOnScreen(it) }
+        return (origin[0] + p.first.toFloat() * dot.width).toDouble() to (origin[1] + p.second.toFloat() * dot.height).toDouble()
+    }
+
+    /** Overlay view origin and size on screen: left, top, width, height. */
+    fun bounds(): IntArray {
+        val origin = IntArray(2).also { dot.getLocationOnScreen(it) }
+        return intArrayOf(origin[0], origin[1], dot.width, dot.height)
+    }
     fun close() { if (dot.isAttachedToWindow) manager.removeView(dot) }
 }

@@ -8,3 +8,8 @@ local.properties
 build-log*.txt
 *.jks
 *.keystore
+
+# Gaze evaluation (Iteration 3): phone exports before import, technical-pilot sessions and local scratch output.
+/docs/evaluation/iteration3/data/incoming/
+/docs/evaluation/iteration3/data/pilot/
+/docs/evaluation/iteration3/data/scratch/

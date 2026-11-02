@@ -29,7 +29,7 @@ class TrackingService : LifecycleService() {
     private var cameraProvider: ProcessCameraProvider? = null
     private var analysis: ImageAnalysis? = null
     private var overlay: DotOverlay? = null
-    private var smoothed: Pair<Double, Double>? = null
+    private val smoother = GazeSmoother()
     private var lastFrame = 0L
     private var lastResult = 0L
     private var initialRotation = Surface.ROTATION_0
@@ -56,8 +56,8 @@ class TrackingService : LifecycleService() {
         override fun run() {
             if (closing) return
             if (!Settings.canDrawOverlays(this@TrackingService)) { fail("다른 앱 위에 표시 권한이 해제되었습니다"); return }
-            if (SystemClock.uptimeMillis() - lastResult > 800) {
-                smoothed = null; overlay?.show(null)
+            if (SystemClock.uptimeMillis() - lastResult > WATCHDOG_NO_RESULT_MS) {
+                resetSmoothing("watchdog_no_result"); overlay?.show(null)
                 TrackerState.publish(null, "카메라 신호 대기 · 다른 카메라 앱을 닫아 주세요")
             }
             main.postDelayed(this, 400)
@@ -81,6 +81,8 @@ class TrackingService : LifecycleService() {
             if (Build.VERSION.SDK_INT >= 30) startForeground(1, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA)
             else startForeground(1, notification)
             overlay = DotOverlay(this)
+            TrackerState.resetSmoothing = { reason -> resetSmoothing(reason) }
+            TrackerState.overlayBounds = { overlay?.bounds() }
             initialRotation = rotation(); initialSize = sizeKey()
             displayManager.registerDisplayListener(displayListener, main)
             ContextCompat.registerReceiver(this, screenReceiver, IntentFilter(Intent.ACTION_SCREEN_OFF), ContextCompat.RECEIVER_NOT_EXPORTED)
@@ -121,6 +123,8 @@ class TrackingService : LifecycleService() {
                 val camera = provider.bindToLifecycle(this, CameraSelector.DEFAULT_FRONT_CAMERA, analyzer)
                 camera.cameraInfo.cameraState.observe(this) { state ->
                     if (state.error != null && !closing) {
+                        // Not a smoothing reset in this pipeline; logged so a run records that it happened.
+                        (EvaluationLog.current ?: EvaluationLog.draining)?.event(SystemClock.uptimeMillis(), EvaluationSession.EVENT_CAMERA_ERROR, state.error?.type?.name ?: "")
                         overlay?.show(null)
                         TrackerState.publish(null, "카메라 사용 불가 · 다른 카메라 앱을 닫고 다시 시도해 주세요")
                     }
@@ -131,19 +135,40 @@ class TrackingService : LifecycleService() {
 
     private fun process(frame: ImageProxy) {
         var raw: Bitmap? = null; var upright: Bitmap? = null
+        // Evaluation logging observes this path only; it stays null outside an evaluation run.
+        var attempt: EvaluationAttempt? = null
         try {
             val now = SystemClock.uptimeMillis()
-            if (closing || now - lastFrame < 66) return
+            val acceptedNanos = System.nanoTime()
+            val log = EvaluationLog.sessionAt(now)
+            log?.frameReceived()
+            if (closing || now - lastFrame < FRAME_INTERVAL_MS) { log?.frameSkipped(closing); return }
             lastFrame = now
+            attempt = log?.beginAttempt(now, acceptedNanos)
             raw = frame.toBitmap()
             val matrix = Matrix().apply { postRotate(frame.imageInfo.rotationDegrees.toFloat()) }
             upright = Bitmap.createBitmap(raw, 0, 0, raw.width, raw.height, matrix, true)
             val image = BitmapImageBuilder(upright).build()
+            val detectStart = System.nanoTime()
             val result = try { landmarker?.detectForVideo(image, now) } finally { image.close() }
-            val features = result?.faceLandmarks()?.firstOrNull()?.let { LandmarkFeatures.extract(it, upright.width, upright.height) }
+            val detectNanos = System.nanoTime() - detectStart
+            val extraction = result?.faceLandmarks()?.firstOrNull()?.let { LandmarkFeatures.extractDetailed(it, upright.width, upright.height) }
+            val features = extraction?.features
+            attempt?.observed(when {
+                result == null -> EvaluationDetector.NOT_READY
+                result.faceLandmarks().isEmpty() -> EvaluationDetector.NO_FACE
+                else -> EvaluationDetector.FACE
+            }, extraction?.rejection, features, if (result != null) detectNanos else null, System.nanoTime())
+            val logged = attempt
             main.post {
-                if (closing) return@post
+                logged?.reachedMain(System.nanoTime())
+                if (closing) { logged?.discarded(EvaluationOutcome.DISCARDED_CLOSING, SystemClock.uptimeMillis()); return@post }
                 lastResult = SystemClock.uptimeMillis()
+                // A run's smoothing context holds only its own logged results: an unlogged result accepted before
+                // the run's planned end (in flight at run start) is dropped while that run is active, and counted.
+                EvaluationLog.current?.let { s ->
+                    if (logged == null && now < s.run.endMs) { s.unloggedResultDropped(now, SystemClock.uptimeMillis()); return@post }
+                }
                 val model = TrackerState.model
                 val position = if (features != null) model?.predict(features) else null
                 val message = when {
@@ -152,20 +177,35 @@ class TrackingService : LifecycleService() {
                     position == null -> "얼굴 위치가 달라졌습니다 · 원래 위치로 돌아오거나 재보정하세요"
                     else -> "추적 중 · 홈으로 나가도 빨간 점이 표시됩니다"
                 }
-                smoothed = if (position == null) null else smoothed?.let {
-                    it.first + 0.28 * (position.first - it.first) to it.second + 0.28 * (position.second - it.second)
-                } ?: position
-                overlay?.show(smoothed)
+                val smoothed = smoother.update(position)
+                // Blind evaluation withholds the pointer from the participant; the coordinate itself is unchanged.
+                val visible = if (EvaluationState.hidesPointer) null else smoothed
+                overlay?.show(visible)
                 TrackerState.publish(features, message,
                     smoothed?.let { ScreenGaze(it.first, it.second, now) })
+                if (logged != null) {
+                    val publishedNanos = System.nanoTime()
+                    val at = SystemClock.uptimeMillis()
+                    // A run measures exactly one model; the evaluation screen ends the run if it changes.
+                    if (model == null || model !== logged.session.model) logged.discarded(EvaluationOutcome.DISCARDED_MODEL_CHANGED, at)
+                    else logged.processed(at, features?.let { model.rejection(it) }, features?.let { model.linearOutput(it) },
+                        position, smoothed, visible?.let { p -> overlay?.drawnAt(p) }, publishedNanos)
+                }
             }
         } catch (e: Exception) {
+            attempt?.failed()
             main.post { if (!closing) fail("영상 처리 실패: ${e.message}") }
         } finally {
             if (upright !== raw) upright?.recycle()
             raw?.recycle()
             frame.close()
         }
+    }
+
+    private fun resetSmoothing(reason: String) {
+        // Replay needs every smoothing reset of a run, in main-thread order.
+        (EvaluationLog.current ?: EvaluationLog.draining)?.smoothingReset(SystemClock.uptimeMillis(), reason)
+        smoother.reset()
     }
 
     private fun fail(message: String) {
@@ -179,6 +219,10 @@ class TrackingService : LifecycleService() {
     }
     override fun onDestroy() {
         closing = true
+        // A run cannot continue without its camera; it is finalized as incomplete.
+        EvaluationLog.finish(EvaluationEndReason.SERVICE_STOPPED, SystemClock.uptimeMillis())
+        TrackerState.resetSmoothing = null; TrackerState.overlayBounds = null
+        TrackerState.clearCalibration()
         main.removeCallbacksAndMessages(null)
         displayManager.unregisterDisplayListener(displayListener)
         if (receiverRegistered) unregisterReceiver(screenReceiver)
@@ -192,5 +236,11 @@ class TrackingService : LifecycleService() {
         stopForeground(STOP_FOREGROUND_REMOVE)
         super.onDestroy()
     }
-    companion object { const val ACTION_STOP = "dev.gazedot.STOP" }
+    companion object {
+        const val ACTION_STOP = "dev.gazedot.STOP"
+        /** Minimum spacing between frames accepted for processing; later frames are skipped. */
+        const val FRAME_INTERVAL_MS = 66L
+        /** The watchdog clears the smoothing state when no result arrived for longer than this. */
+        const val WATCHDOG_NO_RESULT_MS = 800L
+    }
 }

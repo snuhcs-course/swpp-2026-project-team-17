@@ -1,0 +1,6 @@
+schema_version,session_id,main_seq,event_uptime_ms,elapsed_ms,event,detail
+3,eval-synthetic-0001,0,999900,-100,smoothing_reset,run_start
+3,eval-synthetic-0001,1,999990,-10,unlogged_result_dropped,pre_run accepted_uptime_ms=999960
+3,eval-synthetic-0001,51,1003242,3242,smoothing_reset,watchdog_no_result
+3,eval-synthetic-0001,62,1003899,3899,camera_error,ERROR_CAMERA_IN_USE
+3,eval-synthetic-0001,73,1005375,5375,smoothing_reset,watchdog_no_result

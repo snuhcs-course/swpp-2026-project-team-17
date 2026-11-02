@@ -5,6 +5,15 @@ import kotlin.math.*
 data class EyeFeatures(val x: Double, val y: Double, val faceX: Double, val faceY: Double, val scale: Double)
 data class Anchor(val eye: EyeFeatures, val x: Double, val y: Double)
 
+/** Read-only copy of a fitted [GazeModel], recorded by evaluation sessions for replay checks. */
+data class GazeModelParameters(
+    val meanX: Double, val meanY: Double, val stdX: Double, val stdY: Double,
+    val wx: List<Double>, val wy: List<Double>,
+    val referenceX: Double, val referenceY: Double,
+    val referenceFaceX: Double, val referenceFaceY: Double, val referenceScale: Double,
+    val fitError: Double,
+)
+
 /** Calibration maps iris displacement inside the eye to display coordinates.
  * This is a calibrated approximation, not a pretrained screen-gaze model. */
 class GazeModel private constructor(
@@ -14,14 +23,28 @@ class GazeModel private constructor(
     private val reference: EyeFeatures,
     val fitError: Double,
 ) {
-    fun predict(f: EyeFeatures): Pair<Double, Double>? {
-        if (!listOf(f.x, f.y, f.faceX, f.faceY, f.scale).all { it.isFinite() }) return null
+    fun predict(f: EyeFeatures): Pair<Double, Double>? =
+        linearOutput(f)?.let { it.first.coerceIn(0.0, 1.0) to it.second.coerceIn(0.0, 1.0) }
+
+    /** Why [predict] returns null for [f]; null when it predicts. */
+    fun rejection(f: EyeFeatures): String? = when {
+        !listOf(f.x, f.y, f.faceX, f.faceY, f.scale).all { it.isFinite() } -> "non_finite_features"
         // A changed pose/distance invalidates this simple calibration. Do not invent a point.
-        if (f.scale !in reference.scale * 0.72..reference.scale * 1.28 ||
-            abs(f.faceX - reference.faceX) > 0.12 || abs(f.faceY - reference.faceY) > 0.12) return null
-        val v = doubleArrayOf(1.0, (f.x - meanX) / stdX, (f.y - meanY) / stdY)
-        return dot(wx, v).coerceIn(0.0, 1.0) to dot(wy, v).coerceIn(0.0, 1.0)
+        f.scale !in reference.scale * 0.72..reference.scale * 1.28 -> "scale_outside_0.72_1.28"
+        abs(f.faceX - reference.faceX) > 0.12 -> "face_x_shift_gt_0.12"
+        abs(f.faceY - reference.faceY) > 0.12 -> "face_y_shift_gt_0.12"
+        else -> null
     }
+
+    /** The linear map before [predict]'s [0, 1] clamp. Evaluation diagnostics only; the app never uses it. */
+    fun linearOutput(f: EyeFeatures): Pair<Double, Double>? {
+        if (rejection(f) != null) return null
+        val v = doubleArrayOf(1.0, (f.x - meanX) / stdX, (f.y - meanY) / stdY)
+        return dot(wx, v) to dot(wy, v)
+    }
+
+    fun parameters() = GazeModelParameters(meanX, meanY, stdX, stdY, wx.toList(), wy.toList(),
+        reference.x, reference.y, reference.faceX, reference.faceY, reference.scale, fitError)
 
     companion object {
         fun fit(anchors: List<Anchor>): GazeModel? {
@@ -64,6 +87,21 @@ class GazeModel private constructor(
             return DoubleArray(3) { a[it][3] }
         }
     }
+}
+
+/** Exponential smoothing of the model output for the overlay (factor 0.28). A null prediction clears it. */
+class GazeSmoother {
+    var value: Pair<Double, Double>? = null
+        private set
+
+    fun update(position: Pair<Double, Double>?): Pair<Double, Double>? {
+        value = if (position == null) null else value?.let {
+            it.first + 0.28 * (position.first - it.first) to it.second + 0.28 * (position.second - it.second)
+        } ?: position
+        return value
+    }
+
+    fun reset() { value = null }
 }
 
 fun medianFeatures(samples: List<EyeFeatures>): EyeFeatures {
