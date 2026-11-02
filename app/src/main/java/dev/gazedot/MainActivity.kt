@@ -103,7 +103,9 @@ class MainActivity : ComponentActivity() {
             gravity = Gravity.CENTER_HORIZONTAL
             setPadding(dp(24), 0, dp(24), dp(16))
         }
-        root.addView(content, FrameLayout.LayoutParams(-1, -2))
+        // Scrolls if the steps do not fit above the stop button (72 dp margin + 46 dp button + 8 dp gap).
+        val scroll = ScrollView(this).apply { addView(content, ViewGroup.LayoutParams(-1, -2)) }
+        root.addView(scroll, FrameLayout.LayoutParams(-1, -1).apply { bottomMargin = dp(126) })
 
         val logo = TextView(this).apply {
             text = "NoTouch"; textSize = sp(30f); setTextColor(ink); gravity = Gravity.CENTER
@@ -202,6 +204,17 @@ class MainActivity : ComponentActivity() {
                 setContentView(calibration)
             }
         }
+        // Iteration 3 gaze evaluation is an internal tool: debuggable builds only. Placed right below the calibration
+        // control, inside the scrolling content, so it stays clear of the navigation bar.
+        if (evaluationEntryEnabled(applicationInfo.flags)) {
+            val evaluation = TextView(this).apply {
+                text = "시선 정확도 평가 (개발용)"; textSize = sp(13f); setTextColor(blue); gravity = Gravity.CENTER
+                setPadding(dp(16), 0, dp(16), 0)
+                style(this, 600)
+                setOnClickListener { startActivity(Intent(this@MainActivity, EvaluationActivity::class.java)) }
+            }
+            content.addView(evaluation, LinearLayout.LayoutParams(-2, dp(44)).apply { topMargin = dp(4) })
+        }
         addStep("3", "시선 테스트", "회색 점이 시선을 잘 따라오는지 확인해 주세요.\n잘 맞지 않는다면 다시 보정해 주세요.", 26)
 
         stopButton = pill("추적 중지") {
@@ -213,15 +226,6 @@ class MainActivity : ComponentActivity() {
         root.addView(stopButton, FrameLayout.LayoutParams(dp(186), dp(46), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply {
             bottomMargin = dp(72)
         })
-        // Iteration 3 gaze evaluation is an internal tool: debuggable builds only.
-        if (evaluationEntryEnabled(applicationInfo.flags)) {
-            val evaluation = TextView(this).apply {
-                text = "시선 정확도 평가 (개발용)"; textSize = sp(13f); setTextColor(blue); gravity = Gravity.CENTER
-                style(this, 600)
-                setOnClickListener { startActivity(Intent(this@MainActivity, EvaluationActivity::class.java)) }
-            }
-            root.addView(evaluation, FrameLayout.LayoutParams(-1, dp(44), Gravity.BOTTOM).apply { bottomMargin = dp(20) })
-        }
         setContentView(root)
         updateHomeButtons()
 
