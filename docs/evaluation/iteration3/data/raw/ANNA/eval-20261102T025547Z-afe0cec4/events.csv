@@ -1,0 +1,4 @@
+schema_version,session_id,main_seq,event_uptime_ms,elapsed_ms,event,detail
+3,eval-20261102T025547Z-afe0cec4,0,2779983,-95,smoothing_reset,run_start
+3,eval-20261102T025547Z-afe0cec4,1,2779993,-85,unlogged_result_dropped,pre_run accepted_uptime_ms=2779944
+3,eval-20261102T025547Z-afe0cec4,2,2780058,-20,unlogged_result_dropped,pre_run accepted_uptime_ms=2780013

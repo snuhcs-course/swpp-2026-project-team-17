@@ -1,0 +1,38 @@
+{
+  "manifest_schema_version": 1,
+  "purpose": "Session selection for the Iteration 3 analysis and figures of the home-screen candidate. Selection is by unique session_id; labels are recorded as they appear in metadata.json and are not renamed.",
+  "raw_root": "docs/evaluation/iteration3/data/raw",
+  "frozen_inputs": "docs/evaluation/iteration3/data/raw-inputs.sha256",
+  "included": [
+    {
+      "participant_id": "ANNA",
+      "session_label": "S1",
+      "session_id": "eval-20261102T025547Z-afe0cec4",
+      "raw_path": "docs/evaluation/iteration3/data/raw/ANNA/eval-20261102T025547Z-afe0cec4",
+      "reason": "Complete blind_measurement run (32/32 presentations) after a fresh nine-point calibration."
+    },
+    {
+      "participant_id": "ANNA",
+      "session_label": "S3",
+      "session_id": "eval-20261102T025951Z-5333a1c9",
+      "raw_path": "docs/evaluation/iteration3/data/raw/ANNA/eval-20261102T025951Z-5333a1c9",
+      "reason": "Complete blind_measurement run (32/32 presentations) after a fresh nine-point calibration. The recorded label is S3; no session is labelled S2."
+    }
+  ],
+  "excluded": [
+    {
+      "participant_id": "ANNA",
+      "session_label": "S1",
+      "session_id": "eval-20261102T025300Z-a459e68a",
+      "reason": "Interrupted with Back after about 10 s (end_reason back, 4/32 presentations, final_state incomplete). Removed from data/raw by the participant; not restored and not analyzed.",
+      "preserved_copies": [
+        "Original three-session phone export outside the repository: C:\\Users\\user\\Desktop\\gazedot-ANNA-export-20261102-120341\\export-ANNA.tar (SHA-256 0e770fe824d2fd308cf15ae0bd6a550b7425794c9bd3590c41c85ad7737727d7)",
+        "Git-ignored extracted copy: docs/evaluation/iteration3/data/incoming/files/evaluation/iter3/ANNA/eval-20261102T025300Z-a459e68a"
+      ]
+    }
+  ],
+  "never_included": [
+    "Technical-pilot sessions (participant IDs starting with PILOT, stored under data/pilot/)",
+    "Synthetic fixtures (tools/gaze_eval/testdata/ and test-generated sessions)"
+  ]
+}

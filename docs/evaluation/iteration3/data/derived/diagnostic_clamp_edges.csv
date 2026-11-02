@@ -1,0 +1,3 @@
+participant_id,session_label,session_id,valid_measurement_samples,linear_x_below_0,linear_x_above_1,linear_y_below_0_top,linear_y_above_1_bottom,any_axis_outside
+ANNA,S1,eval-20261102T025547Z-afe0cec4,555,1,68,68,0,120
+ANNA,S3,eval-20261102T025951Z-5333a1c9,551,38,0,30,0,64

@@ -10,3 +10,6 @@ docs/evaluation/iteration3/data/raw/README.md text eol=lf
 docs/evaluation/iteration3/data/derived/** text eol=lf
 docs/evaluation/iteration3/data/*.sha256 text eol=lf
 tools/gaze_eval/testdata/** -text
+docs/evaluation/iteration3/data/*.json text eol=lf
+docs/evaluation/iteration3/figures/*.svg -text
+docs/evaluation/iteration3/figures/*.png binary

@@ -16,7 +16,7 @@ spatial metric is a target-referenced gaze error, not a ground-truth eye-directi
 
 Usage:
     python tools/gaze_eval/analyze_gaze_eval.py <raw-data dir | session dir> --out <dir>
-        [--protocol docs/evaluation/iteration3/protocol.json] [--source-label TEXT]
+        [--protocol docs/evaluation/iteration3/protocol.json] [--source-label TEXT] [--selection MANIFEST]
 """
 from __future__ import annotations
 
@@ -868,6 +868,35 @@ def discover(root: Path) -> list[Path]:
     return found
 
 
+def select_sessions(paths: list[Path], selection_path: Path) -> tuple[list[Path], dict]:
+    """Keeps only the sessions whose metadata session_id is listed under "included" in an analysis-input manifest.
+
+    Selection is by unique session_id, never by label or folder name. Every listed session must be found exactly once.
+    """
+    try:
+        manifest = json.loads(selection_path.read_text(encoding="utf-8"))
+        wanted = [entry["session_id"] for entry in manifest["included"]]
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError, KeyError, TypeError) as e:
+        raise SystemExit(f"error: selection manifest {selection_path} unusable: {e}") from e
+    if len(set(wanted)) != len(wanted):
+        raise SystemExit(f"error: selection manifest {selection_path} lists a session_id twice")
+    found: dict[str, list[Path]] = {}
+    for path in paths:
+        try:
+            sid = json.loads((path / "metadata.json").read_text(encoding="utf-8")).get("session_id")
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError, AttributeError):
+            continue
+        if sid in wanted:
+            found.setdefault(sid, []).append(path)
+    problems = [f"{sid} not found" for sid in wanted if sid not in found]
+    problems += [f"{sid} found {len(p)} times" for sid, p in found.items() if len(p) != 1]
+    if problems:
+        raise SystemExit(f"error: selection {selection_path.name}: " + "; ".join(problems))
+    info = {"manifest": selection_path.name, "manifest_sha256": hashlib.sha256(selection_path.read_bytes()).hexdigest(),
+            "included_session_ids": wanted, "excluded_by_selection": len(paths) - len(wanted)}
+    return [found[sid][0] for sid in wanted], info
+
+
 def _strip_private(value):
     if isinstance(value, dict):
         return {k: _strip_private(v) for k, v in value.items() if not k.startswith("_")}
@@ -881,10 +910,14 @@ def _write(path: Path, text: str) -> None:
         f.write(text)
 
 
-def run(input_path: Path, out_dir: Path, protocol_path: Path, source_label: str | None) -> dict:
+def run(input_path: Path, out_dir: Path, protocol_path: Path, source_label: str | None,
+        selection: Path | None = None) -> dict:
     protocol = load_protocol(protocol_path)
     root = input_path.resolve()
     paths = discover(root)
+    selection_info = None
+    if selection is not None:
+        paths, selection_info = select_sessions(paths, selection)
     resolved_out = out_dir.resolve()
     if resolved_out == root or root in resolved_out.parents:
         raise SystemExit(f"error: --out {out_dir} is inside the input data {input_path}; raw data is never written to")
@@ -912,6 +945,7 @@ def run(input_path: Path, out_dir: Path, protocol_path: Path, source_label: str 
         "pipeline_variant": PIPELINE_VARIANT,
         "measured_coordinate": "smoothed_x_norm/smoothed_y_norm: the candidate's smoothed output, which inherits "
                                "GazeModel's [0, 1] clamp (not an unclamped raw output)",
+        **({"input_selection": selection_info} if selection_info is not None else {}),
         "protocol": {"id": protocol.protocol_id, "version": protocol.version, "sha256": protocol.sha256,
                      "manifest": protocol.path.name},
         "source_label": source_label,
@@ -1098,11 +1132,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out", type=Path, required=True, help="output directory, outside the input data")
     parser.add_argument("--protocol", type=Path, default=DEFAULT_PROTOCOL, help="protocol manifest (default: repository copy)")
     parser.add_argument("--source-label", help="free-text label for the analyzed build or dataset")
+    parser.add_argument("--selection", type=Path,
+                        help="analysis-input manifest; only sessions whose session_id is listed under 'included' are analyzed")
     args = parser.parse_args(argv)
     if not args.input.is_dir():
         parser.error(f"input {args.input} is not a directory")
     try:
-        summary = run(args.input, args.out, args.protocol, args.source_label)
+        summary = run(args.input, args.out, args.protocol, args.source_label, args.selection)
     except ProtocolError as e:
         print(f"error: {e}", file=sys.stderr)
         return 2

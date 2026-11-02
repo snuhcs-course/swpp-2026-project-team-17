@@ -1,0 +1,166 @@
+{
+  "schema_version": 3,
+  "record_type": "notouch_gaze_evaluation_session",
+  "session_id": "eval-20261102T025951Z-5333a1c9",
+  "participant_id": "ANNA",
+  "session_label": "S3",
+  "mode": "blind_measurement",
+  "final_state": "complete",
+  "end_reason": "completed",
+  "start_wall_time_utc": "2026-11-02T02:59:51.538Z",
+  "end_wall_time_utc": "2026-11-02T03:01:11.635Z",
+  "start_uptime_ms": 3024513,
+  "end_uptime_ms": 3104513,
+  "planned_end_uptime_ms": 3104513,
+  "protocol": {
+    "id": "notouch-gaze-eval-iter3",
+    "version": "2.0.0",
+    "sha256": "d2c8a788b3b0adf869937c32318af29a7eb9de212e130c1dc76863c654a18c83",
+    "sha256_basis": "docs/evaluation/iteration3/protocol.json bytes with CRLF converted to LF",
+    "grid_norm": [0.2, 0.4, 0.6, 0.8],
+    "presentation_ms": 2500,
+    "settling_ms": 1000,
+    "measurement_ms": 1500,
+    "presentations_planned": 32,
+    "presentations_completed": 32,
+    "case_ids": ["pass1-r0c0", "pass1-r0c1", "pass1-r0c2", "pass1-r0c3", "pass1-r1c3", "pass1-r1c2", "pass1-r1c1", "pass1-r1c0", "pass1-r2c0", "pass1-r2c1", "pass1-r2c2", "pass1-r2c3", "pass1-r3c3", "pass1-r3c2", "pass1-r3c1", "pass1-r3c0", "pass2-r3c0", "pass2-r3c1", "pass2-r3c2", "pass2-r3c3", "pass2-r2c3", "pass2-r2c2", "pass2-r2c1", "pass2-r2c0", "pass2-r1c0", "pass2-r1c1", "pass2-r1c2", "pass2-r1c3", "pass2-r0c3", "pass2-r0c2", "pass2-r0c1", "pass2-r0c0"]
+  },
+  "build": {
+    "git_commit": "a8f08696afd3a550bd20c9d4c52fd657123fcdcb",
+    "git_dirty_at_build": "false",
+    "source_base": "30be1cf726a47ab5751bd8e8bb4f537d0c82c810",
+    "source_base_is_ancestor": "true",
+    "evaluation_reference": "f59bf6acb40c4c1a7eaee5547caea4a382139db1",
+    "build_type": "debug"
+  },
+  "app": {
+    "application_id": "dev.gazedot",
+    "version_name": "0.1.0",
+    "version_code": 1
+  },
+  "libraries": {
+    "mediapipe_tasks_vision": "0.10.26",
+    "camerax": "1.4.2",
+    "face_landmarker_task_sha256": "64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff"
+  },
+  "device": {
+    "manufacturer": "samsung",
+    "model": "SM-S918N",
+    "api_level": 36,
+    "android_release": "16"
+  },
+  "display": {
+    "basis": "WindowManager.maximumWindowMetrics bounds (calibration basis)",
+    "width_px": 1080,
+    "height_px": 2316,
+    "rotation": 0,
+    "density": 2.8125,
+    "evaluation_view": {
+      "left_px": 0,
+      "top_px": 0,
+      "width_px": 1080,
+      "height_px": 2316
+    },
+    "calibration_view": {
+      "left_px": 0,
+      "top_px": 0,
+      "width_px": 1080,
+      "height_px": 2316
+    },
+    "overlay_view": {
+      "left_px": 0,
+      "top_px": 0,
+      "width_px": 1080,
+      "height_px": 2316
+    },
+    "overlay_matches_basis": true
+  },
+  "predictor": {
+    "kind": "GazeModel",
+    "source": "candidate_9_point_calibration",
+    "calibration_serial": 4,
+    "calibration_completed_uptime_ms": 3006214,
+    "calibration_age_ms_at_start": 18299,
+    "evaluation_runs_on_this_calibration_before": 0,
+    "verified_snapshot_refit": true,
+    "calibration_inputs_sha256": "e98369c75c590e63dbaa3ab7822d54cffed9a497de384ec6f4a971d808b5ae68",
+    "anchors": 9,
+    "fit_error": 0.15816149744039687,
+    "snapshot_file": "model_snapshot.json"
+  },
+  "conditions": {
+    "viewing_distance_cm": 40.0,
+    "lighting": "Indoors, good lighting",
+    "glasses": "contact_lenses",
+    "notes": "",
+    "declared": "entered by the operator before the run"
+  },
+  "pipeline": {
+    "variant": "home_screen_candidate",
+    "frame_interval_min_ms": 66,
+    "stale_result_rule": "none; every delivered result is processed",
+    "watchdog_no_result_ms": 800,
+    "model_clamp": "GazeModel.predict clamps each axis to [0, 1]",
+    "smoothing": "GazeSmoother: s + 0.28 * (p - s) per axis; cleared by a null prediction and by the watchdog",
+    "smoothing_reset_at_run_start": true,
+    "run_start_lead_ms": 100,
+    "pointer_visible": false
+  },
+  "coordinates": {
+    "frame": "full-display normalized: px / calibration basis (WindowManager.maximumWindowMetrics bounds); shared by calibration anchors, targets and predictions",
+    "linear": "GazeModel linear output before the model's own [0, 1] clamp; diagnostic only, never used by the app",
+    "predicted": "GazeModel.predict output, clamped to [0, 1] per axis by the model",
+    "smoothed": "GazeSmoother output (0.28 exponential smoothing of predicted) supplied to TrackerState and the overlay; primary measured coordinate; inherits the model clamp",
+    "rendered": "screen px where DotOverlay draws the smoothed point (overlay view origin + smoothed x overlay view size); empty when the pointer is hidden"
+  },
+  "timing": {
+    "accepted_uptime_ms": "SystemClock.uptimeMillis when the camera worker accepted the frame; detectForVideo timestamp and schedule key",
+    "result_uptime_ms": "SystemClock.uptimeMillis when the main thread finished handling the result",
+    "landmarker_ms": "System.nanoTime duration of FaceLandmarker.detectForVideo only",
+    "delivery_ms": "System.nanoTime from posting the result on the worker to the main-thread handler starting",
+    "latency_ms": "System.nanoTime from frame acceptance to publication of the processed result, or to explicit discard"
+  },
+  "counters": {
+    "frames_received": 2325,
+    "frames_cadence_skipped": 1402,
+    "frames_ignored_service_closing": 0,
+    "attempts_accepted": 923,
+    "attempts_recorded": 923,
+    "attempts_unrecorded": 0,
+    "attempts_by_outcome": {
+      "processed": 923,
+      "discarded_closing": 0,
+      "discarded_model_changed": 0,
+      "processing_error": 0
+    },
+    "detector": {
+      "landmarker_not_ready": 0,
+      "no_face": 0,
+      "face_detected": 923
+    },
+    "valid_attempts": 902,
+    "invalid_by_reason": {
+      "no_features": 21
+    },
+    "smoothing_resets": 1,
+    "camera_errors": 0,
+    "unlogged_results_dropped_pre_run": 2,
+    "unlogged_results_dropped_in_run": 0
+  },
+  "logging": {
+    "attempt_rows_enqueued": 923,
+    "attempt_rows_written": 923,
+    "event_rows_enqueued": 3,
+    "event_rows_written": 3,
+    "rows_dropped_queue_full": 0,
+    "rows_dropped_write_error": 0,
+    "rows_lost_total": 0,
+    "write_error": false
+  },
+  "files": {
+    "attempts": "attempts.csv",
+    "events": "events.csv",
+    "model_snapshot": "model_snapshot.json",
+    "checksums": "SHA256SUMS"
+  }
+}

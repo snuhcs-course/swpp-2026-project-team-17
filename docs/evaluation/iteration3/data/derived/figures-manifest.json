@@ -1,0 +1,160 @@
+{
+  "tool": "gaze_eval_figures",
+  "tool_version": "1.0.0",
+  "versions": {
+    "python": "3.14.6",
+    "matplotlib": "3.11.2",
+    "numpy": "2.5.4"
+  },
+  "inputs": {
+    "summary": {
+      "path": "docs/evaluation/iteration3/data/derived/summary.json",
+      "sha256": "713851f6a02ad9bc0dece6cf9d7bd4401341545f16b3b6eb9e56fc3df303a975",
+      "analyzer_version": "3.0.0",
+      "source_label": "ANNA S1 + S3, build a8f08696afd3a550bd20c9d4c52fd657123fcdcb, selection analysis-inputs.json"
+    },
+    "selection": {
+      "path": "docs/evaluation/iteration3/data/analysis-inputs.json",
+      "sha256": "403cdf26f7a450fbaee586eeb081289b77b02a831a934c7905306665c1709189"
+    },
+    "protocol": {
+      "path": "docs/evaluation/iteration3/protocol.json",
+      "id": "notouch-gaze-eval-iter3",
+      "version": "2.0.0",
+      "sha256_lf": "d2c8a788b3b0adf869937c32318af29a7eb9de212e130c1dc76863c654a18c83"
+    },
+    "frozen_raw_inputs": "docs/evaluation/iteration3/data/raw-inputs.sha256"
+  },
+  "sessions": [
+    {
+      "participant_id": "ANNA",
+      "session_label": "S1",
+      "session_id": "eval-20261102T025547Z-afe0cec4",
+      "short_id": "afe0cec4",
+      "start_wall_time_utc": "2026-11-02T02:55:47.104Z",
+      "mode": "blind_measurement",
+      "build": {
+        "git_commit": "a8f08696afd3a550bd20c9d4c52fd657123fcdcb",
+        "git_dirty_at_build": "false",
+        "source_base": "30be1cf726a47ab5751bd8e8bb4f537d0c82c810",
+        "source_base_is_ancestor": "true",
+        "evaluation_reference": "f59bf6acb40c4c1a7eaee5547caea4a382139db1",
+        "build_type": "debug"
+      },
+      "calibration_inputs_sha256": "7c5a1056beb692d06fc1891658f39e0282e058a454628c9847770f896aecfe98",
+      "conditions": {
+        "viewing_distance_cm": 40.0,
+        "lighting": "Indoors, good lighting",
+        "glasses": "contact_lenses",
+        "notes": "",
+        "declared": "entered by the operator before the run"
+      },
+      "raw_path": "ANNA/eval-20261102T025547Z-afe0cec4"
+    },
+    {
+      "participant_id": "ANNA",
+      "session_label": "S3",
+      "session_id": "eval-20261102T025951Z-5333a1c9",
+      "short_id": "5333a1c9",
+      "start_wall_time_utc": "2026-11-02T02:59:51.538Z",
+      "mode": "blind_measurement",
+      "build": {
+        "git_commit": "a8f08696afd3a550bd20c9d4c52fd657123fcdcb",
+        "git_dirty_at_build": "false",
+        "source_base": "30be1cf726a47ab5751bd8e8bb4f537d0c82c810",
+        "source_base_is_ancestor": "true",
+        "evaluation_reference": "f59bf6acb40c4c1a7eaee5547caea4a382139db1",
+        "build_type": "debug"
+      },
+      "calibration_inputs_sha256": "e98369c75c590e63dbaa3ab7822d54cffed9a497de384ec6f4a971d808b5ae68",
+      "conditions": {
+        "viewing_distance_cm": 40.0,
+        "lighting": "Indoors, good lighting",
+        "glasses": "contact_lenses",
+        "notes": "",
+        "declared": "entered by the operator before the run"
+      },
+      "raw_path": "ANNA/eval-20261102T025951Z-5333a1c9"
+    }
+  ],
+  "excluded": [
+    {
+      "participant_id": "ANNA",
+      "session_label": "S1",
+      "session_id": "eval-20261102T025300Z-a459e68a",
+      "reason": "Interrupted with Back after about 10 s (end_reason back, 4/32 presentations, final_state incomplete). Removed from data/raw by the participant; not restored and not analyzed.",
+      "preserved_copies": [
+        "Original three-session phone export outside the repository: C:\\Users\\user\\Desktop\\gazedot-ANNA-export-20261102-120341\\export-ANNA.tar (SHA-256 0e770fe824d2fd308cf15ae0bd6a550b7425794c9bd3590c41c85ad7737727d7)",
+        "Git-ignored extracted copy: docs/evaluation/iteration3/data/incoming/files/evaluation/iter3/ANNA/eval-20261102T025300Z-a459e68a"
+      ]
+    }
+  ],
+  "shared_scales": {
+    "error_axis_norm": [
+      0.0,
+      0.5
+    ],
+    "error_threshold_norm": 0.1,
+    "display": {
+      "identical": true,
+      "displays": [
+        {
+          "session_id": "eval-20261102T025547Z-afe0cec4",
+          "width_px": 1080,
+          "height_px": 2316,
+          "rotation": 0
+        },
+        {
+          "session_id": "eval-20261102T025951Z-5333a1c9",
+          "width_px": 1080,
+          "height_px": 2316,
+          "rotation": 0
+        }
+      ]
+    }
+  },
+  "definitions": {
+    "gaze_map_estimate": "per target: equal-weight mean of the analyzer centroids (mean smoothed x, y of valid measurement samples) of its technically eligible presentations",
+    "target_error_bar": "analyzer presentation mean error: mean over valid measurement samples of sqrt((smoothed_x - target_x)^2 + (smoothed_y - target_y)^2); technically ineligible presentations are shown as N/A"
+  },
+  "outputs": {
+    "tables": [
+      "docs/evaluation/iteration3/data/derived/figure_presentations.csv",
+      "docs/evaluation/iteration3/data/derived/figure_target_centroids.csv"
+    ],
+    "figures": [
+      {
+        "path": "docs/evaluation/iteration3/figures/anna_s1_afe0cec4_gaze_map.svg",
+        "sha256": "a29fc76295aefb81ff6f51a11b30f257a9ed53a83cc0ecf6d5222318560aa400"
+      },
+      {
+        "path": "docs/evaluation/iteration3/figures/anna_s1_afe0cec4_gaze_map.png",
+        "sha256": "7b5644ab330adc530ee66ed8a18c2e2e47844cfb35ff182960d5485f2520ba88"
+      },
+      {
+        "path": "docs/evaluation/iteration3/figures/anna_s1_afe0cec4_target_error.svg",
+        "sha256": "9531c437d280bd926aca7f427d1360802e82d113b92b11cd8446d416adf1b236"
+      },
+      {
+        "path": "docs/evaluation/iteration3/figures/anna_s1_afe0cec4_target_error.png",
+        "sha256": "b49c8b0c86282ff893cd4011995e5c7646471e332c35431a09147b72e34495c4"
+      },
+      {
+        "path": "docs/evaluation/iteration3/figures/anna_s3_5333a1c9_gaze_map.svg",
+        "sha256": "96513aa6a508050278b7870b8a08288125a85d33a589caf3c44d306c3de1a30e"
+      },
+      {
+        "path": "docs/evaluation/iteration3/figures/anna_s3_5333a1c9_gaze_map.png",
+        "sha256": "98564c755e197b933bd3ba03463a6f075e387f7ce826230e44a8553d1fff542e"
+      },
+      {
+        "path": "docs/evaluation/iteration3/figures/anna_s3_5333a1c9_target_error.svg",
+        "sha256": "a8c985a60d25da28f001d1b714446146c7363409730c00beac3e0a043953421a"
+      },
+      {
+        "path": "docs/evaluation/iteration3/figures/anna_s3_5333a1c9_target_error.png",
+        "sha256": "880443051fd75da0c17757e59ac165d1ee3447744e1e5a2369eba2d3ffda91aa"
+      }
+    ]
+  }
+}
