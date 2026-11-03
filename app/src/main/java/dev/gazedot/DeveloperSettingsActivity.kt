@@ -12,6 +12,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 /** Local interaction settings. No learned models or network gaze correction. */
 class DeveloperSettingsActivity : ComponentActivity() {
     private lateinit var status: TextView
+    private lateinit var easyControlSwitch: Switch
     private val microphone = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         status.text = if (granted) "마이크 권한 허용됨 · 추적 중지 후 홈에서 다시 시작하세요" else "마이크 권한이 없어 받아쓰기를 사용할 수 없습니다"
     }
@@ -31,21 +32,23 @@ class DeveloperSettingsActivity : ComponentActivity() {
             text = "쉬운 조작\n현재 화면의 버튼을 큰 카드 3개씩 보여줍니다. 두 카드 사이를 바라보면 후보를 나눠 다시 보여줍니다."
             textSize = 18f
         })
-        button("쉬운 조작 켜기") {
-            val service = ControlAccessibilityService.instance
-            when {
-                service == null -> status.text = "먼저 아래에서 접근성 서비스 설정을 열어 NoTouch를 켜 주세요."
-                !TrackerState.running -> status.text = "홈에서 카메라를 시작한 뒤 쉬운 조작을 켜 주세요."
-                else -> {
-                    service.setEasyPanelEnabled(true)
-                    status.text = "쉬운 조작을 켰습니다. 연습 화면이나 다른 앱으로 이동하면 왼쪽 아래에 표시됩니다."
+        easyControlSwitch = Switch(this).apply {
+            text = "쉬운 조작 사용"
+            textSize = 18f
+            minHeight = (56 * d).toInt()
+            isChecked = EasyControlSettings.isEnabled(this@DeveloperSettingsActivity)
+            setOnCheckedChangeListener { _, enabled ->
+                EasyControlSettings.setEnabled(this@DeveloperSettingsActivity, enabled)
+                status.text = when {
+                    !enabled -> "쉬운 조작 OFF · 기존 눈 조작을 사용합니다. 설정을 저장했습니다."
+                    ControlAccessibilityService.instance == null -> "쉬운 조작 ON을 저장했습니다. 접근성 설정에서 NoTouch를 켜 주세요."
+                    !TrackerState.running -> "쉬운 조작 ON을 저장했습니다. 홈에서 카메라를 시작하면 적용됩니다."
+                    !TrackerState.controls -> "쉬운 조작 ON을 저장했습니다. 아래에서 조작을 재개해 주세요."
+                    else -> "쉬운 조작 ON · 연습 화면이나 다른 앱으로 이동하면 왼쪽 아래에 표시됩니다."
                 }
             }
         }
-        button("쉬운 조작 끄기 · 기존 눈 조작 사용") {
-            ControlAccessibilityService.instance?.setEasyPanelEnabled(false)
-            status.text = "쉬운 조작을 껐습니다. 기존 클릭·스크롤·받아쓰기를 사용합니다."
-        }
+        root.addView(easyControlSwitch)
         button("쉬운 조작 체험 화면 열기") { startActivity(Intent(this, EasyControlDemoActivity::class.java)) }
         root.addView(TextView(this).apply {
             text = "9점 보정 후 사용하세요.\n1초 응시: 클릭 · 윙크: 스크롤 모드 · 양눈 두 번 깜빡임: 받아쓰기"
@@ -69,6 +72,11 @@ class DeveloperSettingsActivity : ComponentActivity() {
         }
         button("추적 중지") { stopService(Intent(this, TrackingService::class.java)); status.text = "추적 중지됨" }
         setContentView(ScrollView(this).apply { addView(root) })
+    }
+    override fun onResume() {
+        super.onResume()
+        val enabled = EasyControlSettings.isEnabled(this)
+        if (easyControlSwitch.isChecked != enabled) easyControlSwitch.isChecked = enabled
     }
     override fun onStart() { super.onStart(); TrackerState.settingsStarted() }
     override fun onStop() { TrackerState.settingsStopped(); super.onStop() }

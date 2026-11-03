@@ -77,6 +77,7 @@ class TrackingService : LifecycleService() {
         if (TrackerState.running) {
             TrackerState.controls = true
             pipeline.cancelInteraction()
+            ControlAccessibilityService.instance?.syncEasyPanelPreference()
             TrackerState.actionStatus = "눈 조작 준비 · 연습 화면 또는 다른 앱에서 사용하세요"
             return START_NOT_STICKY
         }
@@ -112,6 +113,7 @@ class TrackingService : LifecycleService() {
             receiverRegistered = true
             TrackerState.controls = true
             TrackerState.running = true
+            ControlAccessibilityService.instance?.syncEasyPanelPreference()
             TrackerState.publish(null, "카메라·눈 검출 모델 준비 중…")
             TrackerState.actionStatus = "눈 조작 준비 · 접근성 권한을 허용하고 연습 화면에서 확인하세요"
             main.postDelayed(watchdog, 3000)
@@ -275,6 +277,7 @@ class TrackingService : LifecycleService() {
         analysis?.let { cameraProvider?.unbind(it) }
         pipeline.reset()
         TrackerState.trackingStopped()
+        ControlAccessibilityService.instance?.syncEasyPanelPreference()
         TrackerState.model = null
         if (::voice.isInitialized) voice.cancel()
         TrackerState.cancelActions = null

@@ -23,7 +23,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 
-/** Calibration success → dwell click → wink-controlled scrolling → completion. */
+/** Calibration success → dwell click → scrolling → easy-control choice → completion. */
 @SuppressLint("ViewConstructor")
 internal class PostCalibrationTutorialView(
     context: Context,
@@ -32,7 +32,7 @@ internal class PostCalibrationTutorialView(
     private val onRecalibrate: () -> Unit,
     private val onFinished: () -> Unit,
 ) : FrameLayout(context) {
-    private enum class Step { CALIBRATED, BUTTON, SCROLL, FINISHED }
+    private enum class Step { CALIBRATED, BUTTON, SCROLL, EASY_CONTROL, FINISHED }
     private var step = Step.CALIBRATED
     private var closed = false
     private val dwell = TutorialDwell()
@@ -47,6 +47,8 @@ internal class PostCalibrationTutorialView(
     }
     private val logo = label("NoTouch", 800, Gravity.START)
     private var target: GazeButton? = null
+    private val modeChoice = TutorialModeChoice()
+    private val modeButtons = mutableListOf<Pair<GazeButton, Boolean>>()
     private var scrollPanel: ScrollView? = null
     private var horizontalPanel: HorizontalScrollView? = null
     private var scrollStatus: TextView? = null
@@ -56,10 +58,16 @@ internal class PostCalibrationTutorialView(
     }
     private val freshnessCheck = object : Runnable {
         override fun run() {
-            if (closed || step != Step.BUTTON) return
-            dwell.expire(SystemClock.uptimeMillis())
-            TrackerState.localDwellProgress = dwell.progress
-            target?.setProgress(dwell.progress)
+            if (closed || step !in listOf(Step.BUTTON, Step.EASY_CONTROL)) return
+            val now = SystemClock.uptimeMillis()
+            if (step == Step.EASY_CONTROL) {
+                modeChoice.expire(now)
+                updateModeProgress()
+            } else {
+                dwell.expire(now)
+                TrackerState.localDwellProgress = dwell.progress
+                target?.setProgress(dwell.progress)
+            }
             postDelayed(this, 50)
         }
     }
@@ -91,21 +99,44 @@ internal class PostCalibrationTutorialView(
         removeCallbacks(advance); removeCallbacks(freshnessCheck)
         animation?.cancel(); animation = null
         dwell.reset(); retryGesture.reset(); scrolling.reset()
+        modeChoice.reset()
         TrackerState.localDwellProgress = 0f
         TrackerState.localScrollMode = false
         target?.setProgress(0f)
+        modeButtons.forEach { it.first.setProgress(0f) }
     }
 
     fun onFrame(sample: GazeSample?, eye: EyeState) {
-        if (closed || step !in listOf(Step.BUTTON, Step.SCROLL)) return
+        if (closed || step !in listOf(Step.BUTTON, Step.SCROLL, Step.EASY_CONTROL)) return
         val now = SystemClock.uptimeMillis()
         if (sample == null || now - sample.timestampMs !in 0..250 || !TrackerState.running) {
             dwell.reset(); retryGesture.reset(); scrolling.reset()
+            modeChoice.interrupt()
             animation?.cancel(); animation = null
             TrackerState.localDwellProgress = 0f
             TrackerState.localScrollMode = false
             target?.setProgress(0f)
+            updateModeProgress()
             updateScrollStatus()
+            return
+        }
+        if (step == Step.EASY_CONTROL) {
+            val gaze = sample.toScreenGaze()
+            val valid = eye == EyeState.OPEN && gaze?.fresh(now) == true &&
+                gaze.x in 0.0..1.0 && gaze.y in 0.0..1.0
+            val option = if (!valid) null else modeButtons.firstOrNull { (button, _) ->
+                val location = IntArray(2)
+                val visible = Rect()
+                button.getLocationOnScreen(location)
+                button.isShown && button.getLocalVisibleRect(visible) &&
+                    visible.contains((gaze!!.x * displayWidth - location[0]).toInt(),
+                        (gaze.y * displayHeight - location[1]).toInt()) &&
+                    TutorialButtonBounds(location[0], location[1], button.width, button.height)
+                        .contains(gaze, displayWidth, displayHeight, rounded = false)
+            }?.second
+            val selected = modeChoice.update(option, valid, sample.timestampMs, now)
+            updateModeProgress()
+            if (selected != null) chooseEasyControl(selected)
             return
         }
         if (step == Step.SCROLL) {
@@ -176,6 +207,19 @@ internal class PostCalibrationTutorialView(
 
     private fun finishTutorial() {
         if (closed || step != Step.SCROLL) return
+        showStep(Step.EASY_CONTROL)
+    }
+
+    private fun updateModeProgress() {
+        TrackerState.localDwellProgress = modeChoice.progress
+        modeButtons.forEach { (button, enabled) ->
+            button.setProgress(if (modeChoice.candidate == enabled) modeChoice.progress else 0f)
+        }
+    }
+
+    private fun chooseEasyControl(enabled: Boolean) {
+        if (closed || step != Step.EASY_CONTROL) return
+        EasyControlSettings.setEnabled(context, enabled)
         showStep(Step.FINISHED)
         onFinished()
     }
@@ -184,7 +228,7 @@ internal class PostCalibrationTutorialView(
         scrollStatus?.text = "스크롤 모드 ${if (scrolling.enabled) "켜짐 · 파란 커서" else "꺼짐 · 빨간 커서"}\n" +
             "↑ ${if (practice.up) "✓" else "○"}  ↓ ${if (practice.down) "✓" else "○"}  " +
             "← ${if (practice.left) "✓" else "○"}  → ${if (practice.right) "✓" else "○"}" +
-            if (practice.up && practice.down) "\n윙크로 모드를 끄면 완료됩니다." else "\n위·아래로 한 번씩 스크롤해 보세요."
+            if (practice.up && practice.down) "\n윙크로 모드를 끄면 다음 단계로 이동합니다." else "\n위·아래로 한 번씩 스크롤해 보세요."
     }
 
     private fun label(value: String, weight: Int = 700, alignment: Int = Gravity.CENTER) = TextView(context).apply {
@@ -202,6 +246,8 @@ internal class PostCalibrationTutorialView(
         removeCallbacks(advance); removeCallbacks(freshnessCheck)
         animation?.cancel(); animation = null
         dwell.reset(); retryGesture.reset(); scrolling.reset()
+        modeChoice.reset()
+        modeButtons.clear()
         TrackerState.localDwellProgress = 0f
         TrackerState.localScrollMode = false
         target = null; scrollPanel = null; horizontalPanel = null; scrollStatus = null
@@ -263,6 +309,21 @@ internal class PostCalibrationTutorialView(
                 scrollStatus = text("", 15, 500)
                 updateScrollStatus()
             }
+            Step.EASY_CONTROL -> {
+                text("버튼을 크게 보여주는\n쉬운 조작을 사용할까요?", 23)
+                text("현재 화면의 버튼을 큰 카드로\n3개씩 보여드려요.", 20)
+                text("안내를 읽은 뒤 원하는 버튼을\n1초 바라보거나 터치해 주세요.", 16, 500)
+                text("나중에 홈의 설정에서\n언제든 켜고 끌 수 있어요.", 15, 500)
+                for ((caption, enabled) in listOf("ON · 켜고 계속" to true, "OFF · 끄고 계속" to false)) {
+                    val button = GazeButton(context, caption).apply {
+                        isFocusable = true
+                        setOnClickListener { chooseEasyControl(enabled) }
+                    }
+                    modeButtons += button to enabled
+                    column.addView(button, LinearLayout.LayoutParams(BUTTON_WIDTH, BUTTON_HEIGHT))
+                }
+                post(freshnessCheck)
+            }
             Step.FINISHED -> {
                 text("튜토리얼이\n완료되었습니다!", 28)
                 text("NoTouch의 기본 사용법을\n모두 익혔습니다.", 23)
@@ -273,7 +334,8 @@ internal class PostCalibrationTutorialView(
         if (isAttachedToWindow) announceForAccessibility(when (next) {
             Step.CALIBRATED -> "시선 보정이 완료되었습니다!"
             Step.BUTTON -> "버튼을 1초 동안 바라보세요. 잘 맞지 않으면 양눈을 두 번 깜빡여 다시 보정합니다."
-            Step.SCROLL -> "윙크로 모드를 켜면 커서가 파란색이 됩니다. 위·아래·왼쪽·오른쪽 1/3을 바라보면 스크롤합니다. 위아래 연습 후 윙크로 끄면 완료됩니다."
+            Step.SCROLL -> "윙크로 모드를 켜면 커서가 파란색이 됩니다. 위·아래·왼쪽·오른쪽 1/3을 바라보면 스크롤합니다. 위아래 연습 후 윙크로 끄면 다음 단계로 이동합니다."
+            Step.EASY_CONTROL -> "쉬운 조작을 사용할지 선택하세요. 안내를 읽은 뒤 ON 또는 OFF 버튼을 1초 바라보거나 터치하세요. 나중에 설정에서 변경할 수 있습니다."
             Step.FINISHED -> "튜토리얼이 완료되었습니다!"
         })
     }
@@ -281,6 +343,8 @@ internal class PostCalibrationTutorialView(
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         updateLayout(); dwell.reset(); TrackerState.localDwellProgress = 0f
+        modeChoice.reset()
+        modeButtons.forEach { it.first.setProgress(0f) }
         target?.setProgress(0f)
     }
 
@@ -313,7 +377,7 @@ internal class PostCalibrationTutorialView(
         }
     }
 
-    private class GazeButton(context: Context) : View(context) {
+    private class GazeButton(context: Context, private val caption: String = "여기를 바라보세요") : View(context) {
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         private val outline = Path()
         private val outlineBounds = RectF()
@@ -322,7 +386,7 @@ internal class PostCalibrationTutorialView(
         private var progress = 0f
         private val font = resources.getFont(R.font.geologica)
         init {
-            contentDescription = "여기를 바라보세요. 연속 1초 응시하면 선택됩니다."
+            contentDescription = "$caption. 연속 1초 응시하면 선택됩니다."
             importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
         }
         fun setProgress(value: Float) {
@@ -349,7 +413,7 @@ internal class PostCalibrationTutorialView(
             paint.isFakeBoldText = true
             paint.textSize = height * .32f
             paint.textAlign = Paint.Align.CENTER
-            canvas.drawText("여기를 바라보세요", width / 2f,
+            canvas.drawText(caption, width / 2f,
                 height / 2f - (paint.ascent() + paint.descent()) / 2f, paint)
             if (progress > 0f) {
                 segment.reset()

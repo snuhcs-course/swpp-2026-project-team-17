@@ -239,7 +239,7 @@ internal class EasyControlPanel(private val service: AccessibilityService) {
         header.addView(text("NoTouch · 쉬운 조작", 21f), LinearLayout.LayoutParams(0, -2, 1f))
         val exit = Button(service).apply { text = "일반 조작"; textSize = 13f; isAllCaps = false }
         header.addView(exit, LinearLayout.LayoutParams(dp(94), dp(52)))
-        bind("disable", exit) { setEnabled(false) }
+        bind("disable", exit) { EasyControlSettings.setEnabled(service, false) }
         root.addView(header)
 
         val count = snapshot?.actions?.size ?: 0

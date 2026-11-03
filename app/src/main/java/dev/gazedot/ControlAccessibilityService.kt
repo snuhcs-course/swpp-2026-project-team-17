@@ -13,8 +13,16 @@ class ControlAccessibilityService : AccessibilityService() {
     private var busy=false
     private val handler=Handler(Looper.getMainLooper())
     private var easyPanel: EasyControlPanel? = null
-    override fun onServiceConnected() { instance=this; easyPanel = EasyControlPanel(this) }
-    fun setEasyPanelEnabled(enabled: Boolean) { easyPanel?.setEnabled(enabled) }
+    override fun onServiceConnected() {
+        instance = this
+        easyPanel?.close()
+        easyPanel = EasyControlPanel(this)
+        syncEasyPanelPreference()
+    }
+    fun setEasyPanelEnabled(enabled: Boolean) { EasyControlSettings.setEnabled(this, enabled) }
+    internal fun syncEasyPanelPreference() {
+        easyPanel?.setEnabled(EasyControlSettings.isEnabled(this) && TrackerState.running)
+    }
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event != null) easyPanel?.onWindowEvent(event)
         if (event?.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
