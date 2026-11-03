@@ -255,7 +255,7 @@ class MainActivity : ComponentActivity() {
             bottomMargin = dp(72)
         })
         root.addView(TextView(this).apply {
-            text = "설정 · 개발자 기능"
+            text = "쉬운 조작 · 설정"
             textSize = sp(14f)
             setTextColor(blue)
             gravity = Gravity.CENTER

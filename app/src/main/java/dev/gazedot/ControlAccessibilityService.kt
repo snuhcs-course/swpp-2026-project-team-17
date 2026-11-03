@@ -12,8 +12,11 @@ import android.view.accessibility.AccessibilityNodeInfo
 class ControlAccessibilityService : AccessibilityService() {
     private var busy=false
     private val handler=Handler(Looper.getMainLooper())
-    override fun onServiceConnected() { instance=this }
+    private var easyPanel: EasyControlPanel? = null
+    override fun onServiceConnected() { instance=this; easyPanel = EasyControlPanel(this) }
+    fun setEasyPanelEnabled(enabled: Boolean) { easyPanel?.setEnabled(enabled) }
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        if (event != null) easyPanel?.onWindowEvent(event)
         if (event?.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             TrackerState.cancelActions?.invoke()
         } else if (event?.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED ||
@@ -51,13 +54,15 @@ class ControlAccessibilityService : AccessibilityService() {
         }
         return try { visit(root, 0); key } finally { root.recycle() }
     }
-    override fun onInterrupt() { TrackerState.controls=false; TrackerState.cancelActions?.invoke() }
+    override fun onInterrupt() { easyPanel?.close(); TrackerState.controls=false; TrackerState.cancelActions?.invoke() }
     override fun onDestroy() {
+        easyPanel?.close()
         if(instance===this) instance=null
         TrackerState.controls=false; TrackerState.cancelActions?.invoke()
         handler.removeCallbacksAndMessages(null); super.onDestroy()
     }
-    private fun allowed()=TrackerState.running && TrackerState.controls && TrackerState.interactionAllowed && !TrackerState.collecting
+    private fun allowed()=TrackerState.running && TrackerState.controls && TrackerState.interactionAllowed &&
+        !TrackerState.collecting && !TrackerState.easyPanelEnabled
     fun tap(x: Float, y: Float): Boolean {
         if(!allowed() || busy) return false
         return gesture(Path().apply { moveTo(x,y) },80)

@@ -28,6 +28,26 @@ class DeveloperSettingsActivity : ComponentActivity() {
             root.addView(Button(this).apply { text = label; setOnClickListener { action() } })
         }
         root.addView(TextView(this).apply {
+            text = "쉬운 조작\n현재 화면의 버튼을 큰 카드 3개씩 보여줍니다. 두 카드 사이를 바라보면 후보를 나눠 다시 보여줍니다."
+            textSize = 18f
+        })
+        button("쉬운 조작 켜기") {
+            val service = ControlAccessibilityService.instance
+            when {
+                service == null -> status.text = "먼저 아래에서 접근성 서비스 설정을 열어 NoTouch를 켜 주세요."
+                !TrackerState.running -> status.text = "홈에서 카메라를 시작한 뒤 쉬운 조작을 켜 주세요."
+                else -> {
+                    service.setEasyPanelEnabled(true)
+                    status.text = "쉬운 조작을 켰습니다. 연습 화면이나 다른 앱으로 이동하면 왼쪽 아래에 표시됩니다."
+                }
+            }
+        }
+        button("쉬운 조작 끄기 · 기존 눈 조작 사용") {
+            ControlAccessibilityService.instance?.setEasyPanelEnabled(false)
+            status.text = "쉬운 조작을 껐습니다. 기존 클릭·스크롤·받아쓰기를 사용합니다."
+        }
+        button("쉬운 조작 체험 화면 열기") { startActivity(Intent(this, EasyControlDemoActivity::class.java)) }
+        root.addView(TextView(this).apply {
             text = "9점 보정 후 사용하세요.\n1초 응시: 클릭 · 윙크: 스크롤 모드 · 양눈 두 번 깜빡임: 받아쓰기"
         })
         button("접근성 서비스 설정") { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }

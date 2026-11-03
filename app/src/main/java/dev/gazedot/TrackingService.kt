@@ -184,7 +184,7 @@ class TrackingService : LifecycleService() {
                 TrackerState.eyeState = observation.state
                 val model = TrackerState.model
                 val enabled = TrackerState.controls && TrackerState.interactionAllowed && !TrackerState.collecting &&
-                    !TrackerState.speaking && ControlAccessibilityService.instance != null
+                    !TrackerState.speaking && !TrackerState.easyPanelEnabled && ControlAccessibilityService.instance != null
                 val sample = pipeline.process(now, at, observation, model, enabled,
                     ControlAccessibilityService.instance?.let { service -> { p -> service.dwellTargetKey(p) } })
                 sample.actions.forEach(::perform)
