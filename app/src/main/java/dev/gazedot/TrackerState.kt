@@ -7,8 +7,10 @@ object TrackerState {
     var controls = false
     var collecting = false
     var interactionAllowed = false
-    /** The accessibility panel owns gaze while enabled, so ordinary dwell cannot click behind it. */
+    /** Preference/runtime availability; ordinary interaction continues until the panel takes gaze. */
     var easyPanelEnabled = false
+    /** Blocks ordinary gestures only while the panel or its launcher owns gaze. */
+    var easyPanelBlocking = false
     var localDwellProgress = 0f
     var localScrollMode = false
     private var settingsScreens = 0

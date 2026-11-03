@@ -29,7 +29,7 @@ class DeveloperSettingsActivity : ComponentActivity() {
             root.addView(Button(this).apply { text = label; setOnClickListener { action() } })
         }
         root.addView(TextView(this).apply {
-            text = "쉬운 조작\n현재 화면의 버튼을 큰 카드 3개씩 보여줍니다. 두 카드 사이를 바라보면 후보를 나눠 다시 보여줍니다."
+            text = "쉬운 조작\n시선이 한 영역에서 흔들려 클릭하기 어려우면 주변 버튼 2~3개를 크게 보여줍니다. 안내를 읽은 뒤 원하는 카드를 선택하세요."
             textSize = 18f
         })
         easyControlSwitch = Switch(this).apply {

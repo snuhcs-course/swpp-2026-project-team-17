@@ -11,6 +11,7 @@ data class GazeSample(
     val dwellProgress: Float,
     val actions: List<EyeAction>,
     val scrollMode: Boolean = false,
+    val dwellTargetKey: String? = null,
 ) {
     fun calibrationFeatures(nowMs: Long, after: Long): EyeFeatures? = features?.takeIf {
         timestampMs > after && nowMs - timestampMs in 0..250 &&
@@ -62,14 +63,16 @@ class GazePipeline {
             observation.state == EyeState.CLOSED -> TrackingQuality.CLOSED
             else -> TrackingQuality.UNCERTAIN
         }
+        val dwellTarget = if (actionsEnabled && predictor != null) smoothed?.let { targetKey?.invoke(it) } else null
         val actions = if (actionsEnabled && predictor != null) {
             val eye = if (quality == TrackingQuality.OUT_OF_RANGE) EyeState.LOST else observation.state
-            interaction.update(timestampMs, eye, smoothed, targetKey = smoothed?.let { targetKey?.invoke(it) }, receivedAt = nowMs)
+            interaction.update(timestampMs, eye, smoothed, targetKey = dwellTarget, receivedAt = nowMs)
         } else {
             val hadDwell = pending
             cancelInteraction()
             if (hadDwell) listOf(EyeAction.Cancel) else emptyList()
         }
-        return GazeSample(timestampMs, quality, features, position, smoothed, interaction.progress, actions, interaction.scrollMode)
+        return GazeSample(timestampMs, quality, features, position, smoothed, interaction.progress, actions, interaction.scrollMode,
+            dwellTarget)
     }
 }

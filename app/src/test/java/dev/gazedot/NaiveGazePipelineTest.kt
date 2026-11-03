@@ -56,4 +56,39 @@ class NaiveGazePipelineTest {
         val next = pipeline.process(2166, 2166, observation(eye(0.0, 0.0)), model, true)
         assertEquals(0f, next.dwellProgress)
     }
+
+    @Test fun assistanceUsesTheActualDwellTargetWhenSmallJitterCrossesAButtonBoundary() {
+        val model = model()
+        val pipeline = GazePipeline()
+        val assist = GazeAssistDetector()
+        var proposed: AssistFocus? = null
+        for (at in 0L..2_500L step 100) {
+            val f = eye(if ((at / 100) % 2 == 0L) -.01 else .01, 0.0)
+            val sample = pipeline.process(at, at, observation(f), model, true,
+                targetKey = { if (it.first < .5) "left-button" else "right-button" })
+            assertFalse(sample.actions.any { it is EyeAction.Click })
+            val point = sample.point!!
+            val area = assist.update(AssistPoint(point.first * 1_000, point.second * 2_000),
+                sample.timestampMs, at, 1_000.0, sample.dwellProgress, false, sample.dwellTargetKey)
+            if (area != null) proposed = area
+        }
+        assertNotNull(proposed)
+    }
+
+    @Test fun panelOwnershipPreventsBackgroundClickAndResumesWithAFreshDwell() {
+        val model = model()
+        val pipeline = GazePipeline()
+        for (at in 0L..800L step 100) pipeline.process(at, at, observation(eye(0.0, 0.0)), model, true)
+        for (at in 900L..2_000L step 100) {
+            val sample = pipeline.process(at, at, observation(eye(0.0, 0.0)), model, false)
+            assertFalse(sample.actions.any { it is EyeAction.Click })
+            assertEquals(0f, sample.dwellProgress, 0f)
+        }
+        for (at in 2_100L..3_000L step 100) {
+            assertFalse(pipeline.process(at, at, observation(eye(0.0, 0.0)), model, true)
+                .actions.any { it is EyeAction.Click })
+        }
+        assertTrue(pipeline.process(3_100, 3_100, observation(eye(0.0, 0.0)), model, true)
+            .actions.any { it is EyeAction.Click })
+    }
 }

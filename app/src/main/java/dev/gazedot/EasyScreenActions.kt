@@ -60,7 +60,7 @@ internal class EasyScreenActions(private val service: AccessibilityService) {
                 if (node.isEnabled && !rect.isEmpty && Rect.intersects(screen, rect)) {
                     fun add(kind: EasyActionKind, text: String) {
                         val key = "${node.viewIdResourceName}|${node.className}|$rect|$kind"
-                        if (seen.add(key) && actions.size < 60) actions += EasyScreenAction(
+                        if (seen.add(key)) actions += EasyScreenAction(
                             key, text, kind, Rect(rect), node.viewIdResourceName, node.className?.toString().orEmpty())
                     }
                     if (node.isClickable || node.isEditable) {
@@ -77,7 +77,7 @@ internal class EasyScreenActions(private val service: AccessibilityService) {
                 }
             }
             visit(root, 0)
-            // Keep the original reading order; the panel never silently ranks or invents actions.
+            // Keep all discovered actions within the traversal budget; proximity ranking happens later.
             actions += EasyScreenAction("system:back", "뒤로 가기", EasyActionKind.BACK, Rect(), null, "")
             return EasyScreenSnapshot(packageName, windowId, actions)
         } finally { root.recycle() }

@@ -23,6 +23,9 @@ class ControlAccessibilityService : AccessibilityService() {
     internal fun syncEasyPanelPreference() {
         easyPanel?.setEnabled(EasyControlSettings.isEnabled(this) && TrackerState.running)
     }
+    internal fun observeForGazeAssistance(sample: GazeSample, eye: EyeState) {
+        easyPanel?.observe(sample, eye)
+    }
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event != null) easyPanel?.onWindowEvent(event)
         if (event?.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
@@ -70,7 +73,7 @@ class ControlAccessibilityService : AccessibilityService() {
         handler.removeCallbacksAndMessages(null); super.onDestroy()
     }
     private fun allowed()=TrackerState.running && TrackerState.controls && TrackerState.interactionAllowed &&
-        !TrackerState.collecting && !TrackerState.easyPanelEnabled
+        !TrackerState.collecting && !TrackerState.easyPanelBlocking
     fun tap(x: Float, y: Float): Boolean {
         if(!allowed() || busy) return false
         return gesture(Path().apply { moveTo(x,y) },80)

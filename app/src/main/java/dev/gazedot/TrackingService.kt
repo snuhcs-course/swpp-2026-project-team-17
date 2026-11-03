@@ -186,9 +186,12 @@ class TrackingService : LifecycleService() {
                 TrackerState.eyeState = observation.state
                 val model = TrackerState.model
                 val enabled = TrackerState.controls && TrackerState.interactionAllowed && !TrackerState.collecting &&
-                    !TrackerState.speaking && !TrackerState.easyPanelEnabled && ControlAccessibilityService.instance != null
+                    !TrackerState.speaking && !TrackerState.easyPanelBlocking && ControlAccessibilityService.instance != null
                 val sample = pipeline.process(now, at, observation, model, enabled,
                     ControlAccessibilityService.instance?.let { service -> { p -> service.dwellTargetKey(p) } })
+                // Observe the same calibrated, smoothed full-screen coordinates used by normal dwell.
+                // An assistance panel can take ownership before any gesture from this frame executes.
+                ControlAccessibilityService.instance?.observeForGazeAssistance(sample, observation.state)
                 sample.actions.forEach(::perform)
                 val message = when (sample.quality) {
                     TrackingQuality.LOST -> "얼굴 검출 대기"

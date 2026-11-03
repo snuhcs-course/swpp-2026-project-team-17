@@ -311,7 +311,7 @@ internal class PostCalibrationTutorialView(
             }
             Step.EASY_CONTROL -> {
                 text("버튼을 크게 보여주는\n쉬운 조작을 사용할까요?", 23)
-                text("현재 화면의 버튼을 큰 카드로\n3개씩 보여드려요.", 20)
+                text("시선이 흔들려 선택하기 어려우면\n주변 버튼 2~3개를 크게 보여드려요.", 20)
                 text("안내를 읽은 뒤 원하는 버튼을\n1초 바라보거나 터치해 주세요.", 16, 500)
                 text("나중에 홈의 설정에서\n언제든 켜고 끌 수 있어요.", 15, 500)
                 for ((caption, enabled) in listOf("ON · 켜고 계속" to true, "OFF · 끄고 계속" to false)) {
