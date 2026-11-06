@@ -192,7 +192,7 @@ class TrackingService : LifecycleService() {
                 // Observe the same calibrated, smoothed full-screen coordinates used by normal dwell.
                 // An assistance panel can take ownership before any gesture from this frame executes.
                 ControlAccessibilityService.instance?.observeForGazeAssistance(sample, observation.state)
-                sample.actions.forEach(::perform)
+                sample.actions.forEach { perform(it, sample.point) }
                 val message = when (sample.quality) {
                     TrackingQuality.LOST -> "얼굴 검출 대기"
                     TrackingQuality.CLOSED -> "눈 감김 감지"
@@ -227,7 +227,7 @@ class TrackingService : LifecycleService() {
         }
     }
 
-    private fun perform(action: EyeAction) {
+    private fun perform(action: EyeAction, gaze: Pair<Double, Double>?) {
         val service = ControlAccessibilityService.instance ?: return
         val bounds = DisplaySpace.bounds(this)
         when(action) {
@@ -236,7 +236,7 @@ class TrackingService : LifecycleService() {
                 TrackerState.actionStatus = if(ok) "클릭 요청" else "클릭을 실행하지 못했습니다"
             }
             is EyeAction.Scroll -> {
-                val ok = service.scroll(action.direction, bounds.width(), bounds.height())
+                val ok = service.scroll(action.direction, bounds.width(), bounds.height(), gaze)
                 TrackerState.actionStatus = if(ok) when (action.direction) {
                     ScrollDirection.UP -> "위로 스크롤"
                     ScrollDirection.DOWN -> "아래로 스크롤"

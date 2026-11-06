@@ -58,7 +58,7 @@ internal class PostCalibrationTutorialView(
     }
     private val freshnessCheck = object : Runnable {
         override fun run() {
-            if (closed || step !in listOf(Step.BUTTON, Step.EASY_CONTROL)) return
+            if (closed || step !in listOf(Step.BUTTON, Step.EASY_CONTROL, Step.FINISHED)) return
             val now = SystemClock.uptimeMillis()
             if (step == Step.EASY_CONTROL) {
                 modeChoice.expire(now)
@@ -107,7 +107,7 @@ internal class PostCalibrationTutorialView(
     }
 
     fun onFrame(sample: GazeSample?, eye: EyeState) {
-        if (closed || step !in listOf(Step.BUTTON, Step.SCROLL, Step.EASY_CONTROL)) return
+        if (closed || step !in listOf(Step.BUTTON, Step.SCROLL, Step.EASY_CONTROL, Step.FINISHED)) return
         val now = SystemClock.uptimeMillis()
         if (sample == null || now - sample.timestampMs !in 0..250 || !TrackerState.running) {
             dwell.reset(); retryGesture.reset(); scrolling.reset()
@@ -149,7 +149,7 @@ internal class PostCalibrationTutorialView(
             if (practice.complete(scrolling.enabled)) finishTutorial()
             return
         }
-        if (retryGesture.update(sample.timestampMs, eye) == EyeGesture.DOUBLE_BLINK) {
+        if (step == Step.BUTTON && retryGesture.update(sample.timestampMs, eye) == EyeGesture.DOUBLE_BLINK) {
             dwell.reset(); TrackerState.localDwellProgress = 0f
             onRecalibrate()
             return
@@ -168,7 +168,10 @@ internal class PostCalibrationTutorialView(
         val selected = dwell.update(inside, sample.timestampMs, now)
         TrackerState.localDwellProgress = dwell.progress
         button.setProgress(dwell.progress)
-        if (selected) showStep(Step.SCROLL)
+        if (selected) {
+            dwell.reset()
+            if (step == Step.FINISHED) button.performClick() else showStep(Step.SCROLL)
+        }
     }
 
     private fun animateScroll(direction: ScrollDirection) {
@@ -327,7 +330,15 @@ internal class PostCalibrationTutorialView(
             Step.FINISHED -> {
                 text("튜토리얼이\n완료되었습니다!", 28)
                 text("NoTouch의 기본 사용법을\n모두 익혔습니다.", 23)
-                text("이제 직접 사용해 봅시다", 23)
+                text("실제 조작 화면에서도 윙크로\n스크롤 모드를 켤 수 있어요.", 20)
+                text("아래 버튼을 선택한 뒤 접근성 권한을\n확인하고 좌우 스크롤도 연습해 보세요.", 16, 500)
+                target = GazeButton(context, "실제 조작 연습").also { button ->
+                    button.setOnClickListener {
+                        context.startActivity(android.content.Intent(context, PracticeActivity::class.java))
+                    }
+                    column.addView(button, LinearLayout.LayoutParams(BUTTON_WIDTH, BUTTON_HEIGHT))
+                }
+                post(freshnessCheck)
             }
         }
         updateLayout()

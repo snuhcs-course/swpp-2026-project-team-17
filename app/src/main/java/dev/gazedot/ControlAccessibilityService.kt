@@ -78,13 +78,66 @@ class ControlAccessibilityService : AccessibilityService() {
         if(!allowed() || busy) return false
         return gesture(Path().apply { moveTo(x,y) },80)
     }
-    fun scroll(direction: ScrollDirection, width: Int, height: Int): Boolean {
-        if(!allowed() || busy) return false
-        val (from, to) = ScrollSettings.swipe(direction, width, height)
-        return gesture(Path().apply {
-            moveTo(from.first.toFloat(), from.second.toFloat())
-            lineTo(to.first.toFloat(), to.second.toFloat())
-        }, ScrollSettings.DURATION_MS)
+    /** Prefer the app's directional action; swipes are a fallback inside that scroll area. */
+    @Suppress("DEPRECATION")
+    fun scroll(direction: ScrollDirection, width: Int, height: Int,
+        gaze: Pair<Double, Double>? = null): Boolean {
+        if (!allowed() || busy || width <= 0 || height <= 0) return false
+        val point = gaze?.takeIf { it.first.isFinite() && it.second.isFinite() }
+            ?.let { it.first.coerceIn(0.0, 1.0) * width to it.second.coerceIn(0.0, 1.0) * height }
+            ?: (width / 2.0 to height / 2.0)
+        val root = rootInActiveWindow
+        val nodes = mutableListOf<AccessibilityNodeInfo>()
+        val targets = mutableListOf<ScrollTarget>()
+        val fallbackTargets = mutableListOf<ScrollTarget>()
+        val screen = android.graphics.Rect(0, 0, width, height)
+        var visits = 0
+        fun command(d: ScrollDirection) = when (d) {
+            ScrollDirection.UP -> AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_UP.id
+            ScrollDirection.DOWN -> AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_DOWN.id
+            ScrollDirection.LEFT -> AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_LEFT.id
+            ScrollDirection.RIGHT -> AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_RIGHT.id
+        }
+        fun visit(node: AccessibilityNodeInfo, depth: Int) {
+            if (++visits > 350 || depth > 20 || !node.isVisibleToUser || node.isPassword) return
+            val rect = android.graphics.Rect().also(node::getBoundsInScreen)
+            if (node.isEnabled && rect.intersect(screen) && rect.width() > 0 && rect.height() > 0) {
+                val actions = node.actionList.map { it.id }.toSet()
+                val directions = ScrollDirection.entries.filter { command(it) in actions }.toSet()
+                if (node.isScrollable || directions.isNotEmpty()) {
+                    val area = ScrollArea(rect.left, rect.top, rect.right, rect.bottom)
+                    val name = node.className?.toString().orEmpty()
+                    val horizontal = directions.any { it.dx != 0 } || name.contains("HorizontalScrollView") ||
+                        name.contains("ViewPager")
+                    val vertical = directions.any { it.dy != 0 } || (!horizontal && node.isScrollable)
+                    val fallback = ScrollDirection.entries.filter {
+                        if (it.dx != 0) horizontal else vertical
+                    }.toSet()
+                    nodes += AccessibilityNodeInfo.obtain(node)
+                    targets += ScrollTarget(area, directions)
+                    fallbackTargets += ScrollTarget(area, fallback)
+                }
+            }
+            for (i in 0 until node.childCount) {
+                val child = node.getChild(i) ?: continue
+                try { visit(child, depth + 1) } finally { child.recycle() }
+            }
+        }
+        try {
+            if (root != null) visit(root, 0)
+            val exact = ScrollTargeting.choose(targets, direction, point)
+            if (exact != null && nodes[exact].performAction(command(direction))) return true
+            val fallback = exact ?: ScrollTargeting.choose(fallbackTargets, direction, point)
+            val area = fallback?.let { targets[it].area } ?: ScrollArea(0, 0, width, height)
+            val (from, to) = ScrollTargeting.swipe(direction, area)
+            return gesture(Path().apply {
+                moveTo(from.first.toFloat(), from.second.toFloat())
+                lineTo(to.first.toFloat(), to.second.toFloat())
+            }, ScrollSettings.DURATION_MS)
+        } finally {
+            nodes.forEach { it.recycle() }
+            root?.recycle()
+        }
     }
     private fun gesture(path: Path, duration: Long): Boolean {
         val description=GestureDescription.Builder().addStroke(GestureDescription.StrokeDescription(path,0,duration)).build()
