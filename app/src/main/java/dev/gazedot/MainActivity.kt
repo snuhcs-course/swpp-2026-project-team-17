@@ -33,6 +33,10 @@ class MainActivity : ComponentActivity() {
             handler.postDelayed(this, 50)
         }
     }
+    private val accessibilitySettings = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        if (ControlAccessibilityService.instance != null) startTracking()
+        else status.text = "접근성 > 설치된 앱 > NoTouch 눈 조작에서 사용 설정을 켜 주세요."
+    }
     private val overlayPermission = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         if (Settings.canDrawOverlays(this)) startTracking()
         else status.text = "다른 앱 위에 표시 권한을 허용한 뒤 다시 시작하세요."
@@ -239,7 +243,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-        addStep("1", "카메라 시작", "카메라 및 오버레이 권한을 허용해 주세요.", 2, "카메라 시작") { startTracking() }
+        addStep(
+            "1", "카메라 시작",
+            "먼저 접근성 설정에서 'NoTouch 눈 조작'을 켜고, 카메라 및 다른 앱 위 표시 권한을 허용해 주세요.",
+            2, "카메라 시작"
+        ) { startTracking() }
         addStep("2", "시선 보정", "기기를 움직이지 말고 얼굴을 카메라에서 약\n30~50cm 떨어진 위치에 맞춰 주세요.", 26, "보정 시작") {
             startCalibration()
         }
@@ -312,6 +320,17 @@ class MainActivity : ComponentActivity() {
 
     private fun startTracking() {
         if (TrackerState.running) { status.text = TrackerState.status; return }
+        if (ControlAccessibilityService.instance == null) {
+            android.app.AlertDialog.Builder(this)
+                .setTitle("NoTouch 눈 조작 켜기")
+                .setMessage("다음 화면에서 접근성 > 설치된 앱 > NoTouch 눈 조작을 열고 사용 설정을 켜 주세요. 완료 후 NoTouch로 돌아오면 나머지 권한 안내가 이어집니다.")
+                .setNegativeButton("취소", null)
+                .setPositiveButton("접근성 설정 열기") { _, _ ->
+                    accessibilitySettings.launch(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                }
+                .show()
+            return
+        }
         if (!Settings.canDrawOverlays(this)) {
             overlayPermission.launch(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
             return
