@@ -1,6 +1,7 @@
 package dev.gazedot
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.*
@@ -12,12 +13,22 @@ import android.widget.*
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 
+private data class CalibrationCheckResult(
+    val targetX: Double,
+    val targetY: Double,
+    val dotX: Double,
+    val dotY: Double,
+    val madX: Double,
+    val madY: Double,
+)
+
 class MainActivity : ComponentActivity() {
     private lateinit var status: TextView
     private lateinit var cameraButton: Button
     private lateinit var calibrationButton: Button
     private lateinit var stopButton: Button
     private var calibration: CalibrationView? = null
+    private var calibrationCheck: CalibrationCheckView? = null
     private var tutorial: PostCalibrationTutorialView? = null
     private val handler = Handler(Looper.getMainLooper())
     private val homeTargets = mutableListOf<View>()
@@ -26,7 +37,7 @@ class MainActivity : ComponentActivity() {
     private var selectedHomeTarget: View? = null
     private val homeFreshness = object : Runnable {
         override fun run() {
-            if (calibration == null && tutorial == null) {
+            if (calibration == null && calibrationCheck == null && tutorial == null) {
                 homeDwell.expire(SystemClock.uptimeMillis())
                 TrackerState.localDwellProgress = homeDwell.progress
             }
@@ -61,6 +72,11 @@ class MainActivity : ComponentActivity() {
                     TrackerState.cancelCalibration()
                     TrackerState.status = "보정 취소됨"
                     showHome()
+                } else if (calibrationCheck != null) {
+                    calibrationCheck?.close()
+                    calibrationCheck = null
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    showHome()
                 } else if (tutorial != null) {
                     showHome()
                 } else {
@@ -82,6 +98,9 @@ class MainActivity : ComponentActivity() {
             if (tutorial != null) {
                 if (!TrackerState.running) showHome()
                 else tutorial?.onFrame(TrackerState.sample, TrackerState.eyeState)
+            } else if (calibrationCheck != null) {
+                if (!TrackerState.running) showHome()
+                else calibrationCheck?.onFrame(TrackerState.sample)
             } else if (calibration != null && !TrackerState.running) {
                 calibration?.close()
                 calibration = null
@@ -94,7 +113,7 @@ class MainActivity : ComponentActivity() {
                 onHomeGaze(TrackerState.gaze)
             }
         }
-        if (calibration == null && tutorial == null) {
+        if (calibration == null && calibrationCheck == null && tutorial == null) {
             status.text = TrackerState.status
             updateHomeButtons()
         }
@@ -108,6 +127,12 @@ class MainActivity : ComponentActivity() {
         TrackerState.listener = null
         super.onPause()
         if (tutorial != null) showHome()
+        if (calibrationCheck != null) {
+            calibrationCheck?.close()
+            calibrationCheck = null
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            showHome()
+        }
         if (calibration != null) {
             calibration?.close()
             calibration = null
@@ -119,12 +144,15 @@ class MainActivity : ComponentActivity() {
     override fun onStop() { TrackerState.settingsStopped(); super.onStop() }
     override fun onDestroy() {
         calibration?.close()
+        calibrationCheck?.close()
         tutorial?.close()
         handler.removeCallbacksAndMessages(null)
         super.onDestroy()
     }
 
     private fun showHome() {
+        calibrationCheck?.close()
+        calibrationCheck = null
         tutorial?.close()
         tutorial = null
         TrackerState.cancelActions?.invoke()
@@ -358,6 +386,8 @@ class MainActivity : ComponentActivity() {
         }
         tutorial?.close()
         tutorial = null
+        calibrationCheck?.close()
+        calibrationCheck = null
         homeDwell.reset()
         val session = TrackerState.beginCalibration()
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -453,10 +483,8 @@ class MainActivity : ComponentActivity() {
             close()
             calibration = null
             if (saved.getOrDefault(false) && TrackerState.running) {
-                tutorial = PostCalibrationTutorialView(this@MainActivity, bounds.width(), bounds.height(),
-                    onRecalibrate = { startCalibration() },
-                    onFinished = { window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) })
-                setContentView(tutorial)
+                calibrationCheck = CalibrationCheckView(bounds.width(), bounds.height())
+                setContentView(calibrationCheck)
             } else showHome()
         }
         override fun onDraw(canvas: Canvas) {
@@ -487,6 +515,204 @@ class MainActivity : ComponentActivity() {
             canvas.drawArc(x - 23*d, y - 23*d, x + 23*d, y + 23*d, -90f,
                 360f * (samples.size / 22f).coerceAtMost(1f), false, paint)
             paint.style = Paint.Style.FILL
+        }
+    }
+
+    /** Measures cursor bias and steadiness, then applies one bounded global correction. */
+    @SuppressLint("ViewConstructor")
+    private inner class CalibrationCheckView(
+        private val displayWidth: Int,
+        private val displayHeight: Int,
+    ) : View(this@MainActivity) {
+        private val targets = listOf(.2 to .2, .8 to .2, .8 to .8, .2 to .8, .5 to .5)
+        private val results = mutableListOf<CalibrationCheckResult?>()
+        private val samples = mutableListOf<Pair<Double, Double>>()
+        private val targetLocation = IntArray(2)
+        private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val density = resources.displayMetrics.density
+        private val settleMs = 900L
+        private val minPointTimeMs = 2_000L
+        private val targetTimeoutMs = 8_000L
+        private val minSamples = 12
+        private val minCorrectionPoints = 3
+        private val maxCorrection = .08
+        private var index = 0
+        private var since = SystemClock.uptimeMillis()
+        private var lastSampleAt = 0L
+        private var report = false
+        private var closed = false
+        private var correctionX = 0.0
+        private var correctionY = 0.0
+        private var correctionApplied = false
+        private var correctionLimited = false
+        private var hint = "파란 점을 바라보고 빨간 점을 확인해 주세요"
+        private val tick = object : Runnable {
+            override fun run() {
+                if (closed || calibrationCheck !== this@CalibrationCheckView) return
+                if (!report && index < targets.size && SystemClock.uptimeMillis() - since >= targetTimeoutMs) savePoint()
+                invalidate()
+                postDelayed(this, 100)
+            }
+        }
+
+        init {
+            setBackgroundColor(Color.rgb(15, 23, 42))
+            isClickable = true
+            post(tick)
+        }
+
+        fun close() {
+            closed = true
+            removeCallbacks(tick)
+            samples.clear()
+        }
+
+        override fun onDetachedFromWindow() { close(); super.onDetachedFromWindow() }
+
+        fun onFrame(sample: GazeSample?) {
+            if (closed || report || index >= targets.size || width == 0 || height == 0) return
+            val now = SystemClock.uptimeMillis()
+            val elapsed = now - since
+            val point = sample?.point
+            if (sample == null || sample.quality != TrackingQuality.TRACKING ||
+                now - sample.timestampMs !in 0..250 || sample.timestampMs <= lastSampleAt ||
+                point == null || !point.first.isFinite() || !point.second.isFinite()) {
+                hint = "눈 검출 대기 · 화면과 얼굴을 향해 주세요"
+                invalidate()
+                return
+            }
+            lastSampleAt = sample.timestampMs
+            if (elapsed >= settleMs) samples += point
+            hint = if (elapsed < settleMs) "시선을 안정시키는 중…" else "빨간 점 위치를 측정하는 중…"
+            if (elapsed >= minPointTimeMs && samples.size >= minSamples) savePoint()
+            invalidate()
+        }
+
+        private fun median(values: List<Double>): Double {
+            val sorted = values.sorted()
+            return sorted[sorted.size / 2]
+        }
+
+        private fun savePoint() {
+            if (index >= targets.size) return
+            val result = if (samples.size < minSamples) null else {
+                val xs = samples.map { it.first }
+                val ys = samples.map { it.second }
+                val medianX = median(xs)
+                val medianY = median(ys)
+                getLocationOnScreen(targetLocation)
+                val target = targets[index]
+                val targetX = (targetLocation[0] + width * target.first) / displayWidth
+                val targetY = (targetLocation[1] + height * target.second) / displayHeight
+                CalibrationCheckResult(targetX, targetY, medianX, medianY,
+                    median(xs.map { kotlin.math.abs(it - medianX) }),
+                    median(ys.map { kotlin.math.abs(it - medianY) }))
+            }
+            results += result
+            index++
+            samples.clear()
+            since = SystemClock.uptimeMillis()
+            report = index >= targets.size
+            if (report) applyMeasuredCorrection()
+            hint = if (report) "측정이 끝났습니다" else "다음 파란 점을 바라봐 주세요"
+        }
+
+        private fun applyMeasuredCorrection() {
+            val valid = results.filterNotNull()
+            if (valid.size < minCorrectionPoints) return
+            val model = TrackerState.model ?: return
+            val biasX = valid.map { it.dotX - it.targetX }.average()
+            val biasY = valid.map { it.dotY - it.targetY }.average()
+            correctionX = (-biasX).coerceIn(-maxCorrection, maxCorrection)
+            correctionY = (-biasY).coerceIn(-maxCorrection, maxCorrection)
+            correctionLimited = correctionX != -biasX || correctionY != -biasY
+            TrackerState.model = model.withScreenCorrection(correctionX, correctionY)
+            correctionApplied = true
+        }
+
+        private fun percent(value: Double, signed: Boolean = false): String {
+            val sign = if (!signed) "" else if (value > 0) "+" else if (value < 0) "−" else ""
+            return "$sign${"%.1f".format(java.util.Locale.ROOT, kotlin.math.abs(value) * 100)}%"
+        }
+
+        private fun continueToTutorial() {
+            if (closed || !report) return
+            close()
+            calibrationCheck = null
+            val bounds = DisplaySpace.bounds(this@MainActivity)
+            tutorial = PostCalibrationTutorialView(this@MainActivity, bounds.width(), bounds.height(),
+                onRecalibrate = { startCalibration() },
+                onFinished = { window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) })
+            setContentView(tutorial)
+        }
+
+        override fun onTouchEvent(event: MotionEvent): Boolean {
+            val left = 24 * density
+            val right = width - 24 * density
+            val top = height - 92 * density
+            val bottom = height - 36 * density
+            if (event.action == MotionEvent.ACTION_UP && report && event.x in left..right && event.y in top..bottom)
+                continueToTutorial()
+            return true
+        }
+
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            paint.textAlign = Paint.Align.CENTER
+            paint.color = Color.WHITE
+            paint.textSize = 15 * density
+            canvas.drawText(if (report) "시선 보정 확인" else "시선 보정 확인 ${index + 1}/${targets.size}",
+                width / 2f, 55 * density, paint)
+            if (!report) {
+                paint.textSize = 12 * density
+                canvas.drawText(hint, width / 2f, height - 70 * density, paint)
+                canvas.drawText("머리와 기기를 편하게 고정해 주세요", width / 2f, height - 45 * density, paint)
+                val target = targets.getOrNull(index) ?: return
+                val x = (target.first * width).toFloat()
+                val y = (target.second * height).toFloat()
+                paint.color = Color.rgb(96, 165, 250)
+                canvas.drawCircle(x, y, 13 * density, paint)
+                paint.color = Color.WHITE
+                canvas.drawCircle(x, y, 3 * density, paint)
+                paint.style = Paint.Style.STROKE
+                paint.strokeWidth = 3 * density
+                canvas.drawArc(x - 23*density, y - 23*density, x + 23*density, y + 23*density,
+                    -90f, 360f * (samples.size / minSamples.toFloat()).coerceAtMost(1f), false, paint)
+                paint.style = Paint.Style.FILL
+                return
+            }
+            val valid = results.filterNotNull()
+            val lines = if (valid.isEmpty()) {
+                listOf("측정할 시선 표본이 부족했습니다.", "조명과 카메라 각도를 확인한 뒤 다시 보정해 주세요.",
+                    "뒤로 가기를 눌러 보정 화면으로 돌아갈 수 있습니다.")
+            } else {
+                val biasX = valid.map { it.dotX - it.targetX }.average()
+                val biasY = valid.map { it.dotY - it.targetY }.average()
+                val madX = valid.map { it.madX }.average()
+                val madY = valid.map { it.madY }.average()
+                listOf("평균 위치 오차", "가로 ${percent(biasX, true)} · 세로 ${percent(biasY, true)}",
+                    "(+ 오른쪽/아래 · − 왼쪽/위)", "",
+                    if (correctionApplied) "적용한 위치 보정" else "자동 위치 보정 미적용",
+                    if (correctionApplied) "가로 ${percent(correctionX, true)} · 세로 ${percent(correctionY, true)}"
+                    else "표본이 ${minCorrectionPoints}곳 미만입니다.",
+                    if (correctionLimited) "큰 편차는 8% 이내로 제한했습니다." else "", "",
+                    "시선 고정 중 중앙 편차", "가로 ${percent(madX)} · 세로 ${percent(madY)}",
+                    "화면 너비/높이 기준 · ${valid.size}/${targets.size}곳 측정")
+            }
+            val lineHeight = 26 * density
+            var y = height / 2f - lines.count { it.isNotEmpty() } * lineHeight / 2f
+            lines.filter { it.isNotEmpty() }.forEach { line ->
+                paint.textSize = if (line == "평균 위치 오차" || line == "시선 고정 중 중앙 편차" ||
+                    line == "적용한 위치 보정" || line == "자동 위치 보정 미적용") 17 * density else 14 * density
+                canvas.drawText(line, width / 2f, y, paint)
+                y += lineHeight
+            }
+            val button = RectF(24 * density, height - 92 * density, width - 24 * density, height - 36 * density)
+            paint.color = Color.rgb(6, 108, 236)
+            canvas.drawRoundRect(button, 28 * density, 28 * density, paint)
+            paint.color = Color.WHITE
+            paint.textSize = 15 * density
+            canvas.drawText("튜토리얼 시작", width / 2f, button.centerY() + 5 * density, paint)
         }
     }
 }

@@ -13,6 +13,8 @@ class GazeModel private constructor(
     private val wx: DoubleArray, private val wy: DoubleArray,
     private val reference: EyeFeatures,
     val fitError: Double,
+    private val correctionX: Double = 0.0,
+    private val correctionY: Double = 0.0,
 ) {
     fun predict(f: EyeFeatures): Pair<Double, Double>? {
         if (!listOf(f.x, f.y, f.faceX, f.faceY, f.scale).all { it.isFinite() }) return null
@@ -20,7 +22,15 @@ class GazeModel private constructor(
         if (f.scale !in reference.scale * 0.72..reference.scale * 1.28 ||
             abs(f.faceX - reference.faceX) > 0.12 || abs(f.faceY - reference.faceY) > 0.12) return null
         val v = doubleArrayOf(1.0, (f.x - meanX) / stdX, (f.y - meanY) / stdY)
-        return dot(wx, v).coerceIn(0.0, 1.0) to dot(wy, v).coerceIn(0.0, 1.0)
+        return (dot(wx, v) + correctionX).coerceIn(0.0, 1.0) to
+            (dot(wy, v) + correctionY).coerceIn(0.0, 1.0)
+    }
+
+    /** Returns this calibration with an additional screen-space bias correction. */
+    fun withScreenCorrection(dx: Double, dy: Double): GazeModel? {
+        if (!dx.isFinite() || !dy.isFinite()) return null
+        return GazeModel(meanX, meanY, stdX, stdY, wx, wy, reference, fitError,
+            correctionX + dx, correctionY + dy)
     }
 
     companion object {
