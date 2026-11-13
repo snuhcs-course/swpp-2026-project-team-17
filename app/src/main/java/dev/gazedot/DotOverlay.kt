@@ -5,10 +5,28 @@ import android.graphics.*
 import android.view.*
 
 class DotOverlay(context: Context) {
-    private val manager = context.getSystemService(WindowManager::class.java)
+    // On Android 12+, use the connected accessibility service's trusted overlay type.
+    // A full-screen TYPE_APPLICATION_OVERLAY can make system navigation touches get
+    // rejected even though it is FLAG_NOT_TOUCHABLE and visually transparent there.
+    private val accessibilityContext = if (android.os.Build.VERSION.SDK_INT >= 31) {
+        ControlAccessibilityService.instance?.let { service ->
+            runCatching {
+                val display = service.getSystemService(android.hardware.display.DisplayManager::class.java)
+                    .getDisplay(android.view.Display.DEFAULT_DISPLAY)
+                    ?: error("Default display is unavailable")
+                service.createDisplayContext(display).createWindowContext(
+                    WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, null)
+            }.getOrNull()
+        }
+    } else null
+    private val overlayContext = accessibilityContext ?: context
+    private var overlayType = if (accessibilityContext != null)
+        WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
+    else WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+    private var manager = overlayContext.getSystemService(WindowManager::class.java)
     private val displayBounds = DisplaySpace.bounds(context)
     private val viewOrigin = IntArray(2)
-    private val dot = object : View(context) {
+    private val dot = object : View(overlayContext) {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         var position: Pair<Double, Double>? = null
         var progress = 0f
@@ -38,23 +56,33 @@ class DotOverlay(context: Context) {
         }
     }
     init {
-        val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-            PixelFormat.TRANSLUCENT,
-        ).apply {
-            gravity = Gravity.TOP or Gravity.START
-            // Android 12+ blocks touches through untrusted overlays above the opacity threshold.
-            alpha = 0.7f
-            if (android.os.Build.VERSION.SDK_INT >= 28) {
-                layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
-            }
-            if (android.os.Build.VERSION.SDK_INT >= 30) setFitInsetsTypes(0)
+        try {
+            manager.addView(dot, createParams(overlayType))
+        } catch (e: RuntimeException) {
+            if (accessibilityContext == null) throw e
+            // Keep tracking available if this Android build rejects the accessibility window.
+            overlayType = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            manager = context.getSystemService(WindowManager::class.java)
+            manager.addView(dot, createParams(overlayType))
         }
-        manager.addView(dot, params)
+    }
+
+    private fun createParams(type: Int) = WindowManager.LayoutParams(
+        WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT,
+        type,
+        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+        PixelFormat.TRANSLUCENT,
+    ).apply {
+        gravity = Gravity.TOP or Gravity.START
+        alpha = 0.7f
+        if (android.os.Build.VERSION.SDK_INT >= 28) {
+            layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+        }
+        if (android.os.Build.VERSION.SDK_INT >= 30) {
+            setFitInsetsTypes(WindowInsets.Type.systemBars())
+            setFitInsetsIgnoringVisibility(true)
+        }
     }
     fun show(position: Pair<Double, Double>?, progress: Float=0f, label: String="",
         scrollMode: Boolean = false) {
