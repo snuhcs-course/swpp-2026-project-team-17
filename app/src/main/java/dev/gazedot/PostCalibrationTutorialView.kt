@@ -99,7 +99,7 @@ internal class PostCalibrationTutorialView(
     fun onFrame(sample: GazeSample?, eye: EyeState) {
         if (closed || step !in listOf(Step.BUTTON, Step.SCROLL)) return
         val now = SystemClock.uptimeMillis()
-        if (sample == null || now - sample.timestampMs !in 0..250 || !TrackerState.running) {
+        if (sample == null || now - sample.timestampMs !in 0..250 || !TrackerState.running || !TrackerState.controls) {
             dwell.reset(); retryGesture.reset(); scrolling.reset()
             animation?.cancel(); animation = null
             TrackerState.localDwellProgress = 0f
@@ -109,6 +109,7 @@ internal class PostCalibrationTutorialView(
             return
         }
         if (step == Step.SCROLL) {
+            if (eye != EyeState.OPEN || sample.point == null) { animation?.cancel(); animation = null }
             val result = scrolling.update(sample.timestampMs, now, eye, sample.point)
             TrackerState.localScrollMode = scrolling.enabled
             if (result.wink) result.modeChanged?.let(practice::modeChanged)
@@ -128,7 +129,7 @@ internal class PostCalibrationTutorialView(
         val location = IntArray(2)
         button.getLocationOnScreen(location)
         val visible = Rect()
-        val inside = gaze != null && gaze.fresh(now) && button.isShown &&
+        val inside = eye == EyeState.OPEN && gaze != null && gaze.fresh(now) && button.isShown &&
             button.getLocalVisibleRect(visible) &&
             visible.contains((gaze.x * displayWidth - location[0]).toInt(),
                 (gaze.y * displayHeight - location[1]).toInt()) &&

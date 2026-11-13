@@ -27,6 +27,7 @@ class DeveloperSettingsActivity : ComponentActivity() {
         fun button(label: String, action: () -> Unit) {
             root.addView(Button(this).apply { text = label; setOnClickListener { action() } })
         }
+        button("도움 · 인식 문제 해결하기") { startActivity(Intent(this, RecoveryActivity::class.java)) }
         root.addView(TextView(this).apply {
             text = "9점 보정 후 사용하세요.\n1초 응시: 클릭 · 윙크: 스크롤 모드 · 양눈 두 번 깜빡임: 받아쓰기"
         })

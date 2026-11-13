@@ -3,6 +3,8 @@ package dev.gazedot
 import android.content.Context
 import android.graphics.*
 import android.view.*
+import android.widget.LinearLayout
+import android.widget.ScrollView
 
 class DotOverlay(context: Context) {
     // On Android 12+, use the connected accessibility service's trusted overlay type.
@@ -31,16 +33,9 @@ class DotOverlay(context: Context) {
         var position: Pair<Double, Double>? = null
         var progress = 0f
         var scrollMode = false
-        var label = ""
         override fun onDraw(canvas: Canvas) {
             val d=resources.displayMetrics.density
             getLocationOnScreen(viewOrigin)
-            if(label.isNotBlank()) {
-                paint.color=Color.BLACK; paint.textSize=14*d; paint.textAlign=Paint.Align.CENTER
-                canvas.drawRoundRect(8*d,38*d,width-8*d,80*d,12*d,12*d,paint)
-                paint.color=Color.WHITE
-                canvas.drawText(label.take(44),width/2f,64*d,paint)
-            }
             val p = position ?: return
             val x = (p.first.coerceIn(0.0,1.0) * displayBounds.width() - viewOrigin[0]).toFloat()
             val y = (p.second.coerceIn(0.0,1.0) * displayBounds.height() - viewOrigin[1]).toFloat()
@@ -55,6 +50,13 @@ class DotOverlay(context: Context) {
             }
         }
     }
+    private val status = RecoveryUi.text(overlayContext, "").apply {
+        setPadding(RecoveryUi.dp(context, 16), RecoveryUi.dp(context, 8),
+            RecoveryUi.dp(context, 16), RecoveryUi.dp(context, 8))
+        setBackgroundColor(Color.rgb(245, 245, 255))
+    }
+    private var card: ScrollView? = null
+    private var statusAttached = false
     init {
         try {
             manager.addView(dot, createParams(overlayType))
@@ -86,8 +88,78 @@ class DotOverlay(context: Context) {
     }
     fun show(position: Pair<Double, Double>?, progress: Float=0f, label: String="",
         scrollMode: Boolean = false) {
-        dot.position = position; dot.progress=progress.coerceIn(0f,1f); dot.label=label
+        dot.position = position; dot.progress=progress.coerceIn(0f,1f)
         dot.scrollMode=scrollMode; dot.invalidate()
+        if (label.isBlank() || card != null) {
+            if (statusAttached) { manager.removeView(status); statusAttached = false }
+            setDotOpacity(.7f)
+        } else {
+            status.text = label
+            if (!statusAttached) {
+                if (overlayType == WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY) setDotOpacity(.3f)
+                statusAttached = runCatching { manager.addView(status, panelParams(touchable = false)); true }.getOrDefault(false)
+                if (!statusAttached) setDotOpacity(.7f)
+            }
+        }
     }
-    fun close() { if (dot.isAttachedToWindow) manager.removeView(dot) }
+
+    private fun setDotOpacity(alpha: Float) {
+        val params = dot.layoutParams as? WindowManager.LayoutParams ?: return
+        if (params.alpha != alpha && dot.isAttachedToWindow) {
+            params.alpha = alpha
+            manager.updateViewLayout(dot, params)
+        }
+    }
+
+    private fun panelParams(touchable: Boolean) = WindowManager.LayoutParams(
+        (displayBounds.width() - RecoveryUi.dp(overlayContext, 24)).coerceAtLeast(1),
+        WindowManager.LayoutParams.WRAP_CONTENT, overlayType,
+        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+            (if (touchable) WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL else WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE),
+        PixelFormat.TRANSLUCENT,
+    ).apply {
+        gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+        y = RecoveryUi.dp(overlayContext, 12)
+        // Two overlapping untrusted windows must still allow touches through to the app.
+        alpha = if (touchable || overlayType == WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY) 1f else .7f
+    }
+
+    fun showHelp(onTroubleshoot: () -> Unit, onPause: () -> Unit) {
+        if (card != null) return
+        show(null)
+        val column = LinearLayout(overlayContext).apply {
+            orientation = LinearLayout.VERTICAL
+            val padding = RecoveryUi.dp(context, 20)
+            setPadding(padding, padding, padding, padding)
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(Color.WHITE); cornerRadius = padding.toFloat()
+                setStroke(RecoveryUi.dp(context, 2), RecoveryUi.blue)
+            }
+        }
+        column.addView(RecoveryUi.text(overlayContext, overlayContext.getString(R.string.recognition_help_title), 22f))
+        column.addView(RecoveryUi.text(overlayContext,
+            overlayContext.getString(R.string.recognition_help_body)))
+        fun button(label: String, action: () -> Unit) {
+            column.addView(RecoveryUi.button(overlayContext, label, action),
+                LinearLayout.LayoutParams(-1, -2).apply { topMargin = RecoveryUi.dp(overlayContext, 12) })
+        }
+        button(overlayContext.getString(R.string.recognition_help_solve), onTroubleshoot)
+        button(overlayContext.getString(R.string.recognition_help_pause), onPause)
+        val panel = object : ScrollView(overlayContext) {
+            override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+                val maxHeight = (displayBounds.height() - RecoveryUi.dp(overlayContext, 96)).coerceAtLeast(1)
+                super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(maxHeight, MeasureSpec.AT_MOST))
+            }
+        }.apply { addView(column) }
+        // Store only after addView succeeds; the service also offers notification/home fallback.
+        manager.addView(panel, panelParams(touchable = true))
+        card = panel
+    }
+
+    fun hideHelp() { card?.let { if (it.isAttachedToWindow) manager.removeView(it) }; card = null }
+    fun close() {
+        hideHelp()
+        if (statusAttached) { manager.removeView(status); statusAttached = false }
+        if (dot.isAttachedToWindow) manager.removeView(dot)
+    }
 }

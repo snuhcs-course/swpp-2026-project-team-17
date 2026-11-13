@@ -12,7 +12,11 @@ import android.view.accessibility.AccessibilityNodeInfo
 class ControlAccessibilityService : AccessibilityService() {
     private var busy=false
     private val handler=Handler(Looper.getMainLooper())
-    override fun onServiceConnected() { instance=this }
+    override fun onServiceConnected() {
+        instance=this
+        if (TrackerState.fault?.setting == RecoverySetting.ACCESSIBILITY) TrackerState.fault = null
+        TrackerState.notifyListeners()
+    }
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event?.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             TrackerState.cancelActions?.invoke()
@@ -51,13 +55,20 @@ class ControlAccessibilityService : AccessibilityService() {
         }
         return try { visit(root, 0); key } finally { root.recycle() }
     }
-    override fun onInterrupt() { TrackerState.controls=false; TrackerState.cancelActions?.invoke() }
+    private fun reportInterrupted() {
+        if (TrackerState.running) TrackerState.fault = TrackingFault("접근성 조작이 중단되었어요", "접근성 설정에서 NoTouch 눈 조작을 확인한 뒤 조작 재개를 선택해 주세요.", RecoverySetting.ACCESSIBILITY)
+        TrackerState.controls=false
+        TrackerState.cancelActions?.invoke()
+        TrackerState.contextChanged?.invoke()
+        TrackerState.notifyListeners()
+    }
+    override fun onInterrupt() { reportInterrupted() }
     override fun onDestroy() {
         if(instance===this) instance=null
-        TrackerState.controls=false; TrackerState.cancelActions?.invoke()
+        reportInterrupted()
         handler.removeCallbacksAndMessages(null); super.onDestroy()
     }
-    private fun allowed()=TrackerState.running && TrackerState.controls && TrackerState.interactionAllowed && !TrackerState.collecting
+    private fun allowed()=TrackerState.externalActionsAllowed()
     fun tap(x: Float, y: Float): Boolean {
         if(!allowed() || busy) return false
         return gesture(Path().apply { moveTo(x,y) },80)

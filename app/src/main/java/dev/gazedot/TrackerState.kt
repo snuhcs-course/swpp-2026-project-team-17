@@ -5,17 +5,46 @@ object TrackerState {
     var running = false
     var model: GazeModel? = null
     var controls = false
+        set(value) {
+            if (field == value) return
+            field = value
+            cancelActions?.invoke()
+            contextChanged?.invoke()
+            notifyListeners()
+        }
     var collecting = false
     var interactionAllowed = false
     var localDwellProgress = 0f
     var localScrollMode = false
     private var settingsScreens = 0
+    var helpVisible = false
+    var recoveryOpening = false
+    var fault: TrackingFault? = null
+    var signalPending = false
+    var contextChanged: (() -> Unit)? = null
+    private val observers = linkedSetOf<() -> Unit>()
+    fun observe(observer: () -> Unit) { observers += observer }
+    fun unobserve(observer: () -> Unit) { observers -= observer }
+    fun notifyListeners() { listener?.invoke(); observers.toList().forEach { it() } }
+    fun currentStatus(now: Long) = trackingStatus(running, controls, collecting, model != null,
+        sample, eyeState, now, fault, signalPending)
+    fun externalActionsAllowed() = running && controls && interactionAllowed && !collecting &&
+        !helpVisible && !recoveryOpening && fault == null && !signalPending
+    fun recognitionHelpEligible(accessibilityReady: Boolean) = running && controls && interactionAllowed &&
+        !collecting && !speaking && !recoveryOpening && model != null && fault == null &&
+        !signalPending && accessibilityReady
     fun settingsStarted() {
         settingsScreens++
         interactionAllowed = false
         cancelActions?.invoke()
+        contextChanged?.invoke()
     }
-    fun settingsStopped() { settingsScreens=(settingsScreens-1).coerceAtLeast(0); interactionAllowed=settingsScreens==0 }
+    fun settingsStopped() {
+        cancelActions?.invoke()
+        settingsScreens=(settingsScreens-1).coerceAtLeast(0)
+        interactionAllowed=settingsScreens==0
+        contextChanged?.invoke()
+    }
     var speaking = false
     var microphoneReady = false
     var actionStatus = "조작 꺼짐"
@@ -48,6 +77,9 @@ object TrackerState {
         cancelCalibration()
         collecting = false
         clearCoordinates()
+        helpVisible = false
+        recoveryOpening = false
+        signalPending = false
     }
 
     /** Keep the previous in-memory calibration until a new session succeeds. */
@@ -58,6 +90,7 @@ object TrackerState {
         collecting = true
         cancelActions?.invoke()
         clearCoordinates()
+        contextChanged?.invoke()
         return session
     }
 
@@ -78,6 +111,7 @@ object TrackerState {
         collecting = false
         cancelActions?.invoke()
         clearCoordinates()
+        contextChanged?.invoke()
     }
     var status = "시작 전 · 기기를 거치대에 고정해 주세요"
     var listener: (() -> Unit)? = null
@@ -88,15 +122,15 @@ object TrackerState {
             gaze = null
         }
         status = message
-        listener?.invoke()
+        notifyListeners()
     }
 
     fun publishSample(result: GazeSample, message: String) {
         sample = result
         frameAt = result.timestampMs
         features = result.features
-        gaze = result.toScreenGaze()
+        gaze = result.toScreenGaze()?.takeIf { eyeState == EyeState.OPEN }
         status = message
-        listener?.invoke()
+        notifyListeners()
     }
 }

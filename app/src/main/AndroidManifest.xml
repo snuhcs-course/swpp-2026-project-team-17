@@ -22,6 +22,8 @@
             </intent-filter>
         </activity>
         <activity android:name=".DeveloperSettingsActivity" android:exported="false" />
+        <activity android:name=".RecoveryActivity" android:exported="false"
+            android:taskAffinity="dev.gazedot.recovery" android:excludeFromRecents="true" />
         <activity android:name=".PracticeActivity" android:exported="false" />
         <service android:name=".ControlAccessibilityService" android:exported="true"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE" android:label="NoTouch 눈 조작">
