@@ -112,7 +112,7 @@ class MainActivity : ComponentActivity() {
             calibration?.close()
             calibration = null
             TrackerState.cancelCalibration()
-            TrackerState.status = "보정이 중단되었습니다. 다시 9점 보정을 시작하세요."
+            TrackerState.status = "보정이 중단되었습니다. 다시 보정을 시작하세요."
             showHome()
         }
     }
@@ -367,25 +367,24 @@ class MainActivity : ComponentActivity() {
 
     private inner class CalibrationView(private val session: Long) : View(this@MainActivity) {
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-        private val targets = listOf(.5 to .5, .15 to .15, .5 to .15, .85 to .15,
-            .85 to .5, .85 to .85, .5 to .85, .15 to .85, .15 to .5)
-        private var index = 0
-        private var since = SystemClock.uptimeMillis()
-        private val blinkBreakDurationMs = 2_000L
-        private var blinkBreakUntil = 0L
-        private val samples = mutableListOf<EyeFeatures>()
-        private val anchors = mutableListOf<Anchor>()
-        private var lastSampleAt = 0L
         private var closed = false
-        private var hint = "머리는 고정하고 파란 점을 바라보세요"
+        // Scheduling and collection live in CalibrationController; this view keeps the clock, tick and finish.
+        private val controller = CalibrationController(
+            clock = SystemClock::uptimeMillis,
+            toDisplay = { fx, fy ->
+                val location = IntArray(2); getLocationOnScreen(location)
+                val bounds = DisplaySpace.bounds(this@MainActivity)
+                DisplayCoordinates(bounds.width(), bounds.height())
+                    .normalize(location[0] + width * fx, location[1] + height * fy)
+            },
+            fit = { GazeModel.fit(it) },
+            onFinished = { finish(it) },
+        )
         private val tick = object : Runnable {
             override fun run() {
                 if (closed || calibration !== this@CalibrationView) return
-                val now = SystemClock.uptimeMillis()
-                if (!isTakingBlinkBreak(now) && now - since > 9000) {
-                    finish(null, "눈 표본이 부족합니다. 조명·거리·안경 반사를 확인하고 다시 보정하세요.")
-                    return
-                }
+                // Times out the current point, except during a break; a timeout finishes the calibration.
+                if (!controller.onTick()) return
                 invalidate(); postDelayed(this, 100)
             }
         }
@@ -393,57 +392,21 @@ class MainActivity : ComponentActivity() {
         fun close() {
             closed = true
             removeCallbacks(tick)
-            samples.clear()
-            anchors.clear()
-            blinkBreakUntil = 0L
+            controller.close()
         }
         override fun onDetachedFromWindow() { close(); super.onDetachedFromWindow() }
-        private fun isTakingBlinkBreak(now: Long): Boolean {
-            if (blinkBreakUntil == 0L) return false
-            if (now < blinkBreakUntil) return true
-            blinkBreakUntil = 0L
-            // Start point five's settling and timeout clocks after the break, even without eye detection.
-            since = now
-            hint = "${index + 1} / 9 · 파란 점을 계속 바라보세요"
-            return false
-        }
         fun onFrame(sample: GazeSample?) {
-            if (closed || index >= targets.size || width == 0 || height == 0) return
-            val now = SystemClock.uptimeMillis()
-            if (isTakingBlinkBreak(now)) return
-            val elapsed = now - since
-            // Keep collecting open-eye features even when the old model rejects this pose.
-            val f = sample?.calibrationFeatures(now, lastSampleAt)
-            if (f == null) { hint = "눈 검출 대기 · 눈을 뜨고 얼굴을 카메라로 향해 주세요"; return }
-            lastSampleAt = sample.timestampMs
-            hint = "${index + 1} / 9 · 파란 점을 계속 바라보세요"
-            if (elapsed < 1000) return
-            samples += f
-            if (samples.size >= 22 && elapsed >= 2500) {
-                val eye = medianFeatures(samples)
-                // Reject motion within a fixation, rather than fitting mismatched samples.
-                if (samples.any { kotlin.math.abs(it.faceX - eye.faceX) > .045 || kotlin.math.abs(it.faceY - eye.faceY) > .045 }) {
-                    samples.clear(); since = SystemClock.uptimeMillis()
-                    hint = "머리가 움직였습니다 · 같은 점에서 다시 측정합니다"
-                    return
-                }
-                val xy = targets[index]
-                val location = IntArray(2); getLocationOnScreen(location)
-                val bounds = DisplaySpace.bounds(this@MainActivity)
-                val point = DisplayCoordinates(bounds.width(), bounds.height())
-                    .normalize(location[0] + width * xy.first, location[1] + height * xy.second)
-                anchors += Anchor(eye, point.first, point.second)
-                index++; samples.clear(); since = SystemClock.uptimeMillis()
-                if (index == 4) blinkBreakUntil = since + blinkBreakDurationMs
-                if (index == targets.size) {
-                    val model = GazeModel.fit(anchors)
-                    finish(model, if (model == null) "보정 실패 · 시선 변화가 불충분하거나 오차가 큽니다. 기기를 고정하고 다시 시도하세요."
-                        else "보정 완료 · 빨간 점과 실제 시선이 맞는지 확인하세요. 홈으로 나가도 동작합니다.")
-                }
-            }
+            if (closed || width == 0 || height == 0) return
+            controller.onFrame(sample)
             invalidate()
         }
-        private fun finish(model: GazeModel?, message: String) {
+        private fun finish(outcome: CalibrationOutcome) {
+            val model = outcome.model
+            val message = when (outcome.failure) {
+                CalibrationFailure.TIMEOUT -> "눈 표본이 부족합니다. 조명·거리·안경 반사를 확인하고 다시 보정하세요."
+                CalibrationFailure.FIT_REJECTED -> "보정 실패 · 시선 변화가 불충분하거나 오차가 큽니다. 기기를 고정하고 다시 시도하세요."
+                null -> "보정 완료 · 빨간 점과 실제 시선이 맞는지 확인하세요. 홈으로 나가도 동작합니다."
+            }
             val saved = runCatching {
                 TrackerState.finishCalibration(session, model)
             }
@@ -460,33 +423,37 @@ class MainActivity : ComponentActivity() {
             } else showHome()
         }
         override fun onDraw(canvas: Canvas) {
-            val target = targets.getOrNull(index) ?: return
+            val screen = controller.screen(SystemClock.uptimeMillis()) ?: return
             val d = resources.displayMetrics.density
-            paint.color = Color.WHITE; paint.textSize = 15 * d; paint.textAlign = Paint.Align.CENTER
-            if (blinkBreakUntil != 0L) {
-                val secondsLeft = ((blinkBreakUntil - SystemClock.uptimeMillis() + 999) / 1000).coerceAtLeast(1)
-                canvas.drawText("시선 보정 4/9 완료 · 잠시 쉬어가기", width / 2f, 55 * d, paint)
-                paint.textSize = 20 * d
-                canvas.drawText("눈을 편하게 깜빡여 주세요", width / 2f, height / 2f, paint)
-                paint.textSize = 14 * d
-                canvas.drawText("${secondsLeft}초 후 나머지 5개를 이어서 진행합니다", width / 2f, height / 2f + 32 * d, paint)
-                paint.textSize = 12 * d
-                canvas.drawText("머리와 기기는 그대로 유지해 주세요", width / 2f, height - 70 * d, paint)
-                canvas.drawText("중단하려면 뒤로 가기", width / 2f, height - 45 * d, paint)
-                return
+            paint.color = Color.WHITE; paint.textAlign = Paint.Align.CENTER
+            drawLine(canvas, screen.title, 55 * d, 15 * d)
+            // Required head position, below the title; on usual phone heights also above the top row's 23 dp ring.
+            paint.color = Color.rgb(147, 197, 253)
+            drawLine(canvas, screen.position, minOf(78 * d, height * .15f - 30 * d).coerceAtLeast(72 * d), 13 * d)
+            paint.color = Color.WHITE
+            screen.center.forEachIndexed { i, line ->
+                drawLine(canvas, line, height / 2f + if (i == 0) 0f else (32 + (i - 1) * 24) * d, if (i == 0) 20 * d else 14 * d)
             }
-            canvas.drawText("시선 보정 ${index + 1}/9", width / 2f, 55 * d, paint)
-            paint.textSize = 12 * d
-            canvas.drawText(hint, width / 2f, height - 70 * d, paint)
-            canvas.drawText("중단하려면 뒤로 가기", width / 2f, height - 45 * d, paint)
+            screen.footer.forEachIndexed { i, line -> drawLine(canvas, line, height - (70 - 25 * i) * d, 12 * d) }
+            paint.color = Color.rgb(100, 116, 139)
+            drawLine(canvas, CalibrationPlan.ID, height - 22 * d, 10 * d)
+            val target = screen.target ?: return
             val x = (target.first * width).toFloat(); val y = (target.second * height).toFloat()
             paint.color = Color.rgb(96, 165, 250)
             canvas.drawCircle(x, y, 13 * d, paint)
             paint.color = Color.WHITE; canvas.drawCircle(x, y, 3 * d, paint)
             paint.style = Paint.Style.STROKE; paint.strokeWidth = 3 * d
             canvas.drawArc(x - 23*d, y - 23*d, x + 23*d, y + 23*d, -90f,
-                360f * (samples.size / 22f).coerceAtMost(1f), false, paint)
+                360f * screen.sampleProgress, false, paint)
             paint.style = Paint.Style.FILL
+        }
+        /** Centered single line, shrunk if it would not fit the view width minus 16 dp margins. */
+        private fun drawLine(canvas: Canvas, text: String, y: Float, size: Float) {
+            paint.textSize = size
+            val available = width - 32 * resources.displayMetrics.density
+            val measured = paint.measureText(text)
+            if (available > 0 && measured > available) paint.textSize = size * available / measured
+            canvas.drawText(text, width / 2f, y, paint)
         }
     }
 }
