@@ -8,3 +8,8 @@ local.properties
 build-log*.txt
 *.jks
 *.keystore
+# Calibration-comparison evaluation: pilot sessions and phone exports stay local.
+docs/calibration-comparison/data/pilot/*
+!docs/calibration-comparison/data/pilot/README.md
+docs/calibration-comparison/data/incoming/*
+!docs/calibration-comparison/data/incoming/README.md

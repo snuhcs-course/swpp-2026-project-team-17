@@ -5,8 +5,10 @@
 | Candidate ID | `calibration_a_three_pass_static` |
 | Branch | `experiment/calibration-a-three-pass` |
 | `BASE_SHA` | `e8fa01ef1e397f508aa5a3b3a595539b4ef4490a` (`origin/feature/home-screen`, fetched 2026-11-14) |
-| Sibling candidate | B, `calibration_b_three_pass_positions` on `experiment/calibration-b-three-poses`, same `BASE_SHA` |
-| Status | Implemented and checked offline. **Not run on a phone.** |
+| Calibration implementation | `94f1f8c90f09d10763d4a054481888b10f42cd1e` |
+| Evaluation protocol | `notouch-calibration-comparison-eval` 1.0.0 ([`protocol.json`](protocol.json)), log schema 4, snapshot schema 2 |
+| Sibling candidate | B, `calibration_b_three_pass_positions` on `experiment/calibration-b-three-poses`, same `BASE_SHA` (evaluation not yet ported) |
+| Status | Calibration A completed once on the phone (basic operation only). Evaluation tooling integrated and checked offline; **no evaluation session recorded yet**. |
 | Accuracy | **NOT_MEASURED** |
 
 ## 1. Purpose and hypothesis
@@ -28,178 +30,215 @@ offset, and it grew during each session. This experiment asks one question about
 
 `GazeModel` regresses screen coordinates on the two iris features only (`x`, `y`). Face position and scale are used
 only for its runtime validity check, against the mean of all anchors. Head position therefore reaches the fit only
-through its effect on the iris features.
+through its effect on the iris features. Both candidates are evaluated in the same three instructed head positions
+(section 5), so the comparison asks how each calibration holds up when the head is not where it was.
 
-## 2. Participant procedure (Candidate A)
+## 2. Calibration procedure (Candidate A, unchanged since `94f1f8c`)
 
-Operator setup, unchanged from the app:
+Operator setup:
 
-1. Fix the phone on a stand in portrait orientation. It must not move until calibration ends.
-2. In NoTouch, tap **카메라 시작** (Start camera) and complete the existing permission steps.
-3. Seat the participant facing the screen at about 30–50 cm (the home screen's existing guidance).
+1. Fix the phone on a stand in portrait orientation. It must not move until the evaluation ends.
+2. In NoTouch, tap **카메라 시작** (Start camera) and complete the permission steps (accessibility service
+   **NoTouch 눈 조작**, display over other apps, camera).
+3. Seat the participant facing the screen at about 30–50 cm (the home screen's guidance) in the neutral position.
 4. When the eyes are detected (**보정 시작** is enabled), tap **보정 시작** (Start calibration).
 
-Participant:
+Participant: adopt a comfortable, front-facing head position and keep it, at the same distance, for all three
+passes and the breaks. Look at each blue dot until it moves on (the ring fills). Blink during the breaks: 2 s after the
+4th point of every pass, 3 s after passes 1 and 2. A successful calibration opens the existing tutorial.
 
-1. Adopt a comfortable, front-facing head position.
-2. Keep approximately this head position and viewing distance for all three passes, including the breaks.
-3. Look at each blue dot until it moves on. The ring around the dot fills as samples are collected.
-4. Blink naturally during the breaks: 2 s after the 4th point of every pass, and 3 s after passes 1 and 2.
-5. After pass 3, a successful calibration opens the existing tutorial. A failure returns to the home screen with
-   a message. **Back** cancels at any time.
+**Schedule and rules.** The existing nine targets, in the existing order, three times (27 anchors). Per point,
+unchanged from `BASE_SHA`: 1,000 ms settling; ≥ 22 accepted samples and ≥ 2,500 ms; per-feature median; samples
+0–250 ms old, newer than the last, quality TRACKING or OUT_OF_RANGE; missing input pauses collection without resetting
+the clocks; a face shift > 0.045 from the point median restarts the point; > 9,000 ms fails the calibration. No
+samples during breaks; the next point's clocks start when a break ends. One `GazeModel.fit` on all 27 anchors in
+collection order, no intermediate model. On-screen text: "시선 보정 · 2/3회차 · 4/9" (pass 2/3, point 4/9),
+"자세: 처음 자세 그대로 · 정면, 같은 거리" (keep the starting position). The candidate ID is shown in small grey text.
 
-## 3. Targets, schedule and collection rules
+## 3. What this branch changes
 
-**Targets.** The existing nine targets, in the existing order, in every pass. They are fractions of the calibration
-view: centre (.5, .5), top-left (.15, .15), top-centre (.5, .15), top-right (.85, .15), middle-right (.85, .5),
-bottom-right (.85, .85), bottom-centre (.5, .85), bottom-left (.15, .85), middle-left (.15, .5).
-
-**Coordinates.** Unchanged. When an anchor is accepted, its target is converted to normalized display coordinates:
-the view's on-screen origin plus fraction × view size, divided by `DisplaySpace.bounds`
-(`WindowManager.maximumWindowMetrics` on API 30+).
-
-**Schedule.**
-
-```
-pass 1: P1 P2 P3 P4 [blink break 2 s] P5 P6 P7 P8 P9 [inter-pass break 3 s]
-pass 2: P1 P2 P3 P4 [blink break 2 s] P5 P6 P7 P8 P9 [inter-pass break 3 s]
-pass 3: P1 P2 P3 P4 [blink break 2 s] P5 P6 P7 P8 P9 -> one GazeModel.fit on all 27 anchors
-```
-
-- Each pass's nine anchors are kept separately, labelled with pass, point and head position (`CalibrationAnchor`).
-  All 27 go to the fit in collection order. Passes are not averaged into nine anchors.
-- No model is fitted or activated after pass 1 or 2. The model is installed only if all 27 anchors were collected,
-  the single fit succeeds and the calibration session is still current.
-- No samples are collected during any break. Frames delivered during a break are ignored entirely. The next
-  target's settling and timeout clocks start when the end of the break is noticed (by the next frame or by the
-  100 ms tick).
-
-**Per-point rules, unchanged from `BASE_SHA`** (verified in the baseline `MainActivity.CalibrationView`, now
-`CalibrationRules`):
-
-| Rule | Value |
+| Change | Files |
 |---|---|
-| Settling | Samples within 1,000 ms of the point start are not collected |
-| Completion | ≥ 22 accepted samples **and** ≥ 2,500 ms since the point start |
-| Aggregation | Per-feature median (`medianFeatures`) of the point's samples |
-| Sample freshness | Capture timestamp newer than the last accepted capture; age 0–250 ms; quality TRACKING or OUT_OF_RANGE (`GazeSample.calibrationFeatures`, unchanged) |
-| Blinks / missing input | No sample is added and the hint changes. Collected samples are kept and the clocks keep running |
-| Within-point movement | If any sample's face x or y differs from the point median by > 0.045, the samples are discarded and the same point restarts (new settling and timeout) |
-| Timeout | A point not complete after > 9,000 ms fails the whole calibration (checked every 100 ms, never during a break) |
-| Mid-pass break | 2,000 ms after the 4th point, now in every pass |
-| Cancellation | Back, leaving the screen (`onPause`) or tracking stopping closes the calibration; the session token prevents a late result from being installed |
-| Model replacement | The previous model stays active until a new calibration succeeds; failure or cancellation keeps it |
+| Three-pass calibration (commit `94f1f8c`) | `CalibrationController.kt`, `CalibrationPlan.kt`, `MainActivity.kt` (calibration view), tests |
+| Evaluation integration (this stage) | see below |
 
-New in this experiment: three passes, the 3,000 ms inter-pass break after passes 1 and 2, and the labels.
-No between-anchor geometry filter was added.
-
-**On-screen text.**
-
-| Moment | Korean (shown) | English |
-|---|---|---|
-| Collecting (title) | 시선 보정 · 2/3회차 · 4/9 | Gaze calibration · pass 2/3 · point 4/9 |
-| Collecting (position) | 자세: 처음 자세 그대로 · 정면, 같은 거리 | Position: as at the start · facing front, same distance |
-| Hint | 4 / 9 · 파란 점을 계속 바라보세요 | 4 / 9 · keep looking at the blue dot |
-| Hint, no usable eyes | 눈 검출 대기 · 눈을 뜨고 얼굴을 카메라로 향해 주세요 | Waiting for eyes · open your eyes and face the camera |
-| Hint, movement retry | 머리가 움직였습니다 · 같은 점에서 다시 측정합니다 | Your head moved · measuring the same point again |
-| Blink break | 2/3회차 · 4/9 완료 · 잠시 쉬어가기 / 눈을 편하게 깜빡여 주세요 / 2초 후 나머지 5개를 이어서 진행합니다 / 머리와 기기는 그대로 유지해 주세요 | Pass 2/3 · 4/9 done · short break / blink comfortably / the remaining 5 continue in 2 s / keep your head and the phone where they are |
-| Inter-pass break | 1/3회차 완료 · 잠시 쉬어가기 / 다음 자세: 처음 자세 그대로 · 정면, 같은 거리 / 눈을 편하게 깜빡여 주세요 / 같은 자세와 거리를 그대로 유지해 주세요 / 3초 후 2/3회차를 시작합니다 / 머리와 기기는 그대로 유지해 주세요 | Pass 1/3 done · short break / next position: as at the start · facing front, same distance / blink comfortably / keep the same position and distance / pass 2/3 starts in 3 s / keep your head and the phone where they are |
-| Always | 중단하려면 뒤로 가기 | Press Back to cancel |
-
-The candidate ID is drawn in small grey text at the bottom of the calibration screen, so the operator can check
-which build is installed.
-
-## 4. What changed and what did not
-
-Changed (calibration presentation, scheduling and collection only):
+Evaluation integration, adapted selectively from `feature/gaze-evaluation-home-screen-iter3` at `72411ec` (that
+branch predates `BASE_SHA` and was not merged; its recorded sessions were not copied):
 
 | File | Change |
 |---|---|
-| `app/src/main/java/dev/gazedot/CalibrationController.kt` | New. The three-pass schedule, the original per-point rules (moved from `MainActivity`), labelled anchors, the single final fit and the screen text. Identical in A and B |
-| `app/src/main/java/dev/gazedot/CalibrationPlan.kt` | New. Candidate ID, head position per pass and position instructions. **The only main-source file that differs between A and B** |
-| `app/src/main/java/dev/gazedot/MainActivity.kt` | `CalibrationView` delegates to the controller. Same tick, display-coordinate conversion, `TrackerState` session handling and result messages. New drawing of progress, position and break text. The interruption message no longer says "9점" (nine-point) |
-| `app/src/test/java/dev/gazedot/CalibrationControllerTest.kt`, `CalibrationTestHarness.kt` | New schedule and state-transition tests with a fake clock. Identical in A and B |
-| `app/src/test/java/dev/gazedot/CalibrationPlanTest.kt` | New candidate-specific tests (ID, positions, instructions) |
-| `docs/calibration-comparison/README.md` | This file |
+| `Evaluation.kt` (new) | Protocol constants, head positions and block orders, the session timeline (preparation → Ready → countdown → 80 s block, ×3), evaluation state, the start gate, the 27-anchor `CalibrationRecord` and model snapshot |
+| `EvaluationLog.kt` (new) | Schema 4 logger: `attempts.csv`, `events.csv`, `metadata.json`, `model_snapshot.json`, `SHA256SUMS`; block-start admission; counters |
+| `EvaluationActivity.kt` (new) | Setup, preparation/Ready, countdown and target screens; every exit finalizes the record |
+| `EvaluationDiagnostics.kt` (new) | Read-only name of the check that left a face without features |
+| `GazeMath.kt` | Additions only: read-only `rejection`, `linearOutput`, `parameters` (predict and fit unchanged) |
+| `CalibrationController.kt` | Observation only: start/finish times, per-point movement retries and acceptance times |
+| `TrackerState.kt` | Calibration record and serials; reset/overlay hooks; guard functions = original conditions + evaluation guard; a new calibration attempt or tracking stop voids the record |
+| `TrackingService.kt` | Evaluation hooks around the unchanged `pipeline.process(...)` call: attempt logging, named and logged pipeline resets, block-start admission, pointer/label guard, explicit `perform` guard; constants named (same values) |
+| `MainActivity.kt` | Records the `CalibrationRecord` after a successful calibration installs its model |
+| `DotOverlay.kt` | Read-only `drawnAt` and `bounds` |
+| `ControlAccessibilityService.kt` | `allowed()` uses `TrackerState.gazeControlAllowed()` (same condition + evaluation guard) |
+| `DeveloperSettingsActivity.kt` | Debug-only entry **시선 정확도 평가 · 보정 비교 (개발용)** |
+| `AndroidManifest.xml` | `EvaluationActivity` (not exported) |
+| `app/build.gradle.kts` | Build provenance (`BuildConfig`: commit, dirty flag, base ancestry, protocol and model hashes); test inputs and replay properties; **test-only** `org.json:json:20240303` (not packaged) |
+| `docs/calibration-comparison/` | Protocol, tools, synthetic fixtures, data layout, this README |
+| `.gitattributes`, `.gitignore` | Raw data and fixtures stored byte for byte; pilot and incoming exports never committed |
 
-Unchanged: eye and iris feature extraction (`LandmarkFeatures`, `EyeObservations`), eye-state classification,
-`GazeModel.fit`, its model family, ridge term and rejection thresholds, `GazeModel.predict` and its runtime validity
-checks, `GazePipeline` smoothing and staleness rules, display-coordinate conventions (`DisplaySpace`,
-`DisplayCoordinates`), clicking, scrolling, text entry, the tutorial, permissions, `TrackingService`, `TrackerState`,
-dependencies, Gradle and AGP versions, the application ID (`dev.gazedot`) and signing. All existing tests are kept
-unmodified. The fitted personal coefficients change only because the calibration data change.
+**Preserved and checked.** Unchanged files: `GazePipeline.kt` (smoothing, stale rule), `LandmarkFeatures.kt`,
+`EyeObservation.kt`, `EyeGestures.kt`, `InteractionEngine.kt`, `CalibrationPlan.kt`, the tutorial, coordinates,
+dependencies of the app, Gradle/AGP versions, application ID and signing. `CandidateBehaviorTest` requires fit,
+predict, feature extraction and `medianFeatures` to equal frozen copies from `BASE_SHA` bit for bit, and the new
+diagnostics to agree with them exactly. The calibration tests from `94f1f8c` are unchanged and pass. Outside a session,
+behaviour is unchanged: the evaluation guards are false, nothing is logged, and the extra block-start drop applies only
+while a session is current.
 
-## 5. Build and test
+## 4. Evaluation protocol (`notouch-calibration-comparison-eval` 1.0.0)
 
-Requires JDK 17 or 21 and Android SDK 35. Set `sdk.dir` in the ignored `local.properties`. Set `JAVA_HOME` only for
-the build process, not globally. From the repository root (PowerShell):
+**Session.** One fresh, successful 27-anchor calibration of this candidate, then one session of three head-position
+blocks with the same model throughout (no recalibration, model change or tracking stop between blocks).
+
+| | |
+|---|---|
+| Blocks | NEUTRAL (기본 위치), HIGHER (조금 높은 위치), LOWER (조금 낮은 위치) |
+| Planned orders | ANNA / A1: NEUTRAL → HIGHER → LOWER (`nhl`); ANNA / A2: LOWER → HIGHER → NEUTRAL (`lhn`); future B1/B2 the same; technical pilot PILOT01 / T1: `nhl` |
+| Each block | The unchanged Iteration 3 schedule: 16 targets at x, y ∈ {0.2, 0.4, 0.6, 0.8}, pass 1 serpentine, pass 2 reversed, 32 presentations of 1.0 s settling + 1.5 s measurement, 80 s |
+| Case IDs | `<position>-pass<p>-r<row>c<col>`, e.g. `higher-pass1-r0c0` (96 unique per session) |
+| Before each block | Preparation screen naming the position, explicit **준비 완료** (Ready), then a 3 s countdown; preparation and countdown are logged and never count toward a block |
+| Filter reset | As protocol 2.0.0 at its run start: a logged `pipeline_reset` (`GazePipeline.reset`) at the session start and at every block start; results accepted before a block start and handled after it are dropped before smoothing (`discarded_block_start`) |
+| One session per calibration | Starting a session consumes the calibration, even if interrupted; a new calibration attempt voids the previous record |
+| Pose | Instructed only; `f_face_x`, `f_face_y`, `f_scale` logged per attempt and summarized per block and phase; no pose gate, nothing discarded on pose |
+
+**Metrics and verdicts** (definitions and thresholds unchanged from protocol 2.0.0, evaluated per block):
+
+| Criterion | Target |
+|---|---|
+| Successful presentations (complete, ≥ 10 valid samples, coverage ≥ 0.80, mean error ≤ 0.10) / 32 | ≥ 0.80 |
+| Nearest-rank p95 of presentation mean errors (technically eligible presentations; INSUFFICIENT_DATA if fewer than 26) | ≤ 0.20 |
+| Mean per-presentation jitter RMS (eligible presentations) | ≤ 0.05 |
+| Tracking availability: valid / all measurement-phase attempts, invalid outcomes included | ≥ 0.90 |
+| Valid sample rate: valid measurement samples / 48 s | ≥ 10 /s |
+| p95 processing latency over all block attempts (settling and measurement, invalid and discarded included; no preparation/countdown) | ≤ 200 ms |
+
+A block is MET only if all six are MET; a session is MET only if all three blocks are MET. Block results are always
+listed separately; pooled per-position summaries recompute p95 from pooled presentation means and never average
+percentiles. Missing data are never zero error. Incomplete sessions are INCOMPLETE (every block too). Fit error is
+reported as a calibration diagnostic only. Candidates A and B are never pooled: the calibration ID is part of the
+compatibility group. Pilot sessions, sessions outside the collection plan or with another block order, shared
+calibrations, dirty builds and live-preview sessions are never official.
+
+**Records** (app-private storage `files/evaluation/calibration-comparison/<participant>/<session_id>/`):
+`attempts.csv` (one row per processing attempt: block, position, phase, case, features, eye state, linear/predicted/
+smoothed coordinates, outcome, timings), `events.csv` (resets, preparation, Ready, camera errors), `metadata.json`
+(build commit and dirty flag, protocol hash, candidate ID, participant/session, block order and timeline with
+preparation times, device and display, declared conditions incl. head-position markers, calibration identity,
+duration, retries and age, counters), `model_snapshot.json` (the 27 anchors with pass, point, calibration position,
+retries and acceptance time, plus fitted parameters), `SHA256SUMS`. Replay refits all 27 anchors in recorded order,
+requires every parameter bit for bit, and re-runs the unchanged `GazePipeline.process` over the logged inputs.
+
+## 5. Phone procedure: fresh calibration and a session
+
+1. Start tracking (**카메라 시작**) with the phone fixed on the stand; measure the eye–screen distance at the neutral
+   position with a ruler.
+2. **보정 시작** and complete all three passes until "보정 완료" (calibration complete) and the tutorial appear. Do not
+   choose recalibration in the tutorial.
+3. Leave the tutorial with Back, tap **설정 · 개발자 기능**, then **시선 정확도 평가 · 보정 비교 (개발용)**.
+4. Check the status lines: "이 빌드의 보정 후보: calibration_a_three_pass_static" and "새 보정: 준비됨 · 27점 · …" and
+   "평가를 시작할 수 있습니다." If it says 시작 불가 (cannot start), follow the message (usually: calibrate again).
+5. Choose a preset: **PILOT01 · T1 · 기술 시험 (공식 아님)** for the technical pilot, or **ANNA · A1 · 기본 → 위 → 아래**
+   / **ANNA · A2 · 아래 → 위 → 기본** for official sessions. Fill in 눈–화면 거리 (cm), 조명, 안경 and
+   **자세 기준 메모** (see below). Keep **블라인드 측정 (기본)**. Tap **평가 시작**.
+6. For each block: the screen shows "블록 k/3 준비 · <position>" with the instruction. The participant moves to that
+   position (phone untouched), the operator taps **준비 완료** gently, a 3-2-1 countdown follows, then 32 blue dots
+   (80 s). No pointer is shown and gaze clicks, scrolling and dictation are off for the whole session.
+7. After block 3 the setup screen reports "평가 완료 · <participant> <session> · 3블록 96개 목표" and the session
+   folder. Back, leaving the screen, screen-off, rotation or stopping tracking end the session as incomplete; the
+   calibration is then used up and a new one is needed.
+
+**Recording head positions (repeat them for candidate B).** Before formal collection, define reproducible physical
+markers and write them in **자세 기준 메모** for every session, for example: the neutral chin height against a
+marked scale or chin rest and the measured eye–screen distance; HIGHER and LOWER as the same small vertical
+displacement up and down from that mark (the value chosen by the team, not validated here), approximately
+front-facing, phone never moved. Keep the same markers, stand, distance and lighting for A and B. The logged face
+position and scale per block can later show how consistently the positions were reproduced; they are not used to
+accept or reject data.
+
+## 6. Export, verify, import, freeze, replay, analyze
+
+Run from the repository root (PowerShell). Set `JAVA_HOME` only in the build shell; the Android SDK path comes from the
+ignored `local.properties`.
+
+```powershell
+# 1. Read-only export of all sessions from the phone (adb exec-out run-as ... tar); verifies checksums.
+python -B docs\calibration-comparison\tools\calib_eval_data.py export --adb "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" --serial R3CW80G6PGW --out docs\calibration-comparison\data\incoming
+python -B docs\calibration-comparison\tools\calib_eval_data.py verify docs\calibration-comparison\data\incoming\export-<UTC>
+
+# 2a. Technical pilot (never official): import PILOT* sessions only, into data\pilot (Git-ignored).
+python -B docs\calibration-comparison\tools\calib_eval_data.py import docs\calibration-comparison\data\incoming\export-<UTC>\files\evaluation\calibration-comparison\PILOT01 --raw docs\calibration-comparison\data\pilot --allow-pilot
+# 2b. Official sessions: import into data\raw\<calibration_id>\<participant>\<session_id> (never overwrites).
+python -B docs\calibration-comparison\tools\calib_eval_data.py import docs\calibration-comparison\data\incoming\export-<UTC>\files\evaluation\calibration-comparison\ANNA --raw docs\calibration-comparison\data\raw
+
+# 3. Freeze the official inputs before analysis, and check them later.
+python -B docs\calibration-comparison\tools\calib_eval_data.py freeze docs\calibration-comparison\data\raw --out docs\calibration-comparison\data\raw-inputs.sha256
+python -B docs\calibration-comparison\tools\calib_eval_data.py check-frozen docs\calibration-comparison\data\raw docs\calibration-comparison\data\raw-inputs.sha256
+
+# 4. Exact numerical replay with the app's own GazeModel.fit / GazePipeline.process.
+.\gradlew.bat :app:testDebugUnitTest --tests dev.gazedot.EvaluationReplayRunner -PgazeReplaySession=docs/calibration-comparison/data/raw -PgazeReplayOut=docs/calibration-comparison/data/derived/replay
+
+# 5. Analysis by candidate and head position (select sessions by ID in data\analysis-inputs.json: {"included": [{"session_id": "..."}]}).
+python -B docs\calibration-comparison\tools\analyze_calibration_eval.py docs\calibration-comparison\data\raw --out docs\calibration-comparison\data\derived --selection docs\calibration-comparison\data\analysis-inputs.json --source-label "<build commit, selection>"
+```
+
+For the pilot, run steps 4 and 5 on `data\pilot` with `--out` pointing outside `data\derived`. An export that holds
+both pilot and official sessions is imported per participant folder, as above. Keep the export archive and its
+`.sha256` outside the repository as the backup before deleting it from `data\incoming`.
+
+Data layout: [`data/raw/`](data/raw/README.md) (official, byte-exact), [`data/pilot/`](data/pilot/README.md) and
+[`data/incoming/`](data/incoming/README.md) (Git-ignored), [`data/derived/`](data/derived/README.md) (generated),
+[`figures/`](figures/README.md) (future). Synthetic fixtures live only in [`tools/testdata/`](tools/testdata/README.md).
+
+## 7. Build and automated checks
 
 ```powershell
 $env:JAVA_HOME = "<path to JDK 17 or 21>"   # this shell only
-.\gradlew.bat :app:testDebugUnitTest :app:assembleDebug :app:lintDebug
+.\gradlew.bat :app:assembleDebug :app:testDebugUnitTest :app:lintDebug
+python -B -m unittest discover -s docs\calibration-comparison\tools -v
 ```
 
-The APK is `app/build/outputs/apk/debug/app-debug.apk`. Its SHA-256 is recorded with the build report, not in this
-file, because the file is part of the commit the APK is built from.
+Results on 2026-11-15 (Windows 11, Microsoft OpenJDK 21.0.12.1, Gradle 8.13, AGP 8.9.2, Python 3.14), no phone involved:
 
-## 6. Automated-check results
+| Check | Result |
+|---|---|
+| `:app:assembleDebug` | BUILD SUCCESSFUL |
+| `:app:testDebugUnitTest` | 123 tests, 0 failures, 0 errors, 2 skipped (the opt-in `EvaluationReplayRunner` and `SyntheticSessionWriter`, which run only with `-P` properties). Includes the 71 tests of `94f1f8c` unchanged |
+| `:app:lintDebug` | 0 errors, 30 warnings, identical to `BASE_SHA` by issue ID and file |
+| Kotlin compiler | only the pre-existing `setDecorFitsSystemWindows` deprecation warning in `MainActivity.kt` |
+| Python tool tests | 42 tests OK (analyzer 34, data tool 8) |
+| End-to-end, synthetic | Kotlin writer → `export` layout → verify → import → freeze/check-frozen → analyze → Kotlin replay: replay `ok`, 0 mismatches (3,783 and 1,777 processed attempts) |
 
-Run on 2026-11-14 on Windows 11 with Microsoft OpenJDK 21.0.12.1, Gradle 8.13 (wrapper) and AGP 8.9.2. No phone was
-connected or used.
+The regression test `ReferenceRegressionTest` feeds identical synthetic attempts to the frozen Iteration 3 analyzer
+(`tools/testdata/reference_iter3`, unmodified from `72411ec`) and to the per-block code, and requires identical
+presentations, criteria and diagnostics. Deliberately broken metric rules (eligibility and success boundaries, the
+10-sample minimum, the latency population, the p95 rank) each made it fail. The golden session
+(`tools/testdata/synthetic_session`) pins the file format shared by the Kotlin logger and the Python tools.
 
-| Check | `BASE_SHA` (before changes) | Candidate A |
-|---|---|---|
-| `:app:assembleDebug` | BUILD SUCCESSFUL | BUILD SUCCESSFUL |
-| `:app:testDebugUnitTest` | 49 tests, 0 failures, 0 errors, 0 skipped | 71 tests (49 existing + 19 `CalibrationControllerTest` + 3 `CalibrationPlanTest`), 0 failures, 0 errors, 0 skipped |
-| `:app:lintDebug` | 0 errors, 30 warnings | 0 errors, 30 warnings, identical to the baseline by issue ID and file (no new warnings) |
-| Kotlin compiler | 1 warning: deprecated `setDecorFitsSystemWindows` (`MainActivity.kt:51`) | The same pre-existing warning only |
+## 8. Known limitations and on-device uncertainties
 
-The baseline's 30 lint warnings are DataExtractionRules 1, GradleDependency 5, ImplicitSamInstance 2,
-ObsoleteSdkInt 1, OldTargetApi 1, SetTextI18n 14, SwitchIntDef 2, TypographyFractions 1, UnusedAttribute 1 and
-UseKtx 2.
+- **No evaluation session has run on the phone.** The setup, preparation, Ready, countdown and target screens, the
+  3 s countdown, block transitions, Back/background/screen-off handling, file finalization on the device, and the
+  `export` command (`run-as` + `tar`) are verified offline only. The technical pilot (PILOT01 / T1) is the first check.
+- The Ready button is tapped on the fixed phone; tapping can move it. Tap gently or use a stand that stays put.
+- Calibration plus a session takes about 1.5–2 min of calibration and at least 3 × (preparation + 3 s + 80 s); a
+  long preparation is allowed and recorded but adds time since calibration (logged as `age_ms_at_session_start` and
+  per-block times).
+- Instructed positions are not measured. Whether HIGHER and LOWER stay within the model's unchanged validity range
+  (face within ±0.12 of the mean calibration position, scale 0.72–1.28) is unknown; out-of-range frames count as invalid
+  (`out_of_range`) and lower availability. The rule is deliberately not loosened.
+- Processing errors are recorded from the camera worker; in the rare case that one races with the main thread setting
+  a block start, its logged phase could disagree with the timeline, which the analyzer flags as an integrity problem.
+- The evaluation entry is in **설정 · 개발자 기능**, not on the home screen, so the home layout and its gaze targets
+  are unchanged. Release builds hide it.
+- Candidate B is untouched; its evaluation needs the same integration (with B's calibration ID and labels) before
+  B sessions. Candidates A, B and the baseline share application ID `dev.gazedot`, so only one is installed at a time.
+- The root `README.md` still describes the nine-point flow, and some status texts still say "9점 보정".
 
-The tests cover: exactly three passes and 27 anchors; target order and labels across pass boundaries; no fit or
-model activation after 9 or 18 anchors; one fit after 27; the three blink breaks and two inter-pass breaks with their
-durations; frames ignored during breaks; settling and timeout clocks restarting at the end of a break; the original
-freshness, duplicate, quality, settling, 22-sample and 2.5 s rules; missing input; within-point movement retries;
-timeouts; fit rejection; cancellation; preservation of the previous model; genuine per-pass features reaching the
-fit; and Candidate A's ID and same-position instructions. During development, deliberately broken controllers
-(intermediate fit, no clock reset after a break, blink break only in pass 1, frames used during a break, fit on the
-last pass only) each failed at least one of these tests.
-
-## 7. Known limitations and items for phone validation
-
-- **Not run on a phone.** Layout and legibility of the new text, the real per-point duration, break timing, frame
-  rate, and the participant's experience are untested. With the ~15 fps cadence a point needs at least about 2.5 s,
-  so a calibration takes at least about 1.5 minutes. This has not been timed.
-- Each of the 27 points has the unchanged 9 s timeout, and one timeout fails the whole calibration. That gives three
-  times as many chances to fail as the nine-point flow. This is intentional: the rule is preserved, not loosened.
-- After all 27 points, the single fit must still pass the unchanged thresholds (iris-feature spread sx ≥ 0.008,
-  sy ≥ 0.006; RMS fit error ≤ 0.18). Otherwise the calibration fails and the previous model stays active.
-- The labelled anchors and the candidate ID are reported in `CalibrationOutcome`. After calibration, only the
-  model is kept, as before. Nothing is logged or stored yet; the evaluation integration must add this (section 8).
-- Candidates A, B and the baseline all use application ID `dev.gazedot`. On a phone, installing one replaces the
-  other. They cannot be installed side by side.
-- The root `README.md` still describes the nine-point flow. One `TrackingService` status message still says
-  "9점 보정을 시작해 주세요" (start the nine-point calibration). Both are outside the change boundary.
-- Retained baseline behaviour: missing input does not clear a point's samples, so a point's median can combine
-  samples from before and after a blink. A break's end can be noticed up to 100 ms late.
-
-## 8. Planned evaluation integration (not done in this stage)
-
-The existing evaluation tools on `feature/gaze-evaluation-home-screen-iter3` (inspected at `72411ec`, based on
-`30be1cf`, older than `BASE_SHA`) will be ported next. They will not be merged wholesale, and their metrics will be
-kept. Known adaptations:
-
-- **27-anchor snapshots.** Record `CalibrationOutcome` when a model is installed. Extend the snapshot's anchors with
-  pass, point and position labels in collection order (a new snapshot schema version). Replay can refit any number
-  of anchors.
-- **Candidate identifiers.** `home_screen_candidate` and `candidate_9_point_calibration` are hard-coded in the app,
-  `protocol.json`, the replay and the analyzer, which marks other predictor sources unofficial. Record `CalibrationPlan.ID`, update
-  the source base to `BASE_SHA`, and keep A and B in separate compatibility groups.
-- **Ordinary, higher and lower evaluation positions.** This needs a declared head-position field and per-position
-  reporting, which protocol 2.0.0 does not have. That requires a new protocol version.
-- **One run per calibration.** The app gate and the analyzer allow exactly one evaluation run per calibration.
-  Evaluating three positions needs either a fresh calibration per run or a declared protocol extension.
-
-Accuracy remains **NOT_MEASURED** until those sessions are recorded.
+Accuracy remains **NOT_MEASURED**. No session results, figures or conclusions exist yet.

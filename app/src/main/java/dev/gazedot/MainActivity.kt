@@ -413,6 +413,13 @@ class MainActivity : ComponentActivity() {
             TrackerState.status = saved.exceptionOrNull()?.let { "보정 적용 실패: ${it.message}" } ?: message
             // Match the exact normalization dimensions used for the calibration anchors above.
             val bounds = DisplaySpace.bounds(this@MainActivity)
+            if (saved.getOrDefault(false) && model != null) {
+                // Evaluation only: freeze this successful calibration's identity and labelled fit inputs.
+                val location = IntArray(2); getLocationOnScreen(location)
+                TrackerState.calibrationCompleted(CalibrationRecord(outcome.calibrationId, model, outcome.anchors,
+                    bounds.width(), bounds.height(), display?.rotation ?: -1, location[0], location[1], width, height,
+                    outcome.startedAtMs, outcome.finishedAtMs))
+            }
             close()
             calibration = null
             if (saved.getOrDefault(false) && TrackerState.running) {
