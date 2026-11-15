@@ -1,0 +1,7 @@
+schema_version,session_id,main_seq,event_uptime_ms,session_elapsed_ms,block_index,phase,event,detail
+4,eval-synthetic-0001,0,999900,-100,,,pipeline_reset,session_start
+4,eval-synthetic-0001,1,999990,-10,,,unlogged_result_dropped,pre_session accepted_uptime_ms=999960
+4,eval-synthetic-0001,2,1000003,3,1,preparation,preparation_shown,block=1 head_position=neutral
+4,eval-synthetic-0001,34,1002049,2049,1,countdown,ready,block=1 head_position=neutral block_start_uptime_ms=1005049
+4,eval-synthetic-0001,81,1005049,5049,1,settling,pipeline_reset,block_start
+4,eval-synthetic-0001,131,1008321,8321,1,settling,camera_error,ERROR_CAMERA_IN_USE

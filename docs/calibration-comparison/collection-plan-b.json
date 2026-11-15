@@ -1,0 +1,44 @@
+{
+  "plan_schema_version": 1,
+  "plan_id": "notouch-calibration-comparison-collection-plan-b",
+  "plan_version": "1.0.0",
+  "status": "Committed on 2026-11-15, before any candidate B evaluation session was recorded. Entries must not be changed after B results are seen; a change requires a new plan_version and new sessions.",
+  "calibration_id": "calibration_b_three_pass_positions",
+  "protocol": {
+    "protocol_id": "notouch-calibration-comparison-eval",
+    "protocol_version": "1.0.0",
+    "manifest": "docs/calibration-comparison/protocol.json",
+    "manifest_sha256": "651e4402c8208538ccca1d7e204141315e649c8f15cd3e835f795c689046c547",
+    "manifest_sha256_basis": "bytes with CRLF converted to LF; the same manifest and hash as candidate A's evaluation build (f3b224c4801570c57a192d354eb848b30c90b3c3)",
+    "relation": "Protocol 1.0.0 already declares calibration_b_three_pass_positions as an allowed candidate and ANNA / B1 (nhl) and ANNA / B2 (lhn) as official sessions. It is used unchanged, so A and B sessions are recorded and analyzed under one protocol hash. This file only adds what the protocol does not list for candidate B: its technical pilot, and the rule that the B app offers exactly these sessions."
+  },
+  "official": [
+    {
+      "participant_id": "ANNA",
+      "session_label": "B1",
+      "calibration_id": "calibration_b_three_pass_positions",
+      "block_order": "nhl"
+    },
+    {
+      "participant_id": "ANNA",
+      "session_label": "B2",
+      "calibration_id": "calibration_b_three_pass_positions",
+      "block_order": "lhn"
+    }
+  ],
+  "technical_pilot": [
+    {
+      "participant_id": "PILOT01",
+      "session_label": "TB1",
+      "calibration_id": "calibration_b_three_pass_positions",
+      "block_order": "nhl"
+    }
+  ],
+  "rules": [
+    "Each session needs its own fresh, successful candidate B calibration (27 anchors: ordinary, higher, lower).",
+    "The official entries are exactly protocol 1.0.0's collection_plan.official entries for calibration_b_three_pass_positions.",
+    "The technical pilot is never official: protocol 1.0.0 treats every participant ID starting with PILOT as a technical pilot, imported only into data/pilot/. Protocol 1.0.0 lists PILOT01 / T1 for candidate A; candidate B's pilot uses the distinct label TB1.",
+    "The B app's setup screen offers exactly these three sessions, with participant, label and block order fixed by the entry, and no free-text identifiers.",
+    "Head positions and numerical rules, schedule, thresholds and acceptance criteria are those of protocol 1.0.0; nothing here changes them."
+  ]
+}

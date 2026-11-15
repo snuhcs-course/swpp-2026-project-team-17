@@ -1,0 +1,246 @@
+{
+  "schema_version": 4,
+  "record_type": "notouch_calibration_comparison_session",
+  "session_id": "eval-synthetic-0001",
+  "participant_id": "SYNTHETIC",
+  "session_label": "S1",
+  "mode": "blind_measurement",
+  "final_state": "incomplete",
+  "end_reason": "back",
+  "start_wall_time_utc": "2026-11-01T00:00:00Z",
+  "end_wall_time_utc": "2026-11-01T00:00:00Z",
+  "start_uptime_ms": 1000000,
+  "end_uptime_ms": 1009500,
+  "planned_end_uptime_ms": null,
+  "protocol": {
+    "id": "notouch-calibration-comparison-eval",
+    "version": "1.0.0",
+    "sha256": "651e4402c8208538ccca1d7e204141315e649c8f15cd3e835f795c689046c547",
+    "sha256_basis": "docs/calibration-comparison/protocol.json bytes with CRLF converted to LF",
+    "grid_norm": [0.2, 0.4, 0.6, 0.8],
+    "presentation_ms": 2500,
+    "settling_ms": 1000,
+    "measurement_ms": 1500,
+    "presentations_per_block": 32,
+    "blocks_planned": 3,
+    "countdown_ms": 3000,
+    "session_start_lead_ms": 100,
+    "block_order": "nhl",
+    "block_positions": ["neutral", "higher", "lower"],
+    "case_suffixes": ["pass1-r0c0", "pass1-r0c1", "pass1-r0c2", "pass1-r0c3", "pass1-r1c3", "pass1-r1c2", "pass1-r1c1", "pass1-r1c0", "pass1-r2c0", "pass1-r2c1", "pass1-r2c2", "pass1-r2c3", "pass1-r3c3", "pass1-r3c2", "pass1-r3c1", "pass1-r3c0", "pass2-r3c0", "pass2-r3c1", "pass2-r3c2", "pass2-r3c3", "pass2-r2c3", "pass2-r2c2", "pass2-r2c1", "pass2-r2c0", "pass2-r1c0", "pass2-r1c1", "pass2-r1c2", "pass2-r1c3", "pass2-r0c3", "pass2-r0c2", "pass2-r0c1", "pass2-r0c0"],
+    "blocks_completed": 0,
+    "presentations_completed": 1
+  },
+  "blocks": [
+    {
+      "block_index": 1,
+      "head_position": "neutral",
+      "case_id_prefix": "neutral-",
+      "preparation_start_uptime_ms": 1000000,
+      "preparation_shown_uptime_ms": 1000003,
+      "ready_uptime_ms": 1002049,
+      "preparation_ms": 2049,
+      "countdown_ms": 3000,
+      "block_start_uptime_ms": 1005049,
+      "planned_block_end_uptime_ms": 1085049,
+      "block_reset_uptime_ms": 1005049,
+      "presentations_planned": 32,
+      "presentations_completed": 1,
+      "state": "incomplete"
+    },
+    {
+      "block_index": 2,
+      "head_position": "higher",
+      "case_id_prefix": "higher-",
+      "preparation_start_uptime_ms": 1085049,
+      "preparation_shown_uptime_ms": null,
+      "ready_uptime_ms": null,
+      "preparation_ms": null,
+      "countdown_ms": 3000,
+      "block_start_uptime_ms": null,
+      "planned_block_end_uptime_ms": null,
+      "block_reset_uptime_ms": null,
+      "presentations_planned": 32,
+      "presentations_completed": 0,
+      "state": "not_started"
+    },
+    {
+      "block_index": 3,
+      "head_position": "lower",
+      "case_id_prefix": "lower-",
+      "preparation_start_uptime_ms": null,
+      "preparation_shown_uptime_ms": null,
+      "ready_uptime_ms": null,
+      "preparation_ms": null,
+      "countdown_ms": 3000,
+      "block_start_uptime_ms": null,
+      "planned_block_end_uptime_ms": null,
+      "block_reset_uptime_ms": null,
+      "presentations_planned": 32,
+      "presentations_completed": 0,
+      "state": "not_started"
+    }
+  ],
+  "build": {
+    "git_commit": "synthetic-fixture",
+    "git_dirty_at_build": "false",
+    "source_base": "e8fa01ef1e397f508aa5a3b3a595539b4ef4490a",
+    "source_base_is_ancestor": "true",
+    "evaluation_reference": "72411ec35d5d6e9547c322de3d7a14e65812b82e",
+    "build_type": "synthetic"
+  },
+  "app": {
+    "application_id": "dev.gazedot",
+    "version_name": "synthetic",
+    "version_code": 0
+  },
+  "libraries": {
+    "mediapipe_tasks_vision": "synthetic",
+    "camerax": "synthetic",
+    "face_landmarker_task_sha256": "synthetic"
+  },
+  "device": {
+    "manufacturer": "synthetic",
+    "model": "fixture",
+    "api_level": 35,
+    "android_release": "15"
+  },
+  "display": {
+    "basis": "WindowManager.maximumWindowMetrics bounds (calibration basis)",
+    "width_px": 1080,
+    "height_px": 2400,
+    "rotation": 0,
+    "density": 2.75,
+    "evaluation_view": {
+      "left_px": 0,
+      "top_px": 0,
+      "width_px": 1080,
+      "height_px": 2400
+    },
+    "calibration_view": {
+      "left_px": 0,
+      "top_px": 0,
+      "width_px": 1080,
+      "height_px": 2400
+    },
+    "overlay_view": {
+      "left_px": 0,
+      "top_px": 0,
+      "width_px": 1080,
+      "height_px": 2400
+    }
+  },
+  "calibration": {
+    "calibration_id": "calibration_b_three_pass_positions",
+    "calibration_positions_by_pass": ["ordinary", "higher", "lower"],
+    "calibration_serial": 1,
+    "started_uptime_ms": 920000,
+    "completed_uptime_ms": 995000,
+    "duration_ms": 75000,
+    "age_ms_at_session_start": 5000,
+    "movement_retries": 1,
+    "anchors": 27,
+    "passes": 3,
+    "points_per_pass": 9,
+    "calibration_inputs_sha256": "b3ec78e094e678fab3f78d2c25fc615eae8076735b839cd1c71c901211a727f2",
+    "fit_error": 0.0026521598615443084,
+    "fit_error_note": "calibration diagnostic (RMS residual of the fit inputs); not a measured gaze accuracy",
+    "verified_snapshot_refit": true,
+    "evaluation_sessions_on_this_calibration_before": 0,
+    "snapshot_file": "model_snapshot.json"
+  },
+  "predictor": {
+    "kind": "GazeModel",
+    "calibration_id": "calibration_b_three_pass_positions"
+  },
+  "conditions": {
+    "viewing_distance_cm": 40.0,
+    "lighting": "synthetic",
+    "glasses": "none",
+    "head_position_markers": "synthetic markers",
+    "notes": "synthetic fixture",
+    "head_positions": "instructed (neutral, slightly higher, slightly lower), not measured; face_x/face_y/scale are logged per attempt",
+    "declared": "synthetic"
+  },
+  "pipeline": {
+    "variant": "home_screen_gaze_pipeline_e8fa01e",
+    "frame_interval_min_ms": 66,
+    "watchdog_no_result_ms": 800,
+    "pointer_visible": false
+  },
+  "coordinates": {
+    "frame": "full-display normalized: px / calibration basis (WindowManager.maximumWindowMetrics bounds); shared by calibration anchors, targets and predictions",
+    "linear": "GazeModel linear output before the model's own [0, 1] clamp; diagnostic only, never used by the app",
+    "predicted": "GazePipeline rawPoint: GazeModel.predict output, clamped to [0, 1] per axis by the model",
+    "smoothed": "GazePipeline point (0.28 exponential smoothing of predicted) supplied to TrackerState and the overlay; primary measured coordinate; inherits the model clamp",
+    "rendered": "screen px where DotOverlay draws the smoothed point; empty when the pointer is hidden"
+  },
+  "timing": {
+    "accepted_uptime_ms": "SystemClock.uptimeMillis when the camera worker accepted the frame; detectForVideo timestamp, GazePipeline timestamp and schedule key",
+    "handled_uptime_ms": "SystemClock.uptimeMillis passed to GazePipeline.process as its current time (main thread)",
+    "result_uptime_ms": "SystemClock.uptimeMillis when the main thread finished handling the result",
+    "landmarker_ms": "System.nanoTime duration of FaceLandmarker.detectForVideo only",
+    "delivery_ms": "System.nanoTime from posting the result on the worker to the main-thread handler starting",
+    "latency_ms": "System.nanoTime from frame acceptance to publication of the processed result, or to explicit discard"
+  },
+  "counters": {
+    "frames_received": 172,
+    "frames_cadence_skipped": 28,
+    "frames_ignored_service_closing": 0,
+    "attempts_accepted": 144,
+    "attempts_recorded": 144,
+    "attempts_unrecorded": 0,
+    "attempts_by_outcome": {
+      "processed": 143,
+      "discarded_closing": 0,
+      "discarded_epoch": 0,
+      "discarded_delayed": 0,
+      "discarded_block_start": 1,
+      "discarded_model_changed": 0,
+      "processing_error": 0
+    },
+    "attempts_by_phase": {
+      "outside": 0,
+      "preparation": 31,
+      "countdown": 46,
+      "settling": 30,
+      "measurement": 37
+    },
+    "detector": {
+      "landmarker_not_ready": 1,
+      "no_face": 3,
+      "face_detected": 140
+    },
+    "valid_attempts": 130,
+    "invalid_by_reason": {
+      "closed": 6,
+      "discarded_block_start": 1,
+      "lost": 4,
+      "out_of_range": 3
+    },
+    "pipeline_resets": 2,
+    "pipeline_resets_by_reason": {
+      "block_start": 1,
+      "session_start": 1
+    },
+    "camera_errors": 1,
+    "unlogged_results_dropped_pre_session": 1,
+    "unlogged_results_dropped_in_session": 0
+  },
+  "logging": {
+    "attempt_rows_enqueued": 144,
+    "attempt_rows_written": 144,
+    "event_rows_enqueued": 6,
+    "event_rows_written": 6,
+    "rows_dropped_queue_full": 0,
+    "rows_dropped_write_error": 0,
+    "rows_lost_total": 0,
+    "write_error": false
+  },
+  "files": {
+    "attempts": "attempts.csv",
+    "events": "events.csv",
+    "model_snapshot": "model_snapshot.json",
+    "checksums": "SHA256SUMS"
+  }
+}

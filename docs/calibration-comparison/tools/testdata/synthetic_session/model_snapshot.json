@@ -1,0 +1,472 @@
+{
+  "snapshot_schema_version": 2,
+  "pipeline_variant": "home_screen_gaze_pipeline_e8fa01e",
+  "calibration_id": "calibration_b_three_pass_positions",
+  "predictor_kind": "GazeModel",
+  "calibration_serial": 1,
+  "calibration_timing": {
+    "started_uptime_ms": 920000,
+    "completed_uptime_ms": 995000,
+    "duration_ms": 75000,
+    "movement_retries": 1
+  },
+  "calibration_basis": {
+    "width_px": 1080,
+    "height_px": 2400,
+    "rotation": 0,
+    "view_left_px": 0,
+    "view_top_px": 0,
+    "view_width_px": 1080,
+    "view_height_px": 2400
+  },
+  "calibration_inputs_sha256": "b3ec78e094e678fab3f78d2c25fc615eae8076735b839cd1c71c901211a727f2",
+  "anchors": [
+    {
+      "pass": 1,
+      "point": 1,
+      "calibration_position": "ordinary",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 953400,
+      "eye": {
+        "x": -1.0E-4,
+        "y": 1.0E-4,
+        "face_x": 0.5,
+        "face_y": 0.5,
+        "scale": 0.3
+      },
+      "x": 0.5,
+      "y": 0.5
+    },
+    {
+      "pass": 1,
+      "point": 2,
+      "calibration_position": "ordinary",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 956000,
+      "eye": {
+        "x": -0.017599999999999998,
+        "y": -0.0139,
+        "face_x": 0.5,
+        "face_y": 0.5,
+        "scale": 0.3
+      },
+      "x": 0.15,
+      "y": 0.15
+    },
+    {
+      "pass": 1,
+      "point": 3,
+      "calibration_position": "ordinary",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 958600,
+      "eye": {
+        "x": -1.0E-4,
+        "y": -0.0139,
+        "face_x": 0.5,
+        "face_y": 0.5,
+        "scale": 0.3
+      },
+      "x": 0.5,
+      "y": 0.15
+    },
+    {
+      "pass": 1,
+      "point": 4,
+      "calibration_position": "ordinary",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 961200,
+      "eye": {
+        "x": 0.0174,
+        "y": -0.0139,
+        "face_x": 0.5,
+        "face_y": 0.5,
+        "scale": 0.3
+      },
+      "x": 0.85,
+      "y": 0.15
+    },
+    {
+      "pass": 1,
+      "point": 5,
+      "calibration_position": "ordinary",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 963800,
+      "eye": {
+        "x": 0.0174,
+        "y": 1.0E-4,
+        "face_x": 0.5,
+        "face_y": 0.5,
+        "scale": 0.3
+      },
+      "x": 0.85,
+      "y": 0.5
+    },
+    {
+      "pass": 1,
+      "point": 6,
+      "calibration_position": "ordinary",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 966400,
+      "eye": {
+        "x": 0.0174,
+        "y": 0.014099999999999998,
+        "face_x": 0.5,
+        "face_y": 0.5,
+        "scale": 0.3
+      },
+      "x": 0.85,
+      "y": 0.85
+    },
+    {
+      "pass": 1,
+      "point": 7,
+      "calibration_position": "ordinary",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 969000,
+      "eye": {
+        "x": -1.0E-4,
+        "y": 0.014099999999999998,
+        "face_x": 0.5,
+        "face_y": 0.5,
+        "scale": 0.3
+      },
+      "x": 0.5,
+      "y": 0.85
+    },
+    {
+      "pass": 1,
+      "point": 8,
+      "calibration_position": "ordinary",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 971600,
+      "eye": {
+        "x": -0.017599999999999998,
+        "y": 0.014099999999999998,
+        "face_x": 0.5,
+        "face_y": 0.5,
+        "scale": 0.3
+      },
+      "x": 0.15,
+      "y": 0.85
+    },
+    {
+      "pass": 1,
+      "point": 9,
+      "calibration_position": "ordinary",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 974200,
+      "eye": {
+        "x": -0.017599999999999998,
+        "y": 1.0E-4,
+        "face_x": 0.5,
+        "face_y": 0.5,
+        "scale": 0.3
+      },
+      "x": 0.15,
+      "y": 0.5
+    },
+    {
+      "pass": 2,
+      "point": 1,
+      "calibration_position": "higher",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 976800,
+      "eye": {
+        "x": 0.0,
+        "y": 0.0,
+        "face_x": 0.5,
+        "face_y": 0.5,
+        "scale": 0.3
+      },
+      "x": 0.5,
+      "y": 0.5
+    },
+    {
+      "pass": 2,
+      "point": 2,
+      "calibration_position": "higher",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 979400,
+      "eye": {
+        "x": -0.017499999999999998,
+        "y": -0.013999999999999999,
+        "face_x": 0.5,
+        "face_y": 0.5,
+        "scale": 0.3
+      },
+      "x": 0.15,
+      "y": 0.15
+    },
+    {
+      "pass": 2,
+      "point": 3,
+      "calibration_position": "higher",
+      "movement_retries": 1,
+      "accepted_uptime_ms": 982000,
+      "eye": {
+        "x": 0.0,
+        "y": -0.013999999999999999,
+        "face_x": 0.5,
+        "face_y": 0.5,
+        "scale": 0.3
+      },
+      "x": 0.5,
+      "y": 0.15
+    },
+    {
+      "pass": 2,
+      "point": 4,
+      "calibration_position": "higher",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 984600,
+      "eye": {
+        "x": 0.017499999999999998,
+        "y": -0.013999999999999999,
+        "face_x": 0.5,
+        "face_y": 0.5,
+        "scale": 0.3
+      },
+      "x": 0.85,
+      "y": 0.15
+    },
+    {
+      "pass": 2,
+      "point": 5,
+      "calibration_position": "higher",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 987200,
+      "eye": {
+        "x": 0.017499999999999998,
+        "y": 0.0,
+        "face_x": 0.5,
+        "face_y": 0.5,
+        "scale": 0.3
+      },
+      "x": 0.85,
+      "y": 0.5
+    },
+    {
+      "pass": 2,
+      "point": 6,
+      "calibration_position": "higher",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 989800,
+      "eye": {
+        "x": 0.017499999999999998,
+        "y": 0.013999999999999999,
+        "face_x": 0.5,
+        "face_y": 0.5,
+        "scale": 0.3
+      },
+      "x": 0.85,
+      "y": 0.85
+    },
+    {
+      "pass": 2,
+      "point": 7,
+      "calibration_position": "higher",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 992400,
+      "eye": {
+        "x": 0.0,
+        "y": 0.013999999999999999,
+        "face_x": 0.5,
+        "face_y": 0.5,
+        "scale": 0.3
+      },
+      "x": 0.5,
+      "y": 0.85
+    },
+    {
+      "pass": 2,
+      "point": 8,
+      "calibration_position": "higher",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 995000,
+      "eye": {
+        "x": -0.017499999999999998,
+        "y": 0.013999999999999999,
+        "face_x": 0.5,
+        "face_y": 0.5,
+        "scale": 0.3
+      },
+      "x": 0.15,
+      "y": 0.85
+    },
+    {
+      "pass": 2,
+      "point": 9,
+      "calibration_position": "higher",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 997600,
+      "eye": {
+        "x": -0.017499999999999998,
+        "y": 0.0,
+        "face_x": 0.5,
+        "face_y": 0.5,
+        "scale": 0.3
+      },
+      "x": 0.15,
+      "y": 0.5
+    },
+    {
+      "pass": 3,
+      "point": 1,
+      "calibration_position": "lower",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 1000200,
+      "eye": {
+        "x": 1.0E-4,
+        "y": -1.0E-4,
+        "face_x": 0.5,
+        "face_y": 0.5,
+        "scale": 0.3
+      },
+      "x": 0.5,
+      "y": 0.5
+    },
+    {
+      "pass": 3,
+      "point": 2,
+      "calibration_position": "lower",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 1002800,
+      "eye": {
+        "x": -0.0174,
+        "y": -0.014099999999999998,
+        "face_x": 0.5,
+        "face_y": 0.5,
+        "scale": 0.3
+      },
+      "x": 0.15,
+      "y": 0.15
+    },
+    {
+      "pass": 3,
+      "point": 3,
+      "calibration_position": "lower",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 1005400,
+      "eye": {
+        "x": 1.0E-4,
+        "y": -0.014099999999999998,
+        "face_x": 0.5,
+        "face_y": 0.5,
+        "scale": 0.3
+      },
+      "x": 0.5,
+      "y": 0.15
+    },
+    {
+      "pass": 3,
+      "point": 4,
+      "calibration_position": "lower",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 1008000,
+      "eye": {
+        "x": 0.017599999999999998,
+        "y": -0.014099999999999998,
+        "face_x": 0.5,
+        "face_y": 0.5,
+        "scale": 0.3
+      },
+      "x": 0.85,
+      "y": 0.15
+    },
+    {
+      "pass": 3,
+      "point": 5,
+      "calibration_position": "lower",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 1010600,
+      "eye": {
+        "x": 0.017599999999999998,
+        "y": -1.0E-4,
+        "face_x": 0.5,
+        "face_y": 0.5,
+        "scale": 0.3
+      },
+      "x": 0.85,
+      "y": 0.5
+    },
+    {
+      "pass": 3,
+      "point": 6,
+      "calibration_position": "lower",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 1013200,
+      "eye": {
+        "x": 0.017599999999999998,
+        "y": 0.0139,
+        "face_x": 0.5,
+        "face_y": 0.5,
+        "scale": 0.3
+      },
+      "x": 0.85,
+      "y": 0.85
+    },
+    {
+      "pass": 3,
+      "point": 7,
+      "calibration_position": "lower",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 1015800,
+      "eye": {
+        "x": 1.0E-4,
+        "y": 0.0139,
+        "face_x": 0.5,
+        "face_y": 0.5,
+        "scale": 0.3
+      },
+      "x": 0.5,
+      "y": 0.85
+    },
+    {
+      "pass": 3,
+      "point": 8,
+      "calibration_position": "lower",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 1018400,
+      "eye": {
+        "x": -0.0174,
+        "y": 0.0139,
+        "face_x": 0.5,
+        "face_y": 0.5,
+        "scale": 0.3
+      },
+      "x": 0.15,
+      "y": 0.85
+    },
+    {
+      "pass": 3,
+      "point": 9,
+      "calibration_position": "lower",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 1021000,
+      "eye": {
+        "x": -0.0174,
+        "y": -1.0E-4,
+        "face_x": 0.5,
+        "face_y": 0.5,
+        "scale": 0.3
+      },
+      "x": 0.15,
+      "y": 0.5
+    }
+  ],
+  "parameters": {
+    "mean_x": 0.0,
+    "mean_y": -2.2587545260114677E-20,
+    "std_x": 0.01428892344906828,
+    "std_y": 0.011431243735190555,
+    "wx": [0.5000000000000001, 0.2854519693643531, 1.1637682608806846E-5],
+    "wy": [0.5, 1.1637575737088765E-5, 0.2854493479883818],
+    "reference_x": 0.0,
+    "reference_y": -2.2587545260114677E-20,
+    "reference_face_x": 0.5,
+    "reference_face_y": 0.5,
+    "reference_scale": 0.29999999999999993,
+    "fit_error": 0.0026521598615443084
+  },
+  "replay_note": "Replay refits GazeModel.fit on the 27 anchors in this order and requires every parameter to match exactly."
+}

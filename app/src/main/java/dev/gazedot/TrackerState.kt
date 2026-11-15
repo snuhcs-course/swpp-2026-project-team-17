@@ -30,6 +30,34 @@ object TrackerState {
     private var nextCalibration = 0L
     private var calibration: Long? = null
 
+    /**
+     * Evaluation only: the last successful calibration of this tracking run, with its labelled fit inputs. Cleared when
+     * any new calibration starts and when tracking stops, so a failed recalibration cannot pass off the model it keeps
+     * as a fresh calibration. The model itself is kept or replaced exactly as before.
+     */
+    var calibrationRecord: CalibrationRecord? = null
+        private set
+    var calibrationSerial = 0
+        private set
+    /** Calibration serial already used by an evaluation session; a session needs a fresh calibration. */
+    var evaluatedCalibrationSerial = 0
+    /** Set by TrackingService: clears the gaze pipeline's smoothing state for an evaluation; the argument names the cause. */
+    var resetSmoothing: ((String) -> Unit)? = null
+    /** Set by TrackingService: on-screen origin and size of the pointer overlay view, or null. */
+    var overlayBounds: (() -> IntArray?)? = null
+
+    fun calibrationCompleted(record: CalibrationRecord) {
+        calibrationRecord = record
+        calibrationSerial++
+    }
+    fun clearCalibrationRecord() { calibrationRecord = null }
+
+    /** The service's condition for gaze clicks, scrolling and dictation, plus the explicit evaluation guard. */
+    fun gazeActionsEnabled(accessibilityConnected: Boolean) = controls && interactionAllowed && !collecting &&
+        !speaking && accessibilityConnected && !EvaluationState.suppressesActions
+    /** The accessibility service's condition for taps, scrolls and text insertion, plus the explicit evaluation guard. */
+    fun gazeControlAllowed() = running && controls && interactionAllowed && !collecting && !EvaluationState.suppressesActions
+
     fun hasFreshFeatures(now: Long) = features != null && now - frameAt in 0..250
 
     fun clearCoordinates() {
@@ -45,6 +73,7 @@ object TrackerState {
     fun trackingStopped() {
         running = false
         controls = false
+        calibrationRecord = null
         cancelCalibration()
         collecting = false
         clearCoordinates()
@@ -53,6 +82,7 @@ object TrackerState {
     /** Keep the previous in-memory calibration until a new session succeeds. */
     fun beginCalibration(): Long {
         cancelCalibration()
+        calibrationRecord = null
         val session = ++nextCalibration
         calibration = session
         collecting = true

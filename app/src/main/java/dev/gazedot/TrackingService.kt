@@ -57,8 +57,8 @@ class TrackingService : LifecycleService() {
         override fun run() {
             if (closing) return
             if (!Settings.canDrawOverlays(this@TrackingService)) { fail("다른 앱 위에 표시 권한이 해제되었습니다"); return }
-            if (SystemClock.uptimeMillis() - lastResult > 800) {
-                resetTracking()
+            if (SystemClock.uptimeMillis() - lastResult > WATCHDOG_NO_RESULT_MS) {
+                resetTracking("watchdog_no_result")
                 TrackerState.publish(null, "카메라 신호 대기 · 다른 카메라 앱을 닫아 주세요")
             }
             main.postDelayed(this, 400)
@@ -67,10 +67,10 @@ class TrackingService : LifecycleService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
-        if (intent?.action == ACTION_STOP) { closing = true; resetTracking(); stopSelf(); return START_NOT_STICKY }
+        if (intent?.action == ACTION_STOP) { closing = true; resetTracking("stop_action"); stopSelf(); return START_NOT_STICKY }
         if (intent?.action == ACTION_PAUSE) {
             TrackerState.controls = false
-            resetTracking()
+            resetTracking("pause_action")
             TrackerState.actionStatus = "조작 일시정지 · 앱에서 다시 켤 수 있습니다"
             return START_NOT_STICKY
         }
@@ -106,6 +106,9 @@ class TrackingService : LifecycleService() {
                 TrackerState.actionStatus = ""
             }
             overlay = DotOverlay(this)
+            // Evaluation hooks: a logged pipeline reset and the overlay geometry. Unused outside an evaluation session.
+            TrackerState.resetSmoothing = { reason -> evaluationReset(reason) }
+            TrackerState.overlayBounds = { overlay?.bounds() }
             initialRotation = rotation(); initialSize = sizeKey()
             displayManager.registerDisplayListener(displayListener, main)
             ContextCompat.registerReceiver(this, screenReceiver, IntentFilter(Intent.ACTION_SCREEN_OFF), ContextCompat.RECEIVER_NOT_EXPORTED)
@@ -148,7 +151,9 @@ class TrackingService : LifecycleService() {
                 val camera = provider.bindToLifecycle(this, CameraSelector.DEFAULT_FRONT_CAMERA, analyzer)
                 camera.cameraInfo.cameraState.observe(this) { state ->
                     if (state.error != null && !closing) {
-                        resetTracking()
+                        (EvaluationLog.current ?: EvaluationLog.draining)?.event(SystemClock.uptimeMillis(),
+                            EvaluationSession.EVENT_CAMERA_ERROR, state.error?.type?.name ?: "")
+                        resetTracking("camera_error")
                         TrackerState.publish(null, "카메라 사용 불가 · 다른 카메라 앱을 닫고 다시 시도해 주세요")
                     }
                 }
@@ -158,33 +163,53 @@ class TrackingService : LifecycleService() {
 
     private fun process(frame: ImageProxy) {
         var raw: Bitmap? = null; var upright: Bitmap? = null
+        // Evaluation logging observes this path only; it stays null outside an evaluation session.
+        var attempt: EvaluationAttempt? = null
         try {
             val now = SystemClock.uptimeMillis()
+            val acceptedNanos = System.nanoTime()
             val epoch = trackingEpoch
-            if (closing || now - lastFrame < 66) return
+            val log = EvaluationLog.sessionAt(now)
+            log?.frameReceived()
+            if (closing || now - lastFrame < FRAME_INTERVAL_MS) { log?.frameSkipped(closing); return }
             lastFrame = now
+            attempt = log?.beginAttempt(now, acceptedNanos)
             raw = frame.toBitmap()
             val matrix = Matrix().apply { postRotate(frame.imageInfo.rotationDegrees.toFloat()) }
             upright = Bitmap.createBitmap(raw, 0, 0, raw.width, raw.height, matrix, true)
             val image = BitmapImageBuilder(upright).build()
+            val detectStart = System.nanoTime()
             val result = try { landmarker?.detectForVideo(image, now) } finally { image.close() }
-            val observation = result?.faceLandmarks()?.firstOrNull()?.let {
+            val detectNanos = System.nanoTime() - detectStart
+            val landmarks = result?.faceLandmarks()?.firstOrNull()
+            val observation = landmarks?.let {
                 EyeObservations.observe(it, upright.width, upright.height)
             } ?: EyeObservation(EyeState.LOST, null, 0.0, 0.0)
+            attempt?.observed(
+                when { result == null -> EvaluationDetector.NOT_READY; landmarks == null -> EvaluationDetector.NO_FACE
+                    else -> EvaluationDetector.FACE },
+                if (observation.features == null && landmarks != null)
+                    EvaluationDiagnostics.featureRejection(landmarks, upright.width, upright.height) else null,
+                observation, if (result != null) detectNanos else null, System.nanoTime())
+            val logged = attempt
             main.post {
-                if (closing || epoch != trackingEpoch) return@post
+                logged?.reachedMain(System.nanoTime())
+                if (closing) { logged?.discarded(EvaluationOutcome.DISCARDED_CLOSING, null, SystemClock.uptimeMillis()); return@post }
+                if (epoch != trackingEpoch) { logged?.discarded(EvaluationOutcome.DISCARDED_EPOCH, null, SystemClock.uptimeMillis()); return@post }
                 val at = SystemClock.uptimeMillis()
-                if (at - now > 250) {
-                    resetTracking()
+                if (at - now > DELAYED_RESULT_MS) {
+                    logged?.discarded(EvaluationOutcome.DISCARDED_DELAYED, at, at)
+                    resetTracking("delayed_result")
                     TrackerState.publish(null, "영상 처리가 지연됩니다 · 조작 일시 대기")
                     return@post
                 }
                 lastResult = at
+                // Evaluation only: the block-start reset, and dropping results in flight across a session or block start.
+                EvaluationLog.current?.let { s -> if (!s.admit(logged, now, at) { reason -> evaluationReset(reason) }) return@post }
                 TrackerState.frameAt = now
                 TrackerState.eyeState = observation.state
                 val model = TrackerState.model
-                val enabled = TrackerState.controls && TrackerState.interactionAllowed && !TrackerState.collecting &&
-                    !TrackerState.speaking && ControlAccessibilityService.instance != null
+                val enabled = TrackerState.gazeActionsEnabled(ControlAccessibilityService.instance != null)
                 val sample = pipeline.process(now, at, observation, model, enabled,
                     ControlAccessibilityService.instance?.let { service -> { p -> service.dwellTargetKey(p) } })
                 sample.actions.forEach(::perform)
@@ -199,21 +224,33 @@ class TrackingService : LifecycleService() {
                 }
                 val label = when {
                     TrackerState.collecting -> ""
+                    EvaluationState.active -> ""
                     TrackerState.speaking -> TrackerState.actionStatus
                     enabled && sample.scrollMode -> "스크롤 모드 · 위/아래/좌/우 1/3 응시 · 윙크하면 종료"
                     enabled -> TrackerState.actionStatus
                     else -> ""
                 }
-                val visible = if (TrackerState.collecting) null else sample.point
+                // Blind evaluation withholds the pointer from the participant; the coordinate itself is unchanged.
+                val visible = if (TrackerState.collecting || EvaluationState.hidesPointer) null else sample.point
                 TrackerState.publishSample(sample, message)
                 // UI listeners may select Stop or start calibration while handling this frame.
                 if (!closing && TrackerState.running) overlay?.show(
                     if (TrackerState.collecting) null else visible,
-                    if (enabled) sample.dwellProgress else TrackerState.localDwellProgress,
+                    if (enabled) sample.dwellProgress else if (EvaluationState.active) 0f else TrackerState.localDwellProgress,
                     label,
-                    scrollMode = if (enabled) sample.scrollMode else TrackerState.localScrollMode)
+                    scrollMode = if (enabled) sample.scrollMode else TrackerState.localScrollMode && !EvaluationState.active)
+                if (logged != null) {
+                    val publishedNanos = System.nanoTime()
+                    val result = SystemClock.uptimeMillis()
+                    // A session measures exactly one model; the evaluation screen ends the session if it changes.
+                    if (model == null || model !== logged.session.model) logged.discarded(EvaluationOutcome.DISCARDED_MODEL_CHANGED, at, result)
+                    else logged.processed(at, result, sample.quality, sample.features?.let { model.rejection(it) },
+                        sample.features?.let { model.linearOutput(it) }, sample.rawPoint, sample.point,
+                        visible?.let { p -> overlay?.drawnAt(p) }, publishedNanos)
+                }
             }
         } catch (e: Exception) {
+            attempt?.failed()
             main.post { if (!closing) fail("영상 처리 실패: ${e.message}") }
         } finally {
             if (upright !== raw) upright?.recycle()
@@ -223,6 +260,8 @@ class TrackingService : LifecycleService() {
     }
 
     private fun perform(action: EyeAction) {
+        // Explicit evaluation guard: no gaze click, scroll or dictation during a session, whatever produced the action.
+        if (EvaluationState.suppressesActions) return
         val service = ControlAccessibilityService.instance ?: return
         val bounds = DisplaySpace.bounds(this)
         when(action) {
@@ -247,7 +286,9 @@ class TrackingService : LifecycleService() {
         }
     }
 
-    private fun resetTracking() {
+    private fun resetTracking(reason: String) {
+        // Replay needs every pipeline reset of an evaluation session, in main-thread order.
+        (EvaluationLog.current ?: EvaluationLog.draining)?.pipelineReset(SystemClock.uptimeMillis(), reason)
         trackingEpoch++
         pipeline.reset()
         TrackerState.clearCoordinates()
@@ -255,9 +296,18 @@ class TrackingService : LifecycleService() {
         overlay?.show(null)
     }
 
+    /**
+     * Evaluation only (session and block starts): clears the pipeline's smoothing state through its own reset, without
+     * the epoch change, coordinate clearing or overlay hiding of [resetTracking]. Logged for replay.
+     */
+    private fun evaluationReset(reason: String) {
+        (EvaluationLog.current ?: EvaluationLog.draining)?.pipelineReset(SystemClock.uptimeMillis(), reason)
+        pipeline.reset()
+    }
+
     private fun fail(message: String) {
         if (closing) return
-        resetTracking()
+        resetTracking("service_failure")
         closing = true
         TrackerState.publish(null, message)
         stopSelf()
@@ -268,6 +318,9 @@ class TrackingService : LifecycleService() {
     }
     override fun onDestroy() {
         closing = true
+        // A session cannot continue without its camera; it is finalized as incomplete.
+        EvaluationLog.finish(EvaluationEndReason.SERVICE_STOPPED, SystemClock.uptimeMillis())
+        TrackerState.resetSmoothing = null; TrackerState.overlayBounds = null
         main.removeCallbacksAndMessages(null)
         displayManager.unregisterDisplayListener(displayListener)
         if (receiverRegistered) unregisterReceiver(screenReceiver)
@@ -288,5 +341,13 @@ class TrackingService : LifecycleService() {
         stopForeground(STOP_FOREGROUND_REMOVE)
         super.onDestroy()
     }
-    companion object { const val ACTION_STOP = "dev.gazedot.STOP"; const val ACTION_PAUSE = "dev.gazedot.PAUSE" }
+    companion object {
+        const val ACTION_STOP = "dev.gazedot.STOP"; const val ACTION_PAUSE = "dev.gazedot.PAUSE"
+        /** Minimum spacing between frames accepted for processing; later frames are skipped. */
+        const val FRAME_INTERVAL_MS = 66L
+        /** The watchdog resets the pipeline when no result arrived for longer than this. */
+        const val WATCHDOG_NO_RESULT_MS = 800L
+        /** Results handled later than this after acceptance are dropped and reset the pipeline. */
+        const val DELAYED_RESULT_MS = 250L
+    }
 }

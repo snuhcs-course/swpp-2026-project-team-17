@@ -5,6 +5,15 @@ import kotlin.math.*
 data class EyeFeatures(val x: Double, val y: Double, val faceX: Double, val faceY: Double, val scale: Double)
 data class Anchor(val eye: EyeFeatures, val x: Double, val y: Double)
 
+/** Read-only copy of a fitted [GazeModel], recorded by evaluation sessions for replay checks. */
+data class GazeModelParameters(
+    val meanX: Double, val meanY: Double, val stdX: Double, val stdY: Double,
+    val wx: List<Double>, val wy: List<Double>,
+    val referenceX: Double, val referenceY: Double,
+    val referenceFaceX: Double, val referenceFaceY: Double, val referenceScale: Double,
+    val fitError: Double,
+)
+
 /** Calibration maps iris displacement inside the eye to display coordinates.
  * This is a calibrated approximation, not a pretrained screen-gaze model. */
 class GazeModel private constructor(
@@ -22,6 +31,28 @@ class GazeModel private constructor(
         val v = doubleArrayOf(1.0, (f.x - meanX) / stdX, (f.y - meanY) / stdY)
         return dot(wx, v).coerceIn(0.0, 1.0) to dot(wy, v).coerceIn(0.0, 1.0)
     }
+
+    // Evaluation diagnostics only. They repeat predict's checks and arithmetic without changing predict;
+    // CandidateBehaviorTest requires them to agree with predict and with the frozen baseline bit for bit.
+
+    /** The check that makes [predict] return null for [f], or null when it predicts. */
+    fun rejection(f: EyeFeatures): String? = when {
+        !listOf(f.x, f.y, f.faceX, f.faceY, f.scale).all { it.isFinite() } -> "non_finite_features"
+        f.scale !in reference.scale * 0.72..reference.scale * 1.28 -> "scale_outside_0.72_1.28"
+        abs(f.faceX - reference.faceX) > 0.12 -> "face_x_shift_gt_0.12"
+        abs(f.faceY - reference.faceY) > 0.12 -> "face_y_shift_gt_0.12"
+        else -> null
+    }
+
+    /** The linear map before [predict]'s [0, 1] clamp, or null when [predict] rejects [f]. Never used by the app. */
+    fun linearOutput(f: EyeFeatures): Pair<Double, Double>? {
+        if (rejection(f) != null) return null
+        val v = doubleArrayOf(1.0, (f.x - meanX) / stdX, (f.y - meanY) / stdY)
+        return dot(wx, v) to dot(wy, v)
+    }
+
+    fun parameters() = GazeModelParameters(meanX, meanY, stdX, stdY, wx.toList(), wy.toList(),
+        reference.x, reference.y, reference.faceX, reference.faceY, reference.scale, fitError)
 
     companion object {
         fun fit(anchors: List<Anchor>): GazeModel? {

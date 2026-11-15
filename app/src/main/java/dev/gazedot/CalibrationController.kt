@@ -32,17 +32,32 @@ enum class CalibrationBreak { BLINK, PASS }
 
 enum class CalibrationFailure { TIMEOUT, FIT_REJECTED }
 
-/** One accepted anchor with its schedule labels. [pass] and [point] are 1-based; the fit sees only [anchor]. */
-data class CalibrationAnchor(val pass: Int, val point: Int, val position: HeadPosition, val anchor: Anchor)
+/**
+ * One accepted anchor with its schedule labels. [pass] and [point] are 1-based; the fit sees only [anchor].
+ * [movementRetries] counts how often this point restarted under the within-point movement rule before it was
+ * accepted; [acceptedAtMs] is the controller clock when it was accepted. Both are observations only.
+ */
+data class CalibrationAnchor(
+    val pass: Int, val point: Int, val position: HeadPosition, val anchor: Anchor,
+    val movementRetries: Int = 0, val acceptedAtMs: Long = 0L,
+)
 
-/** The result of one calibration attempt. [model] is non-null only if all anchors were collected and the fit succeeded. */
+/**
+ * The result of one calibration attempt. [model] is non-null only if all anchors were collected and the fit succeeded.
+ * [startedAtMs] and [finishedAtMs] are controller clock values (SystemClock.uptimeMillis in the app).
+ */
 class CalibrationOutcome(
     val calibrationId: String,
     anchors: List<CalibrationAnchor>,
     val model: GazeModel?,
     val failure: CalibrationFailure?,
+    val startedAtMs: Long = 0L,
+    val finishedAtMs: Long = 0L,
 ) {
     val anchors: List<CalibrationAnchor> = anchors.toList()
+    val durationMs get() = finishedAtMs - startedAtMs
+    /** Within-point movement restarts of accepted points (a point abandoned by a timeout is not included). */
+    val movementRetries get() = anchors.sumOf { it.movementRetries }
 }
 
 /** Everything the calibration screen draws. [target] is a view fraction, null during breaks. */
@@ -70,6 +85,9 @@ class CalibrationController(
     private var passIndex = 0
     private var pointIndex = 0
     private var since = clock()
+    // Observations for evaluation records only; never read by the schedule.
+    private val startedAt = since
+    private var pointRetries = 0
     private var pendingBreak: CalibrationBreak? = null
     private var breakUntil = 0L
     private val samples = mutableListOf<EyeFeatures>()
@@ -119,7 +137,7 @@ class CalibrationController(
         if (closed) return false
         val now = clock()
         if (!inBreak(now) && now - since > CalibrationRules.POINT_TIMEOUT_MS) {
-            finish(null, CalibrationFailure.TIMEOUT)
+            finish(null, CalibrationFailure.TIMEOUT, now)
             return false
         }
         return true
@@ -143,13 +161,16 @@ class CalibrationController(
             if (samples.any { abs(it.faceX - eye.faceX) > CalibrationRules.MAX_FACE_SHIFT ||
                     abs(it.faceY - eye.faceY) > CalibrationRules.MAX_FACE_SHIFT }) {
                 samples.clear(); since = clock()
+                pointRetries++
                 hint = "머리가 움직였습니다 · 같은 점에서 다시 측정합니다"
                 return
             }
             val xy = toDisplay(target.first, target.second)
             // Genuine median features, including face position and scale; never normalized across passes.
-            accepted += CalibrationAnchor(pass, point, position, Anchor(eye, xy.first, xy.second))
+            val anchor = CalibrationAnchor(pass, point, position, Anchor(eye, xy.first, xy.second), pointRetries)
             pointIndex++; samples.clear(); since = clock()
+            accepted += anchor.copy(acceptedAtMs = since)
+            pointRetries = 0
             if (pointIndex == CalibrationRules.TARGETS.size) {
                 if (passIndex + 1 < CalibrationRules.PASSES) {
                     passIndex++; pointIndex = 0
@@ -157,7 +178,7 @@ class CalibrationController(
                 } else {
                     // The only fit: all passes, every anchor kept separate, nothing averaged across passes.
                     val model = fit(accepted.map { it.anchor })
-                    finish(model, if (model == null) CalibrationFailure.FIT_REJECTED else null)
+                    finish(model, if (model == null) CalibrationFailure.FIT_REJECTED else null, since)
                 }
             } else if (pointIndex == CalibrationRules.BLINK_BREAK_AFTER_POINTS) {
                 startBreak(CalibrationBreak.BLINK, since + CalibrationRules.BLINK_BREAK_MS)
@@ -170,8 +191,8 @@ class CalibrationController(
         breakUntil = until
     }
 
-    private fun finish(model: GazeModel?, failure: CalibrationFailure?) {
-        val outcome = CalibrationOutcome(CalibrationPlan.ID, accepted, model, failure)
+    private fun finish(model: GazeModel?, failure: CalibrationFailure?, finishedAt: Long) {
+        val outcome = CalibrationOutcome(CalibrationPlan.ID, accepted, model, failure, startedAt, finishedAt)
         close()
         onFinished(outcome)
     }

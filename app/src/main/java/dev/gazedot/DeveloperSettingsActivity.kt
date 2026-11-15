@@ -30,6 +30,10 @@ class DeveloperSettingsActivity : ComponentActivity() {
         root.addView(TextView(this).apply {
             text = "9점 보정 후 사용하세요.\n1초 응시: 클릭 · 윙크: 스크롤 모드 · 양눈 두 번 깜빡임: 받아쓰기"
         })
+        // Calibration-comparison gaze evaluation: an internal tool, debuggable builds only.
+        if (evaluationEntryEnabled(applicationInfo.flags)) {
+            button("시선 정확도 평가 · 보정 비교 (개발용)") { startActivity(Intent(this, EvaluationActivity::class.java)) }
+        }
         button("접근성 서비스 설정") { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
         button("받아쓰기 마이크 권한 허용") {
             if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED)

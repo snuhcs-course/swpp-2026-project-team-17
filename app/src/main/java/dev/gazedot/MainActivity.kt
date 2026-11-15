@@ -11,6 +11,8 @@ import android.view.*
 import android.widget.*
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 
 class MainActivity : ComponentActivity() {
     private lateinit var status: TextView
@@ -148,13 +150,23 @@ class MainActivity : ComponentActivity() {
             view.typeface = font
             view.fontVariationSettings = "'wght' $weight"
         }
-        val root = FrameLayout(this).apply { setBackgroundColor(Color.WHITE) }
+        // The window is edge-to-edge: the bottom controls follow the content and sit above the system bars.
+        // If the screen is too short, the page scrolls instead of letting controls overlap.
+        val root = ScrollView(this).apply {
+            setBackgroundColor(Color.WHITE)
+            isFillViewport = true
+        }
+        val column = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+        }
+        root.addView(column, FrameLayout.LayoutParams(-1, -2))
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(dp(24), 0, dp(24), dp(16))
+            setPadding(dp(24), 0, dp(24), dp(8))
         }
-        root.addView(content, FrameLayout.LayoutParams(-1, -2))
+        column.addView(content, LinearLayout.LayoutParams(-1, -2))
 
         val logo = TextView(this).apply {
             text = "NoTouch"; textSize = sp(30f); setTextColor(ink); gravity = Gravity.CENTER
@@ -259,10 +271,9 @@ class MainActivity : ComponentActivity() {
             status.text = TrackerState.status
             updateHomeButtons()
         }
-        root.addView(stopButton, FrameLayout.LayoutParams(dp(186), dp(46), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply {
-            bottomMargin = dp(72)
-        })
-        root.addView(TextView(this).apply {
+        column.addView(Space(this), LinearLayout.LayoutParams(0, 0, 1f))
+        column.addView(stopButton, LinearLayout.LayoutParams(dp(186), dp(46)))
+        column.addView(TextView(this).apply {
             text = "설정 · 개발자 기능"
             textSize = sp(14f)
             setTextColor(blue)
@@ -271,10 +282,14 @@ class MainActivity : ComponentActivity() {
             setOnClickListener { startActivity(Intent(this@MainActivity, DeveloperSettingsActivity::class.java)) }
             isFocusable = true
             homeTargets += this
-        }, FrameLayout.LayoutParams(dp(186), dp(48), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply {
-            bottomMargin = dp(16)
-        })
+        }, LinearLayout.LayoutParams(dp(186), dp(48)).apply { topMargin = dp(4) })
+        ViewCompat.setOnApplyWindowInsetsListener(root) { _, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+            column.setPadding(bars.left, 0, bars.right, maxOf(bars.bottom + dp(4), dp(16)))
+            insets
+        }
         setContentView(root)
+        ViewCompat.requestApplyInsets(root)
         updateHomeButtons()
 
     }
@@ -413,6 +428,13 @@ class MainActivity : ComponentActivity() {
             TrackerState.status = saved.exceptionOrNull()?.let { "보정 적용 실패: ${it.message}" } ?: message
             // Match the exact normalization dimensions used for the calibration anchors above.
             val bounds = DisplaySpace.bounds(this@MainActivity)
+            if (saved.getOrDefault(false) && model != null) {
+                // Evaluation only: freeze this successful calibration's identity and labelled fit inputs.
+                val location = IntArray(2); getLocationOnScreen(location)
+                TrackerState.calibrationCompleted(CalibrationRecord(outcome.calibrationId, model, outcome.anchors,
+                    bounds.width(), bounds.height(), display?.rotation ?: -1, location[0], location[1], width, height,
+                    outcome.startedAtMs, outcome.finishedAtMs))
+            }
             close()
             calibration = null
             if (saved.getOrDefault(false) && TrackerState.running) {

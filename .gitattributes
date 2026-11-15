@@ -3,3 +3,7 @@ gradlew text eol=lf
 *.bat text eol=crlf
 *.task binary
 *.jar binary
+# Calibration-comparison evaluation data and fixtures: stored byte for byte (checksums are computed on the phone).
+docs/calibration-comparison/data/raw/** -text
+docs/calibration-comparison/data/derived/** -text
+docs/calibration-comparison/tools/testdata/** -text

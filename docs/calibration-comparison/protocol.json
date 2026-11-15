@@ -1,0 +1,683 @@
+{
+  "manifest_schema_version": 1,
+  "protocol_id": "notouch-calibration-comparison-eval",
+  "protocol_version": "1.0.0",
+  "status": "Declared before any session of this protocol was recorded. Cases, rules and thresholds must not be changed after results are seen; a change requires a new protocol_version and new sessions.",
+  "derived_from": {
+    "protocol_id": "notouch-gaze-eval-iter3",
+    "protocol_version": "2.0.0",
+    "source": "feature/gaze-evaluation-home-screen-iter3 at 72411ec35d5d6e9547c322de3d7a14e65812b82e (docs/evaluation/iteration3/protocol.json)",
+    "note": "That protocol and its results are unchanged and stay on their own branch. A frozen copy is kept here only as a regression fixture (tools/testdata/reference_iter3/)."
+  },
+  "question": "With the same amount of calibration data (27 anchors: three passes through the nine calibration targets), is the gaze estimate better after repeating calibration in one head position (candidate A) or after collecting it in three head positions (candidate B)? Each candidate is evaluated in the same three instructed head positions.",
+  "reference_note": "Targets are instructed fixation points shown to the participant. No independent eye tracker measures where the participant actually looked, so every spatial value is a target-referenced gaze error, not ground-truth eye-direction error. Head positions are instructed, not measured: face_x, face_y and scale are logged for inspection, and no pose gate accepts or discards data.",
+  "hash_rule": "Sessions record the SHA-256 of this file's bytes after converting CRLF to LF. The analyzer recomputes it the same way and rejects sessions whose hash differs.",
+  "primary": {
+    "mode": "blind_measurement",
+    "measured_output": "The smoothed gaze coordinate: GazePipeline.process point, supplied to TrackerState.gaze and the overlay (columns smoothed_x_norm / smoothed_y_norm).",
+    "predictor": "The personal GazeModel of one fresh, successful 27-anchor calibration of the evaluated candidate, completed in the current tracking run; before the session starts the app refits GazeModel.fit on the frozen labelled inputs in collection order and requires identical parameters.",
+    "pointer": "hidden in blind_measurement for the whole session, including preparation and countdown"
+  },
+  "candidates": {
+    "allowed_calibration_ids": [
+      "calibration_a_three_pass_static",
+      "calibration_b_three_pass_positions"
+    ],
+    "calibration_a_three_pass_static": "Three passes through the nine calibration targets in one comfortable front-facing head position (branch experiment/calibration-a-three-pass).",
+    "calibration_b_three_pass_positions": "Three passes through the nine calibration targets: ordinary, slightly higher and slightly lower head position (branch experiment/calibration-b-three-poses).",
+    "calibration_requirements": "27 anchors labelled pass 1..3 x point 1..9 in collection order, one GazeModel.fit on all of them, unchanged fit thresholds; recorded in model_snapshot.json (snapshot schema 2).",
+    "one_session_per_calibration": "Each session needs its own fresh calibration. Starting a session consumes the calibration, even if the session is interrupted. Starting a new calibration attempt voids the previous calibration's eligibility, so a failed recalibration cannot pass off the model it keeps."
+  },
+  "pipeline": {
+    "variant": "home_screen_gaze_pipeline_e8fa01e",
+    "source_base": "e8fa01ef1e397f508aa5a3b3a595539b4ef4490a (feature/home-screen)",
+    "evaluation_reference": "72411ec35d5d6e9547c322de3d7a14e65812b82e (feature/gaze-evaluation-home-screen-iter3, protocol 2.0.0)",
+    "stages": [
+      "front camera (CameraX ImageAnalysis, keep-only-latest backpressure)",
+      "cadence limiter: frames arriving within 66 ms of the previously accepted frame are skipped",
+      "MediaPipe Face Landmarker (VIDEO mode, one face)",
+      "EyeObservations.observe: eye state from eyelid openness, and LandmarkFeatures.extract (iris displacement in both eyes, nose position, eye-span scale), or a named rejection",
+      "TrackingService main-thread handler: results of a closing service, of an older epoch, or handled more than 250 ms after acceptance are dropped (the last also resets the pipeline)",
+      "GazePipeline.process: stale-timestamp rule (older than 250 ms, in the future or not increasing), GazeModel.predict (ridge-regularized linear map; null for non-finite features or when scale or face position left the calibration range; clamps each axis to [0, 1]), smoothing s + 0.28 * (p - s) per axis",
+      "TrackerState.publishSample and DotOverlay (the smoothed coordinate)"
+    ],
+    "resets": "GazePipeline smoothing is cleared by a null prediction, a gap over 250 ms between processed timestamps, a stale result and a model change (inside GazePipeline.process, reproduced by replay), and by every logged pipeline_reset event: the 800 ms no-result watchdog, a delayed result, a camera error, the notification's pause or stop actions, a service failure, and the evaluation's session_start and block_start resets.",
+    "evaluation_guards": "During a session, including preparation and countdown, gaze clicks, scrolling and dictation are suppressed by explicit guards; camera processing and the numerical pipeline keep running unchanged."
+  },
+  "modes": {
+    "blind_measurement": {
+      "role": "primary",
+      "pointer_visible": false
+    },
+    "live_preview": {
+      "role": "secondary; reported separately and never combined with blind results, because a visible pointer can change where the participant looks",
+      "pointer_visible": true
+    }
+  },
+  "head_positions": {
+    "neutral": {
+      "label_ko": "기본 위치",
+      "instruction": "Comfortable front-facing position, as during calibration."
+    },
+    "higher": {
+      "label_ko": "조금 높은 위치",
+      "instruction": "Head moved slightly upward relative to the fixed phone, approximately front-facing."
+    },
+    "lower": {
+      "label_ko": "조금 낮은 위치",
+      "instruction": "Head moved slightly downward relative to the fixed phone, approximately front-facing."
+    },
+    "compliance": "Instructed only. The operator records the physical markers used (metadata.conditions.head_position_markers) so the positions can be repeated for the other candidate. Logged face_x, face_y and scale are reported per block and phase for inspection; nothing is gated or discarded on assumed pose compliance."
+  },
+  "block_orders": {
+    "nhl": [
+      "neutral",
+      "higher",
+      "lower"
+    ],
+    "lhn": [
+      "lower",
+      "higher",
+      "neutral"
+    ]
+  },
+  "session_structure": {
+    "blocks": 3,
+    "block": "The unchanged Iteration 3 schedule: 32 presentations of 2.5 s (1.0 s settling + 1.5 s measurement), 80 s.",
+    "preparation": "Before each block: a preparation screen names the required head position; it lasts until the operator presses Ready (준비 완료). Preparation time never counts toward a measurement window. Block 1's preparation starts at the session start; block k+1's at block k's planned end.",
+    "countdown_ms": 3000,
+    "countdown": "After Ready, a 3 s countdown; the block's schedule starts at ready_uptime_ms + 3000.",
+    "session_start_lead_ms": 100,
+    "presentations_per_session": 96,
+    "model": "One model for the whole session: no recalibration, model replacement or tracking stop between blocks; any of them ends the session as incomplete."
+  },
+  "collection_plan": {
+    "official": [
+      {
+        "participant_id": "ANNA",
+        "session_label": "A1",
+        "calibration_id": "calibration_a_three_pass_static",
+        "block_order": "nhl"
+      },
+      {
+        "participant_id": "ANNA",
+        "session_label": "A2",
+        "calibration_id": "calibration_a_three_pass_static",
+        "block_order": "lhn"
+      },
+      {
+        "participant_id": "ANNA",
+        "session_label": "B1",
+        "calibration_id": "calibration_b_three_pass_positions",
+        "block_order": "nhl"
+      },
+      {
+        "participant_id": "ANNA",
+        "session_label": "B2",
+        "calibration_id": "calibration_b_three_pass_positions",
+        "block_order": "lhn"
+      }
+    ],
+    "technical_pilot": [
+      {
+        "participant_id": "PILOT01",
+        "session_label": "T1",
+        "calibration_id": "calibration_a_three_pass_static",
+        "block_order": "nhl"
+      }
+    ],
+    "rules": "Each session after its own fresh calibration. Technical-pilot sessions (participant IDs starting with PILOT) are imported only into data/pilot/ and are never official. A session whose block order differs from its planned entry is not official."
+  },
+  "coordinates": {
+    "frame": "Full-display normalized coordinates in the calibration basis: x = screen_x_px / basis_width_px, y = screen_y_px / basis_height_px, where the basis is WindowManager.maximumWindowMetrics bounds (API 30+, which evaluation requires). Calibration anchors, evaluation targets and predictions all use this basis; a session is refused if the basis size or rotation differs from the calibration's.",
+    "origin": "Top-left of the display. Positive x = right, positive y = down.",
+    "target_drawing": "A target at (x, y) is drawn at view-local (x * basis_width - view_left, y * basis_height - view_top), the same mapping the calibration screen used for its anchors.",
+    "linear_output": "GazeModel linear map before the model's own [0, 1] clamp (columns linear_*). Diagnostic only: the app never uses it.",
+    "predicted_output": "GazePipeline rawPoint: GazeModel.predict output, clamped to [0, 1] per axis by the model (columns predicted_*).",
+    "smoothed_output": "GazePipeline point (columns smoothed_*). Primary measured coordinate. It inherits the model clamp and can never leave [0, 1]; it is not an unclamped raw output.",
+    "rendered_output": "Screen pixels where DotOverlay draws the smoothed point (columns rendered_*_px). Empty when the pointer is hidden. Logged for reference only; never used for error metrics."
+  },
+  "timing": {
+    "grid_norm": [
+      0.2,
+      0.4,
+      0.6,
+      0.8
+    ],
+    "presentation_ms": 2500,
+    "settling_ms": 1000,
+    "measurement_ms": 1500,
+    "presentations_per_block": 32,
+    "block_ms": 80000,
+    "blocks": 3,
+    "countdown_ms": 3000,
+    "order": "Within every block: pass 1 serpentine from the top-left (even rows left to right, odd rows right to left); pass 2 is pass 1 reversed. Identical to protocol 2.0.0.",
+    "case_ids": "<head_position>-<case_suffix>, for example neutral-pass1-r0c0; unique within a session.",
+    "assignment": "Each processing attempt is assigned to a block, phase and presentation by its frame-acceptance timestamp (SystemClock.uptimeMillis) against the session timeline in metadata.blocks, never by the target on screen when its result arrives.",
+    "clock": "SystemClock.uptimeMillis (monotonic) for schedule, acceptance and handling times; System.nanoTime (monotonic) for durations.",
+    "frame_cadence": "Frames arriving within 66 ms of the previously accepted frame are skipped (at most about 15 accepted frames per second).",
+    "reset_policy": "Applied at the session start and at each block start, as protocol 2.0.0 applied it at its run start: a logged pipeline reset (GazePipeline.reset) clears the smoothing state at the first main-thread moment at or after the block start; results accepted before the block start and handled after it are dropped before smoothing (outcome discarded_block_start). Every block therefore starts from an empty smoothing state. Results in flight at the session start are dropped and counted (unlogged_results_dropped_pre_session); such a result accepted at or after the session start is a missing attempt and an integrity problem."
+  },
+  "cases": [
+    {
+      "case_suffix": "pass1-r0c0",
+      "trial_index": 0,
+      "pass_number": 1,
+      "index_in_pass": 0,
+      "target_id": "r0c0",
+      "target_x_norm": 0.2,
+      "target_y_norm": 0.2,
+      "onset_ms": 0,
+      "measurement_start_ms": 1000,
+      "end_ms": 2500
+    },
+    {
+      "case_suffix": "pass1-r0c1",
+      "trial_index": 1,
+      "pass_number": 1,
+      "index_in_pass": 1,
+      "target_id": "r0c1",
+      "target_x_norm": 0.4,
+      "target_y_norm": 0.2,
+      "onset_ms": 2500,
+      "measurement_start_ms": 3500,
+      "end_ms": 5000
+    },
+    {
+      "case_suffix": "pass1-r0c2",
+      "trial_index": 2,
+      "pass_number": 1,
+      "index_in_pass": 2,
+      "target_id": "r0c2",
+      "target_x_norm": 0.6,
+      "target_y_norm": 0.2,
+      "onset_ms": 5000,
+      "measurement_start_ms": 6000,
+      "end_ms": 7500
+    },
+    {
+      "case_suffix": "pass1-r0c3",
+      "trial_index": 3,
+      "pass_number": 1,
+      "index_in_pass": 3,
+      "target_id": "r0c3",
+      "target_x_norm": 0.8,
+      "target_y_norm": 0.2,
+      "onset_ms": 7500,
+      "measurement_start_ms": 8500,
+      "end_ms": 10000
+    },
+    {
+      "case_suffix": "pass1-r1c3",
+      "trial_index": 4,
+      "pass_number": 1,
+      "index_in_pass": 4,
+      "target_id": "r1c3",
+      "target_x_norm": 0.8,
+      "target_y_norm": 0.4,
+      "onset_ms": 10000,
+      "measurement_start_ms": 11000,
+      "end_ms": 12500
+    },
+    {
+      "case_suffix": "pass1-r1c2",
+      "trial_index": 5,
+      "pass_number": 1,
+      "index_in_pass": 5,
+      "target_id": "r1c2",
+      "target_x_norm": 0.6,
+      "target_y_norm": 0.4,
+      "onset_ms": 12500,
+      "measurement_start_ms": 13500,
+      "end_ms": 15000
+    },
+    {
+      "case_suffix": "pass1-r1c1",
+      "trial_index": 6,
+      "pass_number": 1,
+      "index_in_pass": 6,
+      "target_id": "r1c1",
+      "target_x_norm": 0.4,
+      "target_y_norm": 0.4,
+      "onset_ms": 15000,
+      "measurement_start_ms": 16000,
+      "end_ms": 17500
+    },
+    {
+      "case_suffix": "pass1-r1c0",
+      "trial_index": 7,
+      "pass_number": 1,
+      "index_in_pass": 7,
+      "target_id": "r1c0",
+      "target_x_norm": 0.2,
+      "target_y_norm": 0.4,
+      "onset_ms": 17500,
+      "measurement_start_ms": 18500,
+      "end_ms": 20000
+    },
+    {
+      "case_suffix": "pass1-r2c0",
+      "trial_index": 8,
+      "pass_number": 1,
+      "index_in_pass": 8,
+      "target_id": "r2c0",
+      "target_x_norm": 0.2,
+      "target_y_norm": 0.6,
+      "onset_ms": 20000,
+      "measurement_start_ms": 21000,
+      "end_ms": 22500
+    },
+    {
+      "case_suffix": "pass1-r2c1",
+      "trial_index": 9,
+      "pass_number": 1,
+      "index_in_pass": 9,
+      "target_id": "r2c1",
+      "target_x_norm": 0.4,
+      "target_y_norm": 0.6,
+      "onset_ms": 22500,
+      "measurement_start_ms": 23500,
+      "end_ms": 25000
+    },
+    {
+      "case_suffix": "pass1-r2c2",
+      "trial_index": 10,
+      "pass_number": 1,
+      "index_in_pass": 10,
+      "target_id": "r2c2",
+      "target_x_norm": 0.6,
+      "target_y_norm": 0.6,
+      "onset_ms": 25000,
+      "measurement_start_ms": 26000,
+      "end_ms": 27500
+    },
+    {
+      "case_suffix": "pass1-r2c3",
+      "trial_index": 11,
+      "pass_number": 1,
+      "index_in_pass": 11,
+      "target_id": "r2c3",
+      "target_x_norm": 0.8,
+      "target_y_norm": 0.6,
+      "onset_ms": 27500,
+      "measurement_start_ms": 28500,
+      "end_ms": 30000
+    },
+    {
+      "case_suffix": "pass1-r3c3",
+      "trial_index": 12,
+      "pass_number": 1,
+      "index_in_pass": 12,
+      "target_id": "r3c3",
+      "target_x_norm": 0.8,
+      "target_y_norm": 0.8,
+      "onset_ms": 30000,
+      "measurement_start_ms": 31000,
+      "end_ms": 32500
+    },
+    {
+      "case_suffix": "pass1-r3c2",
+      "trial_index": 13,
+      "pass_number": 1,
+      "index_in_pass": 13,
+      "target_id": "r3c2",
+      "target_x_norm": 0.6,
+      "target_y_norm": 0.8,
+      "onset_ms": 32500,
+      "measurement_start_ms": 33500,
+      "end_ms": 35000
+    },
+    {
+      "case_suffix": "pass1-r3c1",
+      "trial_index": 14,
+      "pass_number": 1,
+      "index_in_pass": 14,
+      "target_id": "r3c1",
+      "target_x_norm": 0.4,
+      "target_y_norm": 0.8,
+      "onset_ms": 35000,
+      "measurement_start_ms": 36000,
+      "end_ms": 37500
+    },
+    {
+      "case_suffix": "pass1-r3c0",
+      "trial_index": 15,
+      "pass_number": 1,
+      "index_in_pass": 15,
+      "target_id": "r3c0",
+      "target_x_norm": 0.2,
+      "target_y_norm": 0.8,
+      "onset_ms": 37500,
+      "measurement_start_ms": 38500,
+      "end_ms": 40000
+    },
+    {
+      "case_suffix": "pass2-r3c0",
+      "trial_index": 16,
+      "pass_number": 2,
+      "index_in_pass": 0,
+      "target_id": "r3c0",
+      "target_x_norm": 0.2,
+      "target_y_norm": 0.8,
+      "onset_ms": 40000,
+      "measurement_start_ms": 41000,
+      "end_ms": 42500
+    },
+    {
+      "case_suffix": "pass2-r3c1",
+      "trial_index": 17,
+      "pass_number": 2,
+      "index_in_pass": 1,
+      "target_id": "r3c1",
+      "target_x_norm": 0.4,
+      "target_y_norm": 0.8,
+      "onset_ms": 42500,
+      "measurement_start_ms": 43500,
+      "end_ms": 45000
+    },
+    {
+      "case_suffix": "pass2-r3c2",
+      "trial_index": 18,
+      "pass_number": 2,
+      "index_in_pass": 2,
+      "target_id": "r3c2",
+      "target_x_norm": 0.6,
+      "target_y_norm": 0.8,
+      "onset_ms": 45000,
+      "measurement_start_ms": 46000,
+      "end_ms": 47500
+    },
+    {
+      "case_suffix": "pass2-r3c3",
+      "trial_index": 19,
+      "pass_number": 2,
+      "index_in_pass": 3,
+      "target_id": "r3c3",
+      "target_x_norm": 0.8,
+      "target_y_norm": 0.8,
+      "onset_ms": 47500,
+      "measurement_start_ms": 48500,
+      "end_ms": 50000
+    },
+    {
+      "case_suffix": "pass2-r2c3",
+      "trial_index": 20,
+      "pass_number": 2,
+      "index_in_pass": 4,
+      "target_id": "r2c3",
+      "target_x_norm": 0.8,
+      "target_y_norm": 0.6,
+      "onset_ms": 50000,
+      "measurement_start_ms": 51000,
+      "end_ms": 52500
+    },
+    {
+      "case_suffix": "pass2-r2c2",
+      "trial_index": 21,
+      "pass_number": 2,
+      "index_in_pass": 5,
+      "target_id": "r2c2",
+      "target_x_norm": 0.6,
+      "target_y_norm": 0.6,
+      "onset_ms": 52500,
+      "measurement_start_ms": 53500,
+      "end_ms": 55000
+    },
+    {
+      "case_suffix": "pass2-r2c1",
+      "trial_index": 22,
+      "pass_number": 2,
+      "index_in_pass": 6,
+      "target_id": "r2c1",
+      "target_x_norm": 0.4,
+      "target_y_norm": 0.6,
+      "onset_ms": 55000,
+      "measurement_start_ms": 56000,
+      "end_ms": 57500
+    },
+    {
+      "case_suffix": "pass2-r2c0",
+      "trial_index": 23,
+      "pass_number": 2,
+      "index_in_pass": 7,
+      "target_id": "r2c0",
+      "target_x_norm": 0.2,
+      "target_y_norm": 0.6,
+      "onset_ms": 57500,
+      "measurement_start_ms": 58500,
+      "end_ms": 60000
+    },
+    {
+      "case_suffix": "pass2-r1c0",
+      "trial_index": 24,
+      "pass_number": 2,
+      "index_in_pass": 8,
+      "target_id": "r1c0",
+      "target_x_norm": 0.2,
+      "target_y_norm": 0.4,
+      "onset_ms": 60000,
+      "measurement_start_ms": 61000,
+      "end_ms": 62500
+    },
+    {
+      "case_suffix": "pass2-r1c1",
+      "trial_index": 25,
+      "pass_number": 2,
+      "index_in_pass": 9,
+      "target_id": "r1c1",
+      "target_x_norm": 0.4,
+      "target_y_norm": 0.4,
+      "onset_ms": 62500,
+      "measurement_start_ms": 63500,
+      "end_ms": 65000
+    },
+    {
+      "case_suffix": "pass2-r1c2",
+      "trial_index": 26,
+      "pass_number": 2,
+      "index_in_pass": 10,
+      "target_id": "r1c2",
+      "target_x_norm": 0.6,
+      "target_y_norm": 0.4,
+      "onset_ms": 65000,
+      "measurement_start_ms": 66000,
+      "end_ms": 67500
+    },
+    {
+      "case_suffix": "pass2-r1c3",
+      "trial_index": 27,
+      "pass_number": 2,
+      "index_in_pass": 11,
+      "target_id": "r1c3",
+      "target_x_norm": 0.8,
+      "target_y_norm": 0.4,
+      "onset_ms": 67500,
+      "measurement_start_ms": 68500,
+      "end_ms": 70000
+    },
+    {
+      "case_suffix": "pass2-r0c3",
+      "trial_index": 28,
+      "pass_number": 2,
+      "index_in_pass": 12,
+      "target_id": "r0c3",
+      "target_x_norm": 0.8,
+      "target_y_norm": 0.2,
+      "onset_ms": 70000,
+      "measurement_start_ms": 71000,
+      "end_ms": 72500
+    },
+    {
+      "case_suffix": "pass2-r0c2",
+      "trial_index": 29,
+      "pass_number": 2,
+      "index_in_pass": 13,
+      "target_id": "r0c2",
+      "target_x_norm": 0.6,
+      "target_y_norm": 0.2,
+      "onset_ms": 72500,
+      "measurement_start_ms": 73500,
+      "end_ms": 75000
+    },
+    {
+      "case_suffix": "pass2-r0c1",
+      "trial_index": 30,
+      "pass_number": 2,
+      "index_in_pass": 14,
+      "target_id": "r0c1",
+      "target_x_norm": 0.4,
+      "target_y_norm": 0.2,
+      "onset_ms": 75000,
+      "measurement_start_ms": 76000,
+      "end_ms": 77500
+    },
+    {
+      "case_suffix": "pass2-r0c0",
+      "trial_index": 31,
+      "pass_number": 2,
+      "index_in_pass": 15,
+      "target_id": "r0c0",
+      "target_x_norm": 0.2,
+      "target_y_norm": 0.2,
+      "onset_ms": 77500,
+      "measurement_start_ms": 78500,
+      "end_ms": 80000
+    }
+  ],
+  "validity": {
+    "valid_measurement_sample": "A measurement-phase attempt with outcome 'processed', quality 'tracking' and finite smoothed x and y.",
+    "invalid_attempts": "Kept in availability accounting with their actual outcome (discarded_closing, discarded_epoch, discarded_delayed, discarded_block_start, discarded_model_changed, processing_error) or pipeline quality (out_of_range, closed, uncertain, lost, stale), with the pipeline's own rejection names in feature_rejection / prediction_rejection. Excluded from spatial metrics; never imputed, carried forward or treated as zero error.",
+    "off_screen": "Smoothed coordinates cannot leave [0, 1] because GazeModel.predict clamps them. Their off-screen fraction is reported but is zero by construction; model_clamp_active_fraction (from the linear output) is reported as well.",
+    "settling": "Settling-phase attempts are excluded from spatial, availability and throughput metrics and reported separately; they are included in the block's latency population.",
+    "preparation_and_countdown": "Excluded from every block metric and denominator, including latency. Counted and summarized separately (face position and scale for inspection)."
+  },
+  "data_sufficiency": {
+    "purpose": "Technical eligibility for diagnostic spatial summaries. Distinct from, and looser than, the performance pass conditions.",
+    "min_valid_samples": 10,
+    "min_valid_coverage": 0.5,
+    "presentation_must_be_complete": true,
+    "min_eligible_fraction_for_session_spatial_criteria": 0.8,
+    "min_eligible_fraction_note": "Applied per block: the p95-presentation-error and mean-jitter criteria are INSUFFICIENT_DATA when fewer than ceil(0.8 * 32) = 26 of the block's presentations are technically eligible. Unchanged from protocol 2.0.0."
+  },
+  "performance_criteria": {
+    "note": "The predeclared Iteration 3 prototype engineering targets, unchanged, evaluated per head-position block. They are not evidence of reliable small-button selection. Comparisons use unrounded values.",
+    "successful_presentation": {
+      "max_mean_error_norm": 0.1,
+      "min_valid_coverage": 0.8,
+      "min_valid_samples": 10,
+      "requires_complete_presentation": true
+    },
+    "block_criteria": [
+      {
+        "id": "successful_presentation_rate",
+        "comparison": ">=",
+        "threshold": 0.8,
+        "unit": "fraction of planned presentations",
+        "definition": "Successful presentations / all planned presentations of the block (32)."
+      },
+      {
+        "id": "p95_presentation_error",
+        "comparison": "<=",
+        "threshold": 0.2,
+        "unit": "normalized",
+        "definition": "Nearest-rank p95 (k = ceil(0.95 * n)) of the per-presentation mean errors of the smoothed coordinate of the block's technically eligible presentations. Not a p95 across camera samples."
+      },
+      {
+        "id": "mean_jitter_rms",
+        "comparison": "<=",
+        "threshold": 0.05,
+        "unit": "normalized",
+        "definition": "Mean over the block's technically eligible presentations of sqrt(mean((x - mean_x)^2 + (y - mean_y)^2)) of valid smoothed coordinates."
+      },
+      {
+        "id": "tracking_availability",
+        "comparison": ">=",
+        "threshold": 0.9,
+        "unit": "fraction",
+        "definition": "Valid measurement attempts / all measurement-phase processing attempts of the block. Undefined (INSUFFICIENT_DATA) when there are no attempts."
+      },
+      {
+        "id": "valid_sample_rate",
+        "comparison": ">=",
+        "threshold": 10.0,
+        "unit": "valid samples per second",
+        "definition": "Valid measurement samples / planned measurement-window time of the block (32 x 1.5 s = 48 s). A window without attempts contributes zero samples."
+      },
+      {
+        "id": "p95_processing_latency",
+        "comparison": "<=",
+        "threshold": 200.0,
+        "unit": "ms",
+        "definition": "Nearest-rank p95 of per-attempt processing latency over all attempts accepted within the block's 80 s schedule (settling and measurement) with a measured latency, including invalid, stale and discarded results. Preparation and countdown attempts are excluded. Latency runs from frame acceptance for processing to publication (or explicit discard) of its result on the main thread. Not FaceLandmarker inference time alone, not physical eye-to-display latency, not dwell time."
+      }
+    ]
+  },
+  "metric_definitions": {
+    "spatial_error_norm": "e = sqrt((pred_x - target_x)^2 + (pred_y - target_y)^2) in full-display normalized units. Not a percentage of the screen diagonal and not a visual angle.",
+    "spatial_error_px": "e_px = sqrt(((pred_x - target_x) * display_width_px)^2 + ((pred_y - target_y) * display_height_px)^2).",
+    "presentation_mean_error": "Mean of the spatial errors of a presentation's valid measurement samples.",
+    "block_mean_error": "Mean of presentation mean errors; each technically eligible presentation weighted equally.",
+    "jitter_rms": "sqrt(mean((x - mean_x)^2 + (y - mean_y)^2)) within one presentation; pixel version scales dx by width and dy by height.",
+    "bias": "Signed mean of (pred - target) per axis per presentation; block value is the mean over eligible presentations. Positive x = right, positive y = down.",
+    "off_screen_fraction": "Valid measurement samples with a smoothed coordinate outside [0, 1] / all valid measurement samples. Zero by construction (model clamp).",
+    "nearest_rank_p95": "The k-th smallest value with k = ceil(0.95 * n), computed in integer arithmetic.",
+    "model_clamp_active_fraction": "Valid measurement samples whose linear model output is outside [0, 1] on either axis / all valid measurement samples. Diagnostic.",
+    "fit_error": "GazeModel RMS residual on its own calibration anchors. Reported as a calibration diagnostic only; never a substitute for measured gaze accuracy."
+  },
+  "statuses": {
+    "MET": "The criterion was measured and satisfied its threshold.",
+    "NOT_MET": "The criterion was measured and failed its threshold.",
+    "NOT_MEASURED": "No session data exists for the criterion yet.",
+    "INSUFFICIENT_DATA": "Data exist but are too few, or fail an integrity check, to evaluate the criterion.",
+    "INCOMPLETE": "The session ended before all three blocks were shown; it cannot receive a passing verdict."
+  },
+  "assertions": [
+    "Invalid or insufficient presentations cannot be successful presentations.",
+    "Missing coordinates never become zero error.",
+    "Preparation and countdown attempts never enter a block metric or denominator.",
+    "An incomplete session's verdict is INCOMPLETE, whatever its partial metrics; so is every block of it.",
+    "A session with logging loss, unassigned rows or a checksum mismatch has verdict INSUFFICIENT_DATA.",
+    "A block verdict is MET only if every block criterion is MET.",
+    "A session verdict is MET only if all three block verdicts are MET; block results are always shown separately.",
+    "p95 values are never averaged; a pooled p95 is recomputed from pooled presentation means."
+  ],
+  "aggregation": {
+    "block": "All six criteria are evaluated per head-position block (80 s, 32 presentations).",
+    "block_verdict_precedence": [
+      "INCOMPLETE",
+      "INSUFFICIENT_DATA (integrity)",
+      "NOT_MET",
+      "INSUFFICIENT_DATA",
+      "MET"
+    ],
+    "session": "MET only if all three blocks are MET; otherwise INCOMPLETE, then INSUFFICIENT_DATA for integrity problems, then NOT_MET if any block is NOT_MET, then INSUFFICIENT_DATA.",
+    "by_position": "Within one compatibility group (which includes the calibration ID), per participant and head position over complete sessions: verdict MET only if every included block of that position is MET; descriptive metrics weight presentations equally (successful-presentation rate, pooled-presentation p95, mean jitter) or blocks equally (availability, valid sample rate); latency is the worst block p95.",
+    "participant": "Within one compatibility group: MET only if every complete session is MET; NOT_MET if any is NOT_MET; INCOMPLETE if no complete session exists; otherwise INSUFFICIENT_DATA. Positions are always listed separately; no pooled summary hides a failed position.",
+    "compatibility_group": "Sessions are only summarized together when pipeline variant, calibration ID, mode, protocol hash, build commit and dirty flag, predictor kind, device model and display size and rotation all match. Candidates A and B are therefore never pooled; they are compared side by side.",
+    "frame_weighting": "No summary weights sessions or blocks by camera frame count."
+  },
+  "log_schema": {
+    "version": 4,
+    "derived_from": 3,
+    "changes": [
+      "Rows carry block_index, head_position, phase (preparation, countdown, settling, measurement), block_elapsed_ms and position-qualified case_id.",
+      "Quality is GazePipeline's TrackingQuality (tracking, out_of_range, closed, uncertain, lost, stale); outcomes add discarded_epoch, discarded_delayed and discarded_block_start.",
+      "Observation inputs for replay: eye_state, left_open, right_open and handled_uptime_ms (the time passed to GazePipeline.process).",
+      "Events: pipeline_reset (with its reason), preparation_shown, ready, camera_error, unlogged_result_dropped.",
+      "model_snapshot.json schema 2: 27 anchors with pass, point, calibration position, movement retries and acceptance time; calibration identity and timing."
+    ]
+  },
+  "version_history": [
+    {
+      "version": "1.0.0",
+      "log_schema": 4,
+      "snapshot_schema": 2,
+      "changes": [
+        "New protocol for the calibration comparison, derived from notouch-gaze-eval-iter3 2.0.0.",
+        "One session = one fresh 27-anchor calibration + three instructed head-position blocks with preparation, Ready and a 3 s countdown.",
+        "Pipeline is GazePipeline of e8fa01e (stale rule, eye-state qualities, epochs); replay runs GazePipeline.process itself.",
+        "Unchanged from 2.0.0: grid, 32 cases and their order within a block, 80 s block schedule, 1,000 ms settling and 1,500 ms measurement windows, treatment of missing coordinates, data sufficiency, all thresholds and metric formulas (now per block)."
+      ]
+    }
+  ]
+}
