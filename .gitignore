@@ -8,3 +8,12 @@ local.properties
 build-log*.txt
 *.jks
 *.keystore
+
+# Keep local AI credentials out of version control; share empty examples only.
+.env
+.env.*
+!.env.example
+online-prediction.properties
+server/.venv/
+__pycache__/
+*.pyc

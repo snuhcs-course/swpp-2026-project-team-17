@@ -15,6 +15,7 @@ class TrackerStateRecoveryTest {
         TrackerState.fault = null
         TrackerState.speaking = false
         TrackerState.interactionAllowed = false
+        TrackerState.writingOwnsInput = false
     }
     private fun enabled() {
         TrackerState.running = true
@@ -36,6 +37,14 @@ class TrackerStateRecoveryTest {
         TrackerState.recoveryOpening = true
         assertFalse(TrackerState.externalActionsAllowed())
         assertFalse(TrackerState.recognitionHelpEligible(true))
+    }
+    @Test fun writingBlocksEveryExternalActionAndLossHelpUntilReleased() {
+        enabled()
+        TrackerState.writingOwnsInput = true
+        assertFalse(TrackerState.externalActionsAllowed())
+        assertFalse(TrackerState.recognitionHelpEligible(true))
+        TrackerState.writingOwnsInput = false
+        assertTrue(TrackerState.externalActionsAllowed())
     }
     @Test fun everyNonOperableContextSuppressesLossHelp() {
         val disable: List<() -> Unit> = listOf(

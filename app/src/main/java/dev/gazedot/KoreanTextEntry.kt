@@ -16,13 +16,28 @@ internal class KoreanComposer {
 
     fun snapshot() = State(committed, initial, vowel, ending)
     fun restore(state: State) { committed = state.committed; initial = state.initial; vowel = state.vowel; ending = state.ending }
+    fun setText(text: String) {
+        committed = text; initial = null; vowel = null; ending = null
+        val last = text.lastOrNull() ?: return
+        if (last in initialOrder) {
+            committed = text.dropLast(1); initial = last
+        } else if (last in '\uAC00'..'\uD7A3') {
+            val code = last.code - 0xAC00
+            committed = text.dropLast(1); initial = initialOrder[code / 588]
+            vowel = vowelOrder[code % 588 / 28]; ending = finalOrder[code % 28].ifEmpty { null }
+        }
+    }
+    fun literal(value: String) = setText(text + value)
     val composing get() = renderSyllable()
     val text get() = committed + composing
     val currentWord get() = text.substringAfterLast(' ').trim()
     val wordIsComplete get() = composing.isEmpty() && committed.isNotEmpty() && !committed.endsWith(' ')
 
     fun add(jamo: Char) {
-        if (jamo in vowelOrder) addVowel(jamo) else if (jamo in initialOrder) addConsonant(jamo)
+        if (jamo in vowelOrder) addVowel(jamo)
+        else if (jamo in initialOrder) addConsonant(jamo)
+        else if (initial != null && vowel != null && ending == null && jamo.toString() in finalSplit)
+            ending = jamo.toString()
     }
     private fun addConsonant(c: Char) {
         if (initial == null) { initial = c; return }
@@ -65,7 +80,20 @@ internal class KoreanComposer {
                 if (compound != null) vowel = compound.key.first() else vowel = null
             }
             initial != null -> initial = null
-            committed.isNotEmpty() -> committed = committed.dropLast(1)
+            committed.isNotEmpty() -> {
+                val last = committed.last()
+                if (last in '\uAC00'..'\uD7A3') {
+                    val code = last.code - 0xAC00
+                    committed = committed.dropLast(1)
+                    initial = initialOrder[code / 588]
+                    vowel = vowelOrder[(code % 588) / 28]
+                    ending = finalOrder[code % 28].ifEmpty { null }
+                    backspace()
+                } else {
+                    val count = Character.charCount(Character.codePointBefore(committed, committed.length))
+                    committed = committed.dropLast(count)
+                }
+            }
         }
     }
     fun acceptWord(word: String, replaceCurrent: Boolean) {

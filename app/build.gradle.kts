@@ -1,7 +1,16 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
+// TODO: AI provider/model/API key are unset in server/.env. Only a proxy URL belongs in the APK.
+val predictionProperties = Properties().apply {
+    val config = rootProject.file("online-prediction.properties")
+    if (config.isFile) config.inputStream().use { load(it) }
+}
+val predictionUrl = predictionProperties.getProperty("PREDICTION_SERVER_URL", "")
+    .replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "").replace("\r", "")
 android {
     namespace = "dev.gazedot"
     compileSdk = 35
@@ -11,6 +20,7 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
+        buildConfigField("String", "PREDICTION_SERVER_URL", "\"$predictionUrl\"")
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
     }
     compileOptions {
@@ -19,6 +29,7 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
     androidResources { noCompress += "task" }
+    buildFeatures { buildConfig = true }
 }
 dependencies {
     implementation("androidx.activity:activity-ktx:1.10.1")

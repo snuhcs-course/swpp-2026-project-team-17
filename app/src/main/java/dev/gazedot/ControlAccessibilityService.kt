@@ -12,12 +12,15 @@ import android.view.accessibility.AccessibilityNodeInfo
 class ControlAccessibilityService : AccessibilityService() {
     private var busy=false
     private val handler=Handler(Looper.getMainLooper())
+    private var writing: WritingController? = null
     override fun onServiceConnected() {
         instance=this
+        writing = WritingController(this)
         if (TrackerState.fault?.setting == RecoverySetting.ACCESSIBILITY) TrackerState.fault = null
         TrackerState.notifyListeners()
     }
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        writing?.onEvent(event)
         if (event?.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             TrackerState.cancelActions?.invoke()
         } else if (event?.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED ||
@@ -62,8 +65,9 @@ class ControlAccessibilityService : AccessibilityService() {
         TrackerState.contextChanged?.invoke()
         TrackerState.notifyListeners()
     }
-    override fun onInterrupt() { reportInterrupted() }
+    override fun onInterrupt() { writing?.hide(); reportInterrupted() }
     override fun onDestroy() {
+        writing?.close(); writing = null
         if(instance===this) instance=null
         reportInterrupted()
         handler.removeCallbacksAndMessages(null); super.onDestroy()
