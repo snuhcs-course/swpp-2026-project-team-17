@@ -4,6 +4,8 @@ package dev.gazedot
 object TrackerState {
     var running = false
     var model: GazeModel? = null
+    @Volatile var eyeProfile: EyeProfile? = null
+    var faceFrame: FaceFrame? = null
     var controls = false
         set(value) {
             if (field == value) return
@@ -76,6 +78,7 @@ object TrackerState {
         frameAt = 0L
         eyeState = EyeState.LOST
         features = null
+        faceFrame = null
         sample = null
         gaze = null
     }

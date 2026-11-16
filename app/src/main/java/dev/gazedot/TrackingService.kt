@@ -151,6 +151,7 @@ class TrackingService : LifecycleService() {
                         FaceLandmarker.FaceLandmarkerOptions.builder()
                             .setBaseOptions(BaseOptions.builder().setModelAssetPath("face_landmarker.task").build())
                             .setRunningMode(RunningMode.VIDEO).setNumFaces(1)
+                            .setOutputFaceBlendshapes(true).setOutputFacialTransformationMatrixes(true)
                             .setMinFaceDetectionConfidence(0.6f).setMinFacePresenceConfidence(0.6f)
                             .setMinTrackingConfidence(0.6f).build())
                     main.post { if (!closing) bindCamera() }
@@ -219,8 +220,12 @@ class TrackingService : LifecycleService() {
             upright = Bitmap.createBitmap(raw, 0, 0, raw.width, raw.height, matrix, true)
             val image = BitmapImageBuilder(upright).build()
             val result = try { landmarker?.detectForVideo(image, now) } finally { image.close() }
-            val observation = result?.faceLandmarks()?.firstOrNull()?.let {
-                EyeObservations.observe(it, upright.width, upright.height)
+            val landmarks=result?.faceLandmarks()?.firstOrNull()
+            val transform=result?.facialTransformationMatrixes()?.orElse(null)?.firstOrNull()
+            val blends=result?.faceBlendshapes()?.orElse(null)?.firstOrNull()?.associate { it.categoryName() to it.score() } ?: emptyMap()
+            val face=landmarks?.let { FaceGeometry.extract(it,upright.width,upright.height,now,transform,blends) }
+            val observation = landmarks?.let {
+                EyeObservations.observe(it, upright.width, upright.height,face,TrackerState.eyeProfile)
             } ?: EyeObservation(EyeState.LOST, null, 0.0, 0.0)
             main.post {
                 if (closing || epoch != trackingEpoch || cameraFault != null) return@post
@@ -235,6 +240,7 @@ class TrackingService : LifecycleService() {
                 TrackerState.signalPending = false
                 TrackerState.frameAt = now
                 TrackerState.eyeState = observation.state
+                TrackerState.faceFrame = face
                 val model = TrackerState.model
                 val enabled = TrackerState.externalActionsAllowed() &&
                     !TrackerState.speaking && ControlAccessibilityService.instance != null && ControlAccessibilityService.instance?.choosing != true

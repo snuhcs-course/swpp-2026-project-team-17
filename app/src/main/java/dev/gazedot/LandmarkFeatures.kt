@@ -13,7 +13,9 @@ object LandmarkFeatures {
             val len = hypot(dx, dy)
             if (len < 12) return null
             val top = point(upper); val bottom = point(lower)
-            if (hypot(top.first - bottom.first, top.second - bottom.second) / len < 0.10) return null
+            // Closure classification is handled by EyeObservations using personal open-eye baselines.
+            // Keep only a minimal geometric visibility floor here, not a second population threshold.
+            if (hypot(top.first - bottom.first, top.second - bottom.second) / len < 0.04) return null
             val ix = center.first - (c1.first + c2.first) / 2
             val iy = center.second - (c1.second + c2.second) / 2
             return (ix * dx + iy * dy) / (len * len) to (-ix * dy + iy * dx) / (len * len)

@@ -7,7 +7,7 @@ data class EyeObservation(val state: EyeState, val features: EyeFeatures?, val l
 
 /** Gesture classification is independent of the original coordinate extractor. */
 object EyeObservations {
-    fun observe(p: List<NormalizedLandmark>, width: Int, height: Int): EyeObservation {
+    fun observe(p: List<NormalizedLandmark>, width: Int, height: Int, face: FaceFrame? = null, profile: EyeProfile? = null): EyeObservation {
         if (p.size < 478 || width <= 0 || height <= 0 ||
             p.take(478).any { !it.x().isFinite() || !it.y().isFinite() }) {
             return EyeObservation(EyeState.LOST, null, 0.0, 0.0)
@@ -21,9 +21,14 @@ object EyeObservations {
         val right = openness(33, 133, 159, 145)
         val left = openness(362, 263, 386, 374)
         if (right == null || left == null) return EyeObservation(EyeState.LOST, null, 0.0, 0.0)
-        val state = eyeState(left, right)
+        val state = personalizedState(left,right,face?.leftBlink ?: 0.0,face?.rightBlink ?: 0.0,profile)
         // Partial closure can displace iris landmarks: never expose them as calibration/gaze samples.
-        return EyeObservation(state, if (state == EyeState.OPEN) LandmarkFeatures.extract(p, width, height) else null, left, right)
+        return EyeObservation(state, if (state == EyeState.OPEN) LandmarkFeatures.extract(p, width, height)?.copy(head=face?.head) else null, left, right)
+    }
+    fun personalizedState(left:Double,right:Double,leftBlink:Double,rightBlink:Double,profile:EyeProfile?):EyeState {
+        val l=if(profile!=null && profile.leftOpen>0) left/profile.leftOpen*.22 else left
+        val r=if(profile!=null && profile.rightOpen>0) right/profile.rightOpen*.22 else right
+        return eyeState(if(leftBlink>.65) .05 else l,if(rightBlink>.65) .05 else r)
     }
     fun eyeState(leftOpen: Double, rightOpen: Double): EyeState = when {
         !leftOpen.isFinite() || !rightOpen.isFinite() -> EyeState.LOST

@@ -3,7 +3,7 @@ package dev.gazedot
 import kotlin.math.*
 
 data class EyeFeatures(val x: Double, val y: Double, val faceX: Double, val faceY: Double, val scale: Double,
-    val leftX: Double = x, val leftY: Double = y, val rightX: Double = x, val rightY: Double = y)
+    val leftX: Double = x, val leftY: Double = y, val rightX: Double = x, val rightY: Double = y, val head: HeadPose? = null)
 data class Anchor(val eye: EyeFeatures, val x: Double, val y: Double)
 
 /** Calibration maps iris displacement inside the eye to display coordinates.
@@ -16,14 +16,20 @@ class GazeModel private constructor(
     val fitError: Double,
     val correction: ResidualCorrection? = null,
     private val leftModel: GazeModel? = null, private val rightModel: GazeModel? = null,
+    val headCorrection: HeadCorrection? = null,
 ) {
     fun predict(f: EyeFeatures): Pair<Double, Double>? {
         val p=predictUncorrected(f) ?: return null
         val corrected=correction?.apply(p.first,p.second) ?: p
         return corrected.first.coerceIn(0.0,1.0) to corrected.second.coerceIn(0.0,1.0)
     }
-    fun withCorrection(value: ResidualCorrection?) = GazeModel(meanX,meanY,stdX,stdY,wx,wy,reference,fitError,value,leftModel,rightModel)
+    fun withCorrection(value: ResidualCorrection?) = GazeModel(meanX,meanY,stdX,stdY,wx,wy,reference,fitError,value,leftModel,rightModel,headCorrection)
+    fun withHeadCorrection(value: HeadCorrection?) = GazeModel(meanX,meanY,stdX,stdY,wx,wy,reference,fitError,null,leftModel,rightModel,value)
     fun predictUncorrected(f: EyeFeatures): Pair<Double, Double>? {
+        val raw=predictBase(f) ?: return null
+        return if(headCorrection==null) raw else headCorrection.apply(f.head ?: return null,raw)
+    }
+    fun predictBase(f: EyeFeatures): Pair<Double, Double>? {
         if (!listOf(f.x, f.y, f.faceX, f.faceY, f.scale).all { it.isFinite() }) return null
         // A changed pose/distance invalidates this simple calibration. Do not invent a point.
         if (f.scale !in reference.scale * 0.72..reference.scale * 1.28 ||
@@ -90,5 +96,7 @@ class GazeModel private constructor(
 fun medianFeatures(samples: List<EyeFeatures>): EyeFeatures {
     fun median(selector: (EyeFeatures) -> Double): Double = samples.map(selector).sorted()[samples.size / 2]
     return EyeFeatures(median { it.x }, median { it.y }, median { it.faceX }, median { it.faceY }, median { it.scale },
-        median { it.leftX }, median { it.leftY }, median { it.rightX }, median { it.rightY })
+        median { it.leftX }, median { it.leftY }, median { it.rightX }, median { it.rightY },
+        if(samples.all{it.head!=null}) HeadPose(median{it.head!!.yaw},median{it.head!!.pitch},median{it.head!!.roll},
+            median{it.head!!.x},median{it.head!!.y},median{it.head!!.iris}) else null)
 }

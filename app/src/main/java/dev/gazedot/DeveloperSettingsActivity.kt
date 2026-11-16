@@ -28,6 +28,11 @@ class DeveloperSettingsActivity : ComponentActivity() {
             root.addView(Button(this).apply { text = label; setOnClickListener { action() } })
         }
         button("도움 · 인식 문제 해결하기") { startActivity(Intent(this, RecoveryActivity::class.java)) }
+        button("머리 움직임 보정") { startActivity(Intent(this,HeadMotionActivity::class.java)) }
+        button("홍채 기준·머리 보정 결과") {
+            val prefs=getSharedPreferences("personal",MODE_PRIVATE)
+            status.text=prefs.getString("eye_profile_report","홍채 측정 전")+"\n"+prefs.getString("head_report","머리 보정 전")
+        }
         val personal=getSharedPreferences("personal",MODE_PRIVATE)
         root.addView(Switch(this).apply {
             text="개인화 버튼 추천·확인 학습"; isChecked=personal.getBoolean("enabled",true)

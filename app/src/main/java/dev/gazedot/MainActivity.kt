@@ -58,6 +58,20 @@ class MainActivity : ComponentActivity() {
             handler.postDelayed(this, 50)
         }
     }
+    private val faceSetup = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if(result.resultCode == android.app.Activity.RESULT_OK && TrackerState.running) startNinePointCalibration()
+        else { TrackerState.status="얼굴 기준 측정 취소 · 기존 보정 유지"; showHome() }
+    }
+    private val headSetup = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        if (intent.hasExtra(EXTRA_RECOVERY_ACTION)) finish() else showCalibrationTutorial()
+    }
+    private fun showCalibrationTutorial() {
+        if(!TrackerState.running) { showHome(); return }
+        val bounds=DisplaySpace.bounds(this)
+        tutorial=PostCalibrationTutorialView(this,bounds.width(),bounds.height(),
+            onRecalibrate={startCalibration()},onFinished={window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)})
+        setContentView(tutorial)
+    }
     private val accessibilitySettings = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         if (ControlAccessibilityService.instance != null) startTracking()
         else status.text = "접근성 > 설치된 앱 > NoTouch 눈 조작에서 사용 설정을 켜 주세요."
@@ -416,7 +430,12 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun startCalibration() {
-        if (!TrackerState.running || TrackerState.fault != null || !TrackerState.hasFreshFeatures(SystemClock.uptimeMillis())) {
+        if(!TrackerState.running || TrackerState.fault!=null) { status.text="먼저 카메라를 시작하세요";return }
+        tutorial?.close();tutorial=null
+        faceSetup.launch(Intent(this,FaceSetupActivity::class.java))
+    }
+    private fun startNinePointCalibration() {
+        if (!TrackerState.running || TrackerState.fault != null) {
             if (::status.isInitialized) status.text = "보정을 시작할 수 없어요. 카메라를 시작하고 눈이 검출되면 다시 선택해 주세요."
             return
         }
@@ -516,15 +535,9 @@ class MainActivity : ComponentActivity() {
             val bounds = DisplaySpace.bounds(this@MainActivity)
             close()
             calibration = null
-            if (intent.hasExtra(EXTRA_RECOVERY_ACTION)) {
-                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-                finish()
-            } else if (saved.getOrDefault(false) && TrackerState.running) {
-                tutorial = PostCalibrationTutorialView(this@MainActivity, bounds.width(), bounds.height(),
-                    onRecalibrate = { startCalibration() },
-                    onFinished = { window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) })
-                setContentView(tutorial)
-            } else showHome()
+            if (saved.getOrDefault(false) && TrackerState.running) {
+                headSetup.launch(Intent(this@MainActivity,HeadMotionActivity::class.java))
+            } else if (intent.hasExtra(EXTRA_RECOVERY_ACTION)) finish() else showHome()
         }
         override fun onDraw(canvas: Canvas) {
             val target = targets.getOrNull(index) ?: return
