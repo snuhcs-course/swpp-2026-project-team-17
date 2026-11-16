@@ -1,0 +1,39 @@
+calibration_id,participant_id,session_label,session_id,quantity,group,value,unit
+calibration_a_three_pass_static,ANNA,CALIBRATION_A,eval-20261115T093800Z-761b3d19,pass_mean_face_x,pass 1,0.5295321742693583,image-normalized (logged face)
+calibration_a_three_pass_static,ANNA,CALIBRATION_A,eval-20261115T093800Z-761b3d19,pass_mean_face_y,pass 1,0.7872417304250929,image-normalized (logged face)
+calibration_a_three_pass_static,ANNA,CALIBRATION_A,eval-20261115T093800Z-761b3d19,pass_mean_scale,pass 1,0.26841234585177515,image-normalized (logged face)
+calibration_a_three_pass_static,ANNA,CALIBRATION_A,eval-20261115T093800Z-761b3d19,pass_mean_face_x,pass 2,0.5317901571591696,image-normalized (logged face)
+calibration_a_three_pass_static,ANNA,CALIBRATION_A,eval-20261115T093800Z-761b3d19,pass_mean_face_y,pass 2,0.833743135134379,image-normalized (logged face)
+calibration_a_three_pass_static,ANNA,CALIBRATION_A,eval-20261115T093800Z-761b3d19,pass_mean_scale,pass 2,0.26383520361624735,image-normalized (logged face)
+calibration_a_three_pass_static,ANNA,CALIBRATION_A,eval-20261115T093800Z-761b3d19,pass_mean_face_x,pass 3,0.5342023107740614,image-normalized (logged face)
+calibration_a_three_pass_static,ANNA,CALIBRATION_A,eval-20261115T093800Z-761b3d19,pass_mean_face_y,pass 3,0.8501713673273722,image-normalized (logged face)
+calibration_a_three_pass_static,ANNA,CALIBRATION_A,eval-20261115T093800Z-761b3d19,pass_mean_scale,pass 3,0.2641674346991725,image-normalized (logged face)
+calibration_a_three_pass_static,ANNA,CALIBRATION_A,eval-20261115T093800Z-761b3d19,row_mean_f_y,target y 0.15,-0.07632319104049871,iris feature f_y
+calibration_a_three_pass_static,ANNA,CALIBRATION_A,eval-20261115T093800Z-761b3d19,row_mean_f_y,target y 0.5,-0.06467385876659217,iris feature f_y
+calibration_a_three_pass_static,ANNA,CALIBRATION_A,eval-20261115T093800Z-761b3d19,row_mean_f_y,target y 0.85,-0.05809273782465726,iris feature f_y
+calibration_a_three_pass_static,ANNA,CALIBRATION_A,eval-20261115T093800Z-761b3d19,column_mean_f_x,target x 0.15,0.02614083524779679,iris feature f_x
+calibration_a_three_pass_static,ANNA,CALIBRATION_A,eval-20261115T093800Z-761b3d19,column_mean_f_x,target x 0.5,0.0030153511142456697,iris feature f_x
+calibration_a_three_pass_static,ANNA,CALIBRATION_A,eval-20261115T093800Z-761b3d19,column_mean_f_x,target x 0.85,-0.014694108570510187,iris feature f_x
+calibration_a_three_pass_static,ANNA,CALIBRATION_A,eval-20261115T093800Z-761b3d19,between_pass_range_f_x,"target (0.15, 0.15)",0.013926428822904884,iris feature f_x
+calibration_a_three_pass_static,ANNA,CALIBRATION_A,eval-20261115T093800Z-761b3d19,between_pass_range_f_y,"target (0.15, 0.15)",0.001897065928845254,iris feature f_y
+calibration_a_three_pass_static,ANNA,CALIBRATION_A,eval-20261115T093800Z-761b3d19,between_pass_range_f_x,"target (0.5, 0.15)",0.017685619353079263,iris feature f_x
+calibration_a_three_pass_static,ANNA,CALIBRATION_A,eval-20261115T093800Z-761b3d19,between_pass_range_f_y,"target (0.5, 0.15)",0.009676621633840851,iris feature f_y
+calibration_a_three_pass_static,ANNA,CALIBRATION_A,eval-20261115T093800Z-761b3d19,between_pass_range_f_x,"target (0.85, 0.15)",0.012096479724515462,iris feature f_x
+calibration_a_three_pass_static,ANNA,CALIBRATION_A,eval-20261115T093800Z-761b3d19,between_pass_range_f_y,"target (0.85, 0.15)",0.01596109835844428,iris feature f_y
+calibration_a_three_pass_static,ANNA,CALIBRATION_A,eval-20261115T093800Z-761b3d19,between_pass_range_f_x,"target (0.15, 0.5)",0.006612193159199781,iris feature f_x
+calibration_a_three_pass_static,ANNA,CALIBRATION_A,eval-20261115T093800Z-761b3d19,between_pass_range_f_y,"target (0.15, 0.5)",0.00289075665519882,iris feature f_y
+calibration_a_three_pass_static,ANNA,CALIBRATION_A,eval-20261115T093800Z-761b3d19,between_pass_range_f_x,"target (0.5, 0.5)",0.006448974212793737,iris feature f_x
+calibration_a_three_pass_static,ANNA,CALIBRATION_A,eval-20261115T093800Z-761b3d19,between_pass_range_f_y,"target (0.5, 0.5)",0.0009363838082797477,iris feature f_y
+calibration_a_three_pass_static,ANNA,CALIBRATION_A,eval-20261115T093800Z-761b3d19,between_pass_range_f_x,"target (0.85, 0.5)",0.004141695588198595,iris feature f_x
+calibration_a_three_pass_static,ANNA,CALIBRATION_A,eval-20261115T093800Z-761b3d19,between_pass_range_f_y,"target (0.85, 0.5)",0.005715666716884504,iris feature f_y
+calibration_a_three_pass_static,ANNA,CALIBRATION_A,eval-20261115T093800Z-761b3d19,between_pass_range_f_x,"target (0.15, 0.85)",0.006382484376677232,iris feature f_x
+calibration_a_three_pass_static,ANNA,CALIBRATION_A,eval-20261115T093800Z-761b3d19,between_pass_range_f_y,"target (0.15, 0.85)",0.00380227578083301,iris feature f_y
+calibration_a_three_pass_static,ANNA,CALIBRATION_A,eval-20261115T093800Z-761b3d19,between_pass_range_f_x,"target (0.5, 0.85)",0.0031924308209712246,iris feature f_x
+calibration_a_three_pass_static,ANNA,CALIBRATION_A,eval-20261115T093800Z-761b3d19,between_pass_range_f_y,"target (0.5, 0.85)",0.003183788204785057,iris feature f_y
+calibration_a_three_pass_static,ANNA,CALIBRATION_A,eval-20261115T093800Z-761b3d19,between_pass_range_f_x,"target (0.85, 0.85)",0.0026126798304692,iris feature f_x
+calibration_a_three_pass_static,ANNA,CALIBRATION_A,eval-20261115T093800Z-761b3d19,between_pass_range_f_y,"target (0.85, 0.85)",0.0037677493569839154,iris feature f_y
+calibration_a_three_pass_static,ANNA,CALIBRATION_A,eval-20261115T093800Z-761b3d19,model_sensitivity,x per f_x,-16.006942280569177,"normalized screen units per unit of the feature (linear output, before the clamp)"
+calibration_a_three_pass_static,ANNA,CALIBRATION_A,eval-20261115T093800Z-761b3d19,model_sensitivity,x per f_y,-15.848766459249848,"normalized screen units per unit of the feature (linear output, before the clamp)"
+calibration_a_three_pass_static,ANNA,CALIBRATION_A,eval-20261115T093800Z-761b3d19,model_sensitivity,y per f_x,-0.36050630683737084,"normalized screen units per unit of the feature (linear output, before the clamp)"
+calibration_a_three_pass_static,ANNA,CALIBRATION_A,eval-20261115T093800Z-761b3d19,model_sensitivity,y per f_y,30.957313048022353,"normalized screen units per unit of the feature (linear output, before the clamp)"
+calibration_a_three_pass_static,ANNA,CALIBRATION_A,eval-20261115T093800Z-761b3d19,fit_error_diagnostic,all anchors,0.14129758906079565,RMS residual of the fit inputs (not gaze accuracy)

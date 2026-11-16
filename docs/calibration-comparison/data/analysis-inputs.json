@@ -1,0 +1,36 @@
+{
+  "manifest_schema_version": 1,
+  "purpose": "Session selection for the candidate A analysis and figures (protocol notouch-calibration-comparison-eval 1.0.0, log schema 4). Selection is by unique session_id. Labels are recorded exactly as in metadata.json and are not renamed.",
+  "selection_rule": "Decided from metadata.json, SHA256SUMS and the import result only, before any metric was computed: include every candidate A session that is complete (final_state complete, 3/3 blocks, 96/96 presentations), finalized with verified device checksums and recorded in blind_measurement mode from a clean build. Accuracy, availability and verdicts play no part in selection. Official status is not changed by selection: the analyzer applies the protocol's rule and every report states it.",
+  "raw_root": "docs/calibration-comparison/data/raw",
+  "frozen_inputs": "docs/calibration-comparison/data/raw-inputs.sha256",
+  "included": [
+    {
+      "participant_id": "ANNA",
+      "session_label": "CALIBRATION_A",
+      "session_id": "eval-20261115T093800Z-761b3d19",
+      "calibration_id": "calibration_a_three_pass_static",
+      "raw_path": "docs/calibration-comparison/data/raw/calibration_a_three_pass_static/ANNA/eval-20261115T093800Z-761b3d19",
+      "designation": "complete, not official",
+      "official": false,
+      "official_status_reason": "The recorded label CALIBRATION_A is not in the protocol's collection plan (official candidate A sessions are ANNA / A1 with order nhl and ANNA / A2 with order lhn). The predeclared rule makes sessions outside the plan non-official; the label is kept as recorded. Its block order (nhl) matches the planned A1 order.",
+      "reason": "Complete blind_measurement session (3/3 blocks, 96/96 presentations, end_reason completed) after a fresh 27-anchor candidate A calibration (serial 1, 0 sessions before), build f3b224c4801570c57a192d354eb848b30c90b3c3 with git_dirty_at_build false, device checksums verified on export and import, 0 logging rows lost. The only complete candidate A session recorded."
+    }
+  ],
+  "excluded": [],
+  "pilot_sessions": [],
+  "incomplete_sessions": [],
+  "export_provenance": {
+    "archive": "C:\\Users\\user\\Desktop\\calibartion\\phone-exports\\export-20261115T094943Z.tar",
+    "archive_sha256": "72ee0a3ae98858eb04dd3d2b3948b993a5548241aca8c621ebe33bf8cd52e18d",
+    "exported_utc": "2026-11-15T09:49:43Z",
+    "sessions_in_export": ["ANNA/eval-20261115T093800Z-761b3d19"],
+    "phone": "Samsung SM-S918N (serial R3CW80G6PGW); recordings left on the phone"
+  },
+  "never_included": [
+    "Technical-pilot sessions (participant IDs starting with PILOT, stored under data/pilot/); none were recorded",
+    "Candidate B sessions (separate compatibility group; none recorded)",
+    "Iteration 3 sessions (schema 3, another application base)",
+    "Synthetic fixtures (tools/testdata/ and test-generated sessions)"
+  ]
+}

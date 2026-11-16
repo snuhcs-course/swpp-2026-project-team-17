@@ -1,0 +1,4 @@
+calibration_id,participant_id,session_label,session_id,block_index,head_position,valid_measurement_samples,linear_x_below_0_left,linear_x_above_1_right,linear_y_below_0_top,linear_y_above_1_bottom,any_axis_outside
+calibration_a_three_pass_static,ANNA,CALIBRATION_A_final,eval-20261115T130702Z-4ee40520,1,neutral,550,0,0,51,1,52
+calibration_a_three_pass_static,ANNA,CALIBRATION_A_final,eval-20261115T130702Z-4ee40520,2,higher,557,0,32,0,498,498
+calibration_a_three_pass_static,ANNA,CALIBRATION_A_final,eval-20261115T130702Z-4ee40520,3,lower,0,0,0,0,0,0

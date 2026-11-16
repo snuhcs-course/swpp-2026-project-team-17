@@ -1,0 +1,22 @@
+{
+  "tool": "EvaluationReplay",
+  "tool_version": "1.0.0",
+  "pipeline_variant": "home_screen_gaze_pipeline_e8fa01e",
+  "scope": "numerical gaze module only (GazeModel.fit/predict + GazePipeline.process); not camera, detection or latency",
+  "tolerance": "none: logged and replayed values are compared as exact Double.toString strings",
+  "session_id": "eval-20261115T093800Z-761b3d19",
+  "participant_id": "ANNA",
+  "calibration_id": "calibration_a_three_pass_static",
+  "ok": true,
+  "parameters_match": true,
+  "parameter_differences": [],
+  "attempt_rows": 3738,
+  "processed_replayed": 3736,
+  "not_processed_by_outcome": {
+    "discarded_block_start": 2
+  },
+  "resets_applied": 4,
+  "mismatch_count": 0,
+  "mismatches": [],
+  "errors": []
+}

@@ -1,0 +1,55 @@
+{
+  "manifest_schema_version": 1,
+  "purpose": "Session selection for the candidate A final-collection analysis and figures (protocol notouch-calibration-comparison-eval 1.0.0, log schema 4). Selection is by unique session_id. Labels are recorded exactly as in metadata.json and are not renamed. The earlier exploratory collection keeps its own selection (analysis-inputs.json), frozen list (raw-inputs.sha256), outputs (data/derived/) and figures (figures/draft/) and is not part of this scope.",
+  "collection": "final (second candidate A collection, exported 2026-11-15T13:14:03Z)",
+  "selection_rule": "Decided from metadata.json, SHA256SUMS, the export inventory and the import result only, before any metric was computed: include every candidate A session of the final collection (every session in the export other than the exploratory session eval-20261115T093800Z-761b3d19) that is complete (final_state complete, 3/3 blocks, 96/96 presentations), finalized with verified device checksums and recorded in blind_measurement mode from a clean build. Accuracy, availability and verdicts play no part in selection. Official status is not changed by selection: the analyzer applies the protocol's unchanged rule and every report states it.",
+  "raw_root": "docs/calibration-comparison/data/raw",
+  "frozen_inputs": "docs/calibration-comparison/data/raw-inputs-final.sha256",
+  "previous_frozen_inputs": "docs/calibration-comparison/data/raw-inputs.sha256 (exploratory scope; kept unchanged: its 5 files still match, and it reports the 5 files added by this import as additions)",
+  "derived_outputs": "docs/calibration-comparison/data/derived-final",
+  "figures": "docs/calibration-comparison/figures/final",
+  "included": [
+    {
+      "participant_id": "ANNA",
+      "session_label": "CALIBRATION_A_final",
+      "session_id": "eval-20261115T130702Z-4ee40520",
+      "calibration_id": "calibration_a_three_pass_static",
+      "raw_path": "docs/calibration-comparison/data/raw/calibration_a_three_pass_static/ANNA/eval-20261115T130702Z-4ee40520",
+      "designation": "complete, not official",
+      "official": false,
+      "official_status_reason": "The recorded label CALIBRATION_A_final is not in the protocol's collection plan (official candidate A sessions are ANNA / A1 with order nhl and ANNA / A2 with order lhn). The predeclared rule makes sessions outside the plan non-official; the label is kept as recorded and the protocol is not changed. Its block order (nhl) matches the planned A1 order.",
+      "reason": "Complete blind_measurement session (3/3 blocks, 96/96 presentations, end_reason completed) after a fresh 27-anchor candidate A calibration (calibration serial 3, 0 sessions before on it, refit verified), build f3b224c4801570c57a192d354eb848b30c90b3c3 with git_dirty_at_build false, device checksums verified on export and import, 0 logging rows lost. The only new recording in the export."
+    }
+  ],
+  "excluded": [
+    {
+      "participant_id": "ANNA",
+      "session_label": "CALIBRATION_A",
+      "session_id": "eval-20261115T093800Z-761b3d19",
+      "calibration_id": "calibration_a_three_pass_static",
+      "raw_path": "docs/calibration-comparison/data/raw/calibration_a_three_pass_static/ANNA/eval-20261115T093800Z-761b3d19",
+      "designation": "complete, not official",
+      "reason": "First, exploratory collection (exported 2026-11-15T09:49:43Z). Excluded by collection scope, not by its results: it remains draft evidence with its own selection, outputs and figures and is never combined with the final collection."
+    }
+  ],
+  "pilot_sessions": [],
+  "incomplete_sessions": [],
+  "export_provenance": {
+    "archive": "C:\\Users\\user\\Desktop\\calibartion\\phone-exports\\final-collection-20261115T131403Z\\export-20261115T131403Z.tar",
+    "archive_sha256": "96fba9ccbc84dae7c28b8f404ad0b095ffada05aafd6edce38eb10fa73cda72a",
+    "exported_utc": "2026-11-15T13:14:03Z",
+    "sessions_in_export": [
+      "ANNA/eval-20261115T093800Z-761b3d19",
+      "ANNA/eval-20261115T130702Z-4ee40520"
+    ],
+    "temporary_or_unfinalized_files_in_export": [],
+    "phone": "Samsung SM-S918N (serial R3CW80G6PGW); recordings left on the phone"
+  },
+  "never_included": [
+    "The exploratory session eval-20261115T093800Z-761b3d19 (separate scope; see excluded)",
+    "Technical-pilot sessions (participant IDs starting with PILOT, stored under data/pilot/); none were recorded",
+    "Candidate B sessions (separate compatibility group; none recorded)",
+    "Iteration 3 sessions (schema 3, another application base)",
+    "Synthetic fixtures (tools/testdata/ and test-generated sessions)"
+  ]
+}

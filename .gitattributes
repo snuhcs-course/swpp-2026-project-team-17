@@ -6,4 +6,10 @@ gradlew text eol=lf
 # Calibration-comparison evaluation data and fixtures: stored byte for byte (checksums are computed on the phone).
 docs/calibration-comparison/data/raw/** -text
 docs/calibration-comparison/data/derived/** -text
+docs/calibration-comparison/data/derived-final/** -text
 docs/calibration-comparison/tools/testdata/** -text
+# Hashed selection/frozen-input manifests and figures keep their exact bytes on every OS (their checksums are recorded).
+docs/calibration-comparison/data/*.json text eol=lf
+docs/calibration-comparison/data/*.sha256 text eol=lf
+docs/calibration-comparison/figures/** -text
+docs/calibration-comparison/figures/**/*.png binary

@@ -1,0 +1,206 @@
+{
+  "tool": "calib_eval_figures",
+  "tool_version": "1.0.0",
+  "adapted_from": "tools/gaze_eval/gaze_eval_figures.py 1.0.0 at 72411ec35d5d6e9547c322de3d7a14e65812b82e",
+  "versions": {
+    "python": "3.14.6",
+    "matplotlib": "3.11.2",
+    "numpy": "2.5.4"
+  },
+  "inputs": {
+    "summary": {
+      "path": "docs/calibration-comparison/data/derived/summary.json",
+      "sha256": "a1dcf381bc044fd5283e10f42975f533a0b27ba2259c0e2bb6191cb9cdbe93c1",
+      "analyzer_version": "1.0.0",
+      "source_label": "ANNA CALIBRATION_A eval-20261115T093800Z-761b3d19 (complete, not official), build f3b224c4801570c57a192d354eb848b30c90b3c3, selection analysis-inputs.json",
+      "measured_coordinate": "smoothed_x_norm/smoothed_y_norm: GazePipeline's smoothed output, which inherits GazeModel's [0, 1] clamp (not an unclamped raw output)"
+    },
+    "selection": {
+      "path": "docs/calibration-comparison/data/analysis-inputs.json",
+      "sha256": "97ef705e2fc8fa1f80dc6d9d7cbe8bb63ac0cee57f7cbfca05260380c27b072a"
+    },
+    "protocol": {
+      "path": "docs/calibration-comparison/protocol.json",
+      "id": "notouch-calibration-comparison-eval",
+      "version": "1.0.0",
+      "sha256_lf": "651e4402c8208538ccca1d7e204141315e649c8f15cd3e835f795c689046c547"
+    },
+    "frozen_raw_inputs": "docs/calibration-comparison/data/raw-inputs.sha256"
+  },
+  "sessions": [
+    {
+      "calibration_id": "calibration_a_three_pass_static",
+      "participant_id": "ANNA",
+      "session_label": "CALIBRATION_A",
+      "session_id": "eval-20261115T093800Z-761b3d19",
+      "short_id": "761b3d19",
+      "start_wall_time_utc": "2026-11-15T09:38:00.179Z",
+      "mode": "blind_measurement",
+      "block_order": "nhl",
+      "official": false,
+      "official_exclusions": [
+        "ANNA / CALIBRATION_A is not in the collection plan"
+      ],
+      "designation": "Complete session, not official: ANNA / CALIBRATION_A is not in the collection plan",
+      "build": {
+        "git_commit": "f3b224c4801570c57a192d354eb848b30c90b3c3",
+        "git_dirty_at_build": "false",
+        "source_base": "e8fa01ef1e397f508aa5a3b3a595539b4ef4490a",
+        "source_base_is_ancestor": "true",
+        "evaluation_reference": "72411ec35d5d6e9547c322de3d7a14e65812b82e",
+        "build_type": "debug"
+      },
+      "calibration_inputs_sha256": "ad5c9fe9c73c410d91497184b07e5894fcd6ba5af3d96cb0b3b5dbe26fbf28c6",
+      "conditions": {
+        "viewing_distance_cm": 20.0,
+        "lighting": "room with normal light",
+        "glasses": "none",
+        "head_position_markers": "-",
+        "notes": "",
+        "head_positions": "instructed (neutral, slightly higher, slightly lower), not measured; face_x/face_y/scale are logged per attempt",
+        "declared": "entered by the operator before the session"
+      },
+      "raw_path": "calibration_a_three_pass_static/ANNA/eval-20261115T093800Z-761b3d19"
+    }
+  ],
+  "excluded": [],
+  "shared_scales": {
+    "error_axis_norm": [
+      0.0,
+      0.75
+    ],
+    "error_threshold_norm": 0.1,
+    "display": {
+      "identical": true,
+      "displays": [
+        {
+          "session_id": "eval-20261115T093800Z-761b3d19",
+          "width_px": 1080,
+          "height_px": 2316,
+          "rotation": 0
+        }
+      ]
+    }
+  },
+  "definitions": {
+    "gaze_map_estimate": "per block and target: equal-weight mean of the analyzer centroids (mean smoothed x, y of valid measurement samples) of its technically eligible presentations",
+    "target_error_bar": "analyzer presentation mean error: mean over valid measurement samples of sqrt((smoothed_x - target_x)^2 + (smoothed_y - target_y)^2); technically ineligible presentations are shown as N/A",
+    "measured_coordinate": "GazePipeline's smoothed output, which inherits GazeModel's [0, 1] clamp"
+  },
+  "outputs": {
+    "tables": [
+      "docs/calibration-comparison/data/derived/figure_presentations.csv",
+      "docs/calibration-comparison/data/derived/figure_target_centroids.csv"
+    ],
+    "figures": [
+      {
+        "path": "docs/calibration-comparison/figures/cand_a_anna_calibration_a_761b3d19_b1_neutral_gaze_map.svg",
+        "sha256": "e7ba34ef02accc5266b80b7583a5983b61f2e68a5093b12521cc2f7a3945da40",
+        "session_id": "eval-20261115T093800Z-761b3d19",
+        "block_index": 1,
+        "head_position": "neutral",
+        "figure": "gaze_map",
+        "designation": "not_official"
+      },
+      {
+        "path": "docs/calibration-comparison/figures/cand_a_anna_calibration_a_761b3d19_b1_neutral_gaze_map.png",
+        "sha256": "29ed26db0cf72e3ce62f051853133661b7d22ce4b535d1466c7b840d1480b832",
+        "session_id": "eval-20261115T093800Z-761b3d19",
+        "block_index": 1,
+        "head_position": "neutral",
+        "figure": "gaze_map",
+        "designation": "not_official"
+      },
+      {
+        "path": "docs/calibration-comparison/figures/cand_a_anna_calibration_a_761b3d19_b1_neutral_target_error.svg",
+        "sha256": "7ccd8d4e3c38780ae4619e61d207e44173b629a6a9d25d81621366a27b5fa7f7",
+        "session_id": "eval-20261115T093800Z-761b3d19",
+        "block_index": 1,
+        "head_position": "neutral",
+        "figure": "target_error",
+        "designation": "not_official"
+      },
+      {
+        "path": "docs/calibration-comparison/figures/cand_a_anna_calibration_a_761b3d19_b1_neutral_target_error.png",
+        "sha256": "c3131ae6e0e0914577ff963350ecc923d77debe79d93fb82ff6af1f615fc96f4",
+        "session_id": "eval-20261115T093800Z-761b3d19",
+        "block_index": 1,
+        "head_position": "neutral",
+        "figure": "target_error",
+        "designation": "not_official"
+      },
+      {
+        "path": "docs/calibration-comparison/figures/cand_a_anna_calibration_a_761b3d19_b2_higher_gaze_map.svg",
+        "sha256": "cd2049b05e95e4f9fb8b39bad5cd1d95a32980435fb482eee599fee3a2cf2533",
+        "session_id": "eval-20261115T093800Z-761b3d19",
+        "block_index": 2,
+        "head_position": "higher",
+        "figure": "gaze_map",
+        "designation": "not_official"
+      },
+      {
+        "path": "docs/calibration-comparison/figures/cand_a_anna_calibration_a_761b3d19_b2_higher_gaze_map.png",
+        "sha256": "f1cbd08a71a8023a12b608c5ef73159fc090ef1741a9f6206e8b5b017c5279b8",
+        "session_id": "eval-20261115T093800Z-761b3d19",
+        "block_index": 2,
+        "head_position": "higher",
+        "figure": "gaze_map",
+        "designation": "not_official"
+      },
+      {
+        "path": "docs/calibration-comparison/figures/cand_a_anna_calibration_a_761b3d19_b2_higher_target_error.svg",
+        "sha256": "77e6fefe345ebe959b48ab825a45d1a4b0bc990c3491b19c485efc4ca155e979",
+        "session_id": "eval-20261115T093800Z-761b3d19",
+        "block_index": 2,
+        "head_position": "higher",
+        "figure": "target_error",
+        "designation": "not_official"
+      },
+      {
+        "path": "docs/calibration-comparison/figures/cand_a_anna_calibration_a_761b3d19_b2_higher_target_error.png",
+        "sha256": "18478237b3fde69311f677960d98e26f35bd6ead9ccb4f636c176cc43accba3c",
+        "session_id": "eval-20261115T093800Z-761b3d19",
+        "block_index": 2,
+        "head_position": "higher",
+        "figure": "target_error",
+        "designation": "not_official"
+      },
+      {
+        "path": "docs/calibration-comparison/figures/cand_a_anna_calibration_a_761b3d19_b3_lower_gaze_map.svg",
+        "sha256": "179f7ce70adc6db82b887af01fa1734a193d04dc7a6a1452d7859672775f3cd7",
+        "session_id": "eval-20261115T093800Z-761b3d19",
+        "block_index": 3,
+        "head_position": "lower",
+        "figure": "gaze_map",
+        "designation": "not_official"
+      },
+      {
+        "path": "docs/calibration-comparison/figures/cand_a_anna_calibration_a_761b3d19_b3_lower_gaze_map.png",
+        "sha256": "8a0cd3adbe171fd11c53e203d1790e7b932bcb8d14473d9a047c4021b67f2b0c",
+        "session_id": "eval-20261115T093800Z-761b3d19",
+        "block_index": 3,
+        "head_position": "lower",
+        "figure": "gaze_map",
+        "designation": "not_official"
+      },
+      {
+        "path": "docs/calibration-comparison/figures/cand_a_anna_calibration_a_761b3d19_b3_lower_target_error.svg",
+        "sha256": "08de2f2595d211ab0f72e6b5ca0e9101f6e909b606a24eaf61e1c3cb7af37646",
+        "session_id": "eval-20261115T093800Z-761b3d19",
+        "block_index": 3,
+        "head_position": "lower",
+        "figure": "target_error",
+        "designation": "not_official"
+      },
+      {
+        "path": "docs/calibration-comparison/figures/cand_a_anna_calibration_a_761b3d19_b3_lower_target_error.png",
+        "sha256": "f7074ce7388904b9776ae184501855142312b85a74028a1a0261305ce15506a0",
+        "session_id": "eval-20261115T093800Z-761b3d19",
+        "block_index": 3,
+        "head_position": "lower",
+        "figure": "target_error",
+        "designation": "not_official"
+      }
+    ]
+  }
+}

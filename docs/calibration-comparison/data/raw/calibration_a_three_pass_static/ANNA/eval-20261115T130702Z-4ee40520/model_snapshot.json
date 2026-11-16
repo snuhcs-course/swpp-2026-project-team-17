@@ -1,0 +1,472 @@
+{
+  "snapshot_schema_version": 2,
+  "pipeline_variant": "home_screen_gaze_pipeline_e8fa01e",
+  "calibration_id": "calibration_a_three_pass_static",
+  "predictor_kind": "GazeModel",
+  "calibration_serial": 3,
+  "calibration_timing": {
+    "started_uptime_ms": 71103917,
+    "completed_uptime_ms": 71193132,
+    "duration_ms": 89215,
+    "movement_retries": 0
+  },
+  "calibration_basis": {
+    "width_px": 1080,
+    "height_px": 2316,
+    "rotation": 0,
+    "view_left_px": 0,
+    "view_top_px": 0,
+    "view_width_px": 1080,
+    "view_height_px": 2316
+  },
+  "calibration_inputs_sha256": "c0ad406ed52802da3cd19a46b85de726d0e3f62f02972bb3bfacce5a0f4bb4bc",
+  "anchors": [
+    {
+      "pass": 1,
+      "point": 1,
+      "calibration_position": "same",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 71106833,
+      "eye": {
+        "x": 0.027570455318012374,
+        "y": -0.06335216722969912,
+        "face_x": 0.5251128077507019,
+        "face_y": 0.7592436671257019,
+        "scale": 0.2049724371032927
+      },
+      "x": 0.5,
+      "y": 0.5
+    },
+    {
+      "pass": 1,
+      "point": 2,
+      "calibration_position": "same",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 71109585,
+      "eye": {
+        "x": 0.03577946191489548,
+        "y": -0.07791965184886551,
+        "face_x": 0.5252254605293274,
+        "face_y": 0.7607622742652893,
+        "scale": 0.2063478813839433
+      },
+      "x": 0.15,
+      "y": 0.15
+    },
+    {
+      "pass": 1,
+      "point": 3,
+      "calibration_position": "same",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 71112441,
+      "eye": {
+        "x": 0.029099356026609756,
+        "y": -0.07775692885368762,
+        "face_x": 0.5244959592819214,
+        "face_y": 0.7614107728004456,
+        "scale": 0.2067901701264591
+      },
+      "x": 0.5,
+      "y": 0.15
+    },
+    {
+      "pass": 1,
+      "point": 4,
+      "calibration_position": "same",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 71115392,
+      "eye": {
+        "x": 0.009355812552092016,
+        "y": -0.07728090488615103,
+        "face_x": 0.5238835215568542,
+        "face_y": 0.7620471119880676,
+        "scale": 0.20696109425193798
+      },
+      "x": 0.85,
+      "y": 0.15
+    },
+    {
+      "pass": 1,
+      "point": 5,
+      "calibration_position": "same",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 71120249,
+      "eye": {
+        "x": 0.013070645468946228,
+        "y": -0.06336353734916339,
+        "face_x": 0.5218048095703125,
+        "face_y": 0.7606111764907837,
+        "scale": 0.20464307446244512
+      },
+      "x": 0.85,
+      "y": 0.5
+    },
+    {
+      "pass": 1,
+      "point": 6,
+      "calibration_position": "same",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 71123018,
+      "eye": {
+        "x": 0.007919590931762657,
+        "y": -0.05472108815663666,
+        "face_x": 0.5212224721908569,
+        "face_y": 0.7599945664405823,
+        "scale": 0.20249153168188994
+      },
+      "x": 0.85,
+      "y": 0.85
+    },
+    {
+      "pass": 1,
+      "point": 7,
+      "calibration_position": "same",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 71125845,
+      "eye": {
+        "x": 0.0178157084971753,
+        "y": -0.053760302549116026,
+        "face_x": 0.5224372148513794,
+        "face_y": 0.7609919309616089,
+        "scale": 0.20216673625580311
+      },
+      "x": 0.5,
+      "y": 0.85
+    },
+    {
+      "pass": 1,
+      "point": 8,
+      "calibration_position": "same",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 71128651,
+      "eye": {
+        "x": 0.03954553594389386,
+        "y": -0.05189243254342268,
+        "face_x": 0.5217651128768921,
+        "face_y": 0.7620683908462524,
+        "scale": 0.20211387001533132
+      },
+      "x": 0.15,
+      "y": 0.85
+    },
+    {
+      "pass": 1,
+      "point": 9,
+      "calibration_position": "same",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 71131526,
+      "eye": {
+        "x": 0.04915380176324684,
+        "y": -0.06486994892716938,
+        "face_x": 0.521262526512146,
+        "face_y": 0.7624310255050659,
+        "scale": 0.20493748488722796
+      },
+      "x": 0.15,
+      "y": 0.5
+    },
+    {
+      "pass": 2,
+      "point": 1,
+      "calibration_position": "same",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 71137426,
+      "eye": {
+        "x": 0.028485709527978024,
+        "y": -0.05920352756373765,
+        "face_x": 0.5204978585243225,
+        "face_y": 0.7633561491966248,
+        "scale": 0.20444517469171558
+      },
+      "x": 0.5,
+      "y": 0.5
+    },
+    {
+      "pass": 2,
+      "point": 2,
+      "calibration_position": "same",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 71140290,
+      "eye": {
+        "x": 0.038852746665772736,
+        "y": -0.07886118691852165,
+        "face_x": 0.5205864310264587,
+        "face_y": 0.7637605667114258,
+        "scale": 0.20550369729077475
+      },
+      "x": 0.15,
+      "y": 0.15
+    },
+    {
+      "pass": 2,
+      "point": 3,
+      "calibration_position": "same",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 71143091,
+      "eye": {
+        "x": 0.034002883481260016,
+        "y": -0.07757753388317246,
+        "face_x": 0.5204334855079651,
+        "face_y": 0.7643065452575684,
+        "scale": 0.20697073924039158
+      },
+      "x": 0.5,
+      "y": 0.15
+    },
+    {
+      "pass": 2,
+      "point": 4,
+      "calibration_position": "same",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 71145938,
+      "eye": {
+        "x": 0.015365476262227791,
+        "y": -0.07693490180408366,
+        "face_x": 0.5204359889030457,
+        "face_y": 0.7640155553817749,
+        "scale": 0.20666119203449976
+      },
+      "x": 0.85,
+      "y": 0.15
+    },
+    {
+      "pass": 2,
+      "point": 5,
+      "calibration_position": "same",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 71150872,
+      "eye": {
+        "x": 0.011387393472646008,
+        "y": -0.06275710567047095,
+        "face_x": 0.5192214846611023,
+        "face_y": 0.7648133039474487,
+        "scale": 0.20473500391151678
+      },
+      "x": 0.85,
+      "y": 0.5
+    },
+    {
+      "pass": 2,
+      "point": 6,
+      "calibration_position": "same",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 71153730,
+      "eye": {
+        "x": 0.014288283837947252,
+        "y": -0.05250375991739746,
+        "face_x": 0.5170120000839233,
+        "face_y": 0.7654696702957153,
+        "scale": 0.20258752083682743
+      },
+      "x": 0.85,
+      "y": 0.85
+    },
+    {
+      "pass": 2,
+      "point": 7,
+      "calibration_position": "same",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 71156542,
+      "eye": {
+        "x": 0.023623699067708705,
+        "y": -0.053588056800838585,
+        "face_x": 0.5175362229347229,
+        "face_y": 0.7660011649131775,
+        "scale": 0.20222609360107077
+      },
+      "x": 0.5,
+      "y": 0.85
+    },
+    {
+      "pass": 2,
+      "point": 8,
+      "calibration_position": "same",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 71159437,
+      "eye": {
+        "x": 0.03907363759718954,
+        "y": -0.05127971621541698,
+        "face_x": 0.5170999765396118,
+        "face_y": 0.7667746543884277,
+        "scale": 0.2011451446358169
+      },
+      "x": 0.15,
+      "y": 0.85
+    },
+    {
+      "pass": 2,
+      "point": 9,
+      "calibration_position": "same",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 71162288,
+      "eye": {
+        "x": 0.046213540386639745,
+        "y": -0.0664529358696449,
+        "face_x": 0.5147573947906494,
+        "face_y": 0.767758846282959,
+        "scale": 0.2038577644547851
+      },
+      "x": 0.15,
+      "y": 0.5
+    },
+    {
+      "pass": 3,
+      "point": 1,
+      "calibration_position": "same",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 71168200,
+      "eye": {
+        "x": 0.031850235517895904,
+        "y": -0.06653040765490469,
+        "face_x": 0.5130103230476379,
+        "face_y": 0.7682705521583557,
+        "scale": 0.2046661627670816
+      },
+      "x": 0.5,
+      "y": 0.5
+    },
+    {
+      "pass": 3,
+      "point": 2,
+      "calibration_position": "same",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 71171085,
+      "eye": {
+        "x": 0.045721405467901835,
+        "y": -0.07901787036066607,
+        "face_x": 0.5125771164894104,
+        "face_y": 0.7687631845474243,
+        "scale": 0.2064580929718931
+      },
+      "x": 0.15,
+      "y": 0.15
+    },
+    {
+      "pass": 3,
+      "point": 3,
+      "calibration_position": "same",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 71173985,
+      "eye": {
+        "x": 0.03547540463804674,
+        "y": -0.07556308703717982,
+        "face_x": 0.5118745565414429,
+        "face_y": 0.7684157490730286,
+        "scale": 0.20663529434160136
+      },
+      "x": 0.5,
+      "y": 0.15
+    },
+    {
+      "pass": 3,
+      "point": 4,
+      "calibration_position": "same",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 71176846,
+      "eye": {
+        "x": 0.02059497124233954,
+        "y": -0.07399457160633663,
+        "face_x": 0.5123708248138428,
+        "face_y": 0.7681361436843872,
+        "scale": 0.20673337211810958
+      },
+      "x": 0.85,
+      "y": 0.15
+    },
+    {
+      "pass": 3,
+      "point": 5,
+      "calibration_position": "same",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 71181697,
+      "eye": {
+        "x": 0.017594634339247725,
+        "y": -0.06288996032720598,
+        "face_x": 0.5098533034324646,
+        "face_y": 0.768987238407135,
+        "scale": 0.2042010358546247
+      },
+      "x": 0.85,
+      "y": 0.5
+    },
+    {
+      "pass": 3,
+      "point": 6,
+      "calibration_position": "same",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 71184657,
+      "eye": {
+        "x": 0.014918177646230692,
+        "y": -0.05572618605134458,
+        "face_x": 0.5090797543525696,
+        "face_y": 0.7698655128479004,
+        "scale": 0.20200274654371927
+      },
+      "x": 0.85,
+      "y": 0.85
+    },
+    {
+      "pass": 3,
+      "point": 7,
+      "calibration_position": "same",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 71187420,
+      "eye": {
+        "x": 0.0215755908920319,
+        "y": -0.055148966630231874,
+        "face_x": 0.508009672164917,
+        "face_y": 0.7700299024581909,
+        "scale": 0.201918036581296
+      },
+      "x": 0.5,
+      "y": 0.85
+    },
+    {
+      "pass": 3,
+      "point": 8,
+      "calibration_position": "same",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 71190315,
+      "eye": {
+        "x": 0.044247222323871634,
+        "y": -0.054649559713211955,
+        "face_x": 0.5077378153800964,
+        "face_y": 0.7714971899986267,
+        "scale": 0.20095808353274544
+      },
+      "x": 0.15,
+      "y": 0.85
+    },
+    {
+      "pass": 3,
+      "point": 9,
+      "calibration_position": "same",
+      "movement_retries": 0,
+      "accepted_uptime_ms": 71193132,
+      "eye": {
+        "x": 0.04445475129401958,
+        "y": -0.06769967985415479,
+        "face_x": 0.5074762105941772,
+        "face_y": 0.7714444398880005,
+        "scale": 0.20390461476807661
+      },
+      "x": 0.15,
+      "y": 0.5
+    }
+  ],
+  "parameters": {
+    "mean_x": 0.028038375262132955,
+    "mean_y": -0.06501096208231229,
+    "std_x": 0.012570206871438316,
+    "std_y": 0.009796193761096734,
+    "wx": [0.5000000000000002, -0.2730536572068441, -0.03539265780711633],
+    "wy": [0.5000000000000003, 0.011065136376567544, 0.28184273379172364],
+    "reference_x": 0.028038375262132955,
+    "reference_y": -0.06501096208231229,
+    "reference_face_x": 0.5172881594410649,
+    "reference_face_y": 0.76523064021711,
+    "reference_scale": 0.2043345944572177,
+    "fit_error": 0.11172230623331207
+  },
+  "replay_note": "Replay refits GazeModel.fit on the 27 anchors in this order and requires every parameter to match exactly."
+}

@@ -1,0 +1,253 @@
+{
+  "schema_version": 4,
+  "record_type": "notouch_calibration_comparison_session",
+  "session_id": "eval-20261115T093800Z-761b3d19",
+  "participant_id": "ANNA",
+  "session_label": "CALIBRATION_A",
+  "mode": "blind_measurement",
+  "final_state": "complete",
+  "end_reason": "completed",
+  "start_wall_time_utc": "2026-11-15T09:38:00.179Z",
+  "end_wall_time_utc": "2026-11-15T09:43:22.914Z",
+  "start_uptime_ms": 61770640,
+  "end_uptime_ms": 62093290,
+  "planned_end_uptime_ms": 62093290,
+  "protocol": {
+    "id": "notouch-calibration-comparison-eval",
+    "version": "1.0.0",
+    "sha256": "651e4402c8208538ccca1d7e204141315e649c8f15cd3e835f795c689046c547",
+    "sha256_basis": "docs/calibration-comparison/protocol.json bytes with CRLF converted to LF",
+    "grid_norm": [0.2, 0.4, 0.6, 0.8],
+    "presentation_ms": 2500,
+    "settling_ms": 1000,
+    "measurement_ms": 1500,
+    "presentations_per_block": 32,
+    "blocks_planned": 3,
+    "countdown_ms": 3000,
+    "session_start_lead_ms": 100,
+    "block_order": "nhl",
+    "block_positions": ["neutral", "higher", "lower"],
+    "case_suffixes": ["pass1-r0c0", "pass1-r0c1", "pass1-r0c2", "pass1-r0c3", "pass1-r1c3", "pass1-r1c2", "pass1-r1c1", "pass1-r1c0", "pass1-r2c0", "pass1-r2c1", "pass1-r2c2", "pass1-r2c3", "pass1-r3c3", "pass1-r3c2", "pass1-r3c1", "pass1-r3c0", "pass2-r3c0", "pass2-r3c1", "pass2-r3c2", "pass2-r3c3", "pass2-r2c3", "pass2-r2c2", "pass2-r2c1", "pass2-r2c0", "pass2-r1c0", "pass2-r1c1", "pass2-r1c2", "pass2-r1c3", "pass2-r0c3", "pass2-r0c2", "pass2-r0c1", "pass2-r0c0"],
+    "blocks_completed": 3,
+    "presentations_completed": 96
+  },
+  "blocks": [
+    {
+      "block_index": 1,
+      "head_position": "neutral",
+      "case_id_prefix": "neutral-",
+      "preparation_start_uptime_ms": 61770640,
+      "preparation_shown_uptime_ms": 61770650,
+      "ready_uptime_ms": 61784481,
+      "preparation_ms": 13841,
+      "countdown_ms": 3000,
+      "block_start_uptime_ms": 61787481,
+      "planned_block_end_uptime_ms": 61867481,
+      "block_reset_uptime_ms": 61787485,
+      "presentations_planned": 32,
+      "presentations_completed": 32,
+      "state": "complete"
+    },
+    {
+      "block_index": 2,
+      "head_position": "higher",
+      "case_id_prefix": "higher-",
+      "preparation_start_uptime_ms": 61867481,
+      "preparation_shown_uptime_ms": 61867491,
+      "ready_uptime_ms": 61887855,
+      "preparation_ms": 20374,
+      "countdown_ms": 3000,
+      "block_start_uptime_ms": 61890855,
+      "planned_block_end_uptime_ms": 61970855,
+      "block_reset_uptime_ms": 61890859,
+      "presentations_planned": 32,
+      "presentations_completed": 32,
+      "state": "complete"
+    },
+    {
+      "block_index": 3,
+      "head_position": "lower",
+      "case_id_prefix": "lower-",
+      "preparation_start_uptime_ms": 61970855,
+      "preparation_shown_uptime_ms": 61970865,
+      "ready_uptime_ms": 62010290,
+      "preparation_ms": 39435,
+      "countdown_ms": 3000,
+      "block_start_uptime_ms": 62013290,
+      "planned_block_end_uptime_ms": 62093290,
+      "block_reset_uptime_ms": 62013301,
+      "presentations_planned": 32,
+      "presentations_completed": 32,
+      "state": "complete"
+    }
+  ],
+  "build": {
+    "git_commit": "f3b224c4801570c57a192d354eb848b30c90b3c3",
+    "git_dirty_at_build": "false",
+    "source_base": "e8fa01ef1e397f508aa5a3b3a595539b4ef4490a",
+    "source_base_is_ancestor": "true",
+    "evaluation_reference": "72411ec35d5d6e9547c322de3d7a14e65812b82e",
+    "build_type": "debug"
+  },
+  "app": {
+    "application_id": "dev.gazedot",
+    "version_name": "0.1.0",
+    "version_code": 1
+  },
+  "libraries": {
+    "mediapipe_tasks_vision": "0.10.26",
+    "camerax": "1.4.2",
+    "face_landmarker_task_sha256": "64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff"
+  },
+  "device": {
+    "manufacturer": "samsung",
+    "model": "SM-S918N",
+    "api_level": 36,
+    "android_release": "16"
+  },
+  "display": {
+    "basis": "WindowManager.maximumWindowMetrics bounds (calibration basis)",
+    "width_px": 1080,
+    "height_px": 2316,
+    "rotation": 0,
+    "density": 2.8125,
+    "evaluation_view": {
+      "left_px": 0,
+      "top_px": 0,
+      "width_px": 1080,
+      "height_px": 2316
+    },
+    "calibration_view": {
+      "left_px": 0,
+      "top_px": 0,
+      "width_px": 1080,
+      "height_px": 2316
+    },
+    "overlay_view": {
+      "left_px": 0,
+      "top_px": 0,
+      "width_px": 1080,
+      "height_px": 2316
+    }
+  },
+  "calibration": {
+    "calibration_id": "calibration_a_three_pass_static",
+    "calibration_positions_by_pass": ["same", "same", "same"],
+    "calibration_serial": 1,
+    "started_uptime_ms": 61559655,
+    "completed_uptime_ms": 61648652,
+    "duration_ms": 88997,
+    "age_ms_at_session_start": 121988,
+    "movement_retries": 0,
+    "anchors": 27,
+    "passes": 3,
+    "points_per_pass": 9,
+    "calibration_inputs_sha256": "ad5c9fe9c73c410d91497184b07e5894fcd6ba5af3d96cb0b3b5dbe26fbf28c6",
+    "fit_error": 0.14129758906079565,
+    "fit_error_note": "calibration diagnostic (RMS residual of the fit inputs); not a measured gaze accuracy",
+    "verified_snapshot_refit": true,
+    "evaluation_sessions_on_this_calibration_before": 0,
+    "snapshot_file": "model_snapshot.json"
+  },
+  "predictor": {
+    "kind": "GazeModel",
+    "calibration_id": "calibration_a_three_pass_static"
+  },
+  "conditions": {
+    "viewing_distance_cm": 20.0,
+    "lighting": "room with normal light",
+    "glasses": "none",
+    "head_position_markers": "-",
+    "notes": "",
+    "head_positions": "instructed (neutral, slightly higher, slightly lower), not measured; face_x/face_y/scale are logged per attempt",
+    "declared": "entered by the operator before the session"
+  },
+  "pipeline": {
+    "variant": "home_screen_gaze_pipeline_e8fa01e",
+    "frame_interval_min_ms": 66,
+    "delayed_result_rule": "results handled more than 250 ms after acceptance are dropped and reset the pipeline",
+    "stale_rule": "GazePipeline.process marks a timestamp older than 250 ms, in the future or not increasing as stale and resets",
+    "watchdog_no_result_ms": 800,
+    "model_clamp": "GazeModel.predict clamps each axis to [0, 1]",
+    "smoothing": "GazePipeline: s + 0.28 * (p - s) per axis; cleared by a null prediction, a gap over 250 ms, a stale result, a model change and every pipeline reset",
+    "reset_policy": "pipeline reset at session start and at each block start (first main-thread moment at or after it); results accepted before a block start and handled after it are dropped before smoothing",
+    "session_start_lead_ms": 100,
+    "pointer_visible": false,
+    "gaze_actions": "clicks, scrolling and dictation suppressed for the whole session (explicit guards)"
+  },
+  "coordinates": {
+    "frame": "full-display normalized: px / calibration basis (WindowManager.maximumWindowMetrics bounds); shared by calibration anchors, targets and predictions",
+    "linear": "GazeModel linear output before the model's own [0, 1] clamp; diagnostic only, never used by the app",
+    "predicted": "GazePipeline rawPoint: GazeModel.predict output, clamped to [0, 1] per axis by the model",
+    "smoothed": "GazePipeline point (0.28 exponential smoothing of predicted) supplied to TrackerState and the overlay; primary measured coordinate; inherits the model clamp",
+    "rendered": "screen px where DotOverlay draws the smoothed point; empty when the pointer is hidden"
+  },
+  "timing": {
+    "accepted_uptime_ms": "SystemClock.uptimeMillis when the camera worker accepted the frame; detectForVideo timestamp, GazePipeline timestamp and schedule key",
+    "handled_uptime_ms": "SystemClock.uptimeMillis passed to GazePipeline.process as its current time (main thread)",
+    "result_uptime_ms": "SystemClock.uptimeMillis when the main thread finished handling the result",
+    "landmarker_ms": "System.nanoTime duration of FaceLandmarker.detectForVideo only",
+    "delivery_ms": "System.nanoTime from posting the result on the worker to the main-thread handler starting",
+    "latency_ms": "System.nanoTime from frame acceptance to publication of the processed result, or to explicit discard"
+  },
+  "counters": {
+    "frames_received": 9426,
+    "frames_cadence_skipped": 5688,
+    "frames_ignored_service_closing": 0,
+    "attempts_accepted": 3738,
+    "attempts_recorded": 3738,
+    "attempts_unrecorded": 0,
+    "attempts_by_outcome": {
+      "processed": 3736,
+      "discarded_closing": 0,
+      "discarded_epoch": 0,
+      "discarded_delayed": 0,
+      "discarded_block_start": 2,
+      "discarded_model_changed": 0,
+      "processing_error": 0
+    },
+    "attempts_by_phase": {
+      "outside": 0,
+      "preparation": 853,
+      "countdown": 105,
+      "settling": 1120,
+      "measurement": 1660
+    },
+    "detector": {
+      "landmarker_not_ready": 0,
+      "no_face": 0,
+      "face_detected": 3738
+    },
+    "valid_attempts": 3264,
+    "invalid_by_reason": {
+      "closed": 28,
+      "discarded_block_start": 2,
+      "out_of_range": 429,
+      "uncertain": 15
+    },
+    "pipeline_resets": 4,
+    "pipeline_resets_by_reason": {
+      "block_start": 3,
+      "session_start": 1
+    },
+    "camera_errors": 0,
+    "unlogged_results_dropped_pre_session": 2,
+    "unlogged_results_dropped_in_session": 0
+  },
+  "logging": {
+    "attempt_rows_enqueued": 3738,
+    "attempt_rows_written": 3738,
+    "event_rows_enqueued": 12,
+    "event_rows_written": 12,
+    "rows_dropped_queue_full": 0,
+    "rows_dropped_write_error": 0,
+    "rows_lost_total": 0,
+    "write_error": false
+  },
+  "files": {
+    "attempts": "attempts.csv",
+    "events": "events.csv",
+    "model_snapshot": "model_snapshot.json",
+    "checksums": "SHA256SUMS"
+  }
+}
