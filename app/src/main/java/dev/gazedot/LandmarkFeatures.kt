@@ -24,6 +24,6 @@ object LandmarkFeatures {
         val scale = hypot((p[33].x() - p[263].x()).toDouble(),
             (p[33].y() - p[263].y()).toDouble() * height / width)
         return EyeFeatures((r.first + l.first) / 2, (r.second + l.second) / 2,
-            p[1].x().toDouble(), p[1].y().toDouble(), scale)
+            p[1].x().toDouble(), p[1].y().toDouble(), scale, l.first, l.second, r.first, r.second)
     }
 }

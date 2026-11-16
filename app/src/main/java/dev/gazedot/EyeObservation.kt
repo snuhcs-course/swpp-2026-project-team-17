@@ -22,8 +22,8 @@ object EyeObservations {
         val left = openness(362, 263, 386, 374)
         if (right == null || left == null) return EyeObservation(EyeState.LOST, null, 0.0, 0.0)
         val state = eyeState(left, right)
-        // Do not apply gesture thresholds to the legacy five-value gaze features.
-        return EyeObservation(state, LandmarkFeatures.extract(p, width, height), left, right)
+        // Partial closure can displace iris landmarks: never expose them as calibration/gaze samples.
+        return EyeObservation(state, if (state == EyeState.OPEN) LandmarkFeatures.extract(p, width, height) else null, left, right)
     }
     fun eyeState(leftOpen: Double, rightOpen: Double): EyeState = when {
         !leftOpen.isFinite() || !rightOpen.isFinite() -> EyeState.LOST

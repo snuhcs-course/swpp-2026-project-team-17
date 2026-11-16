@@ -373,7 +373,8 @@ class TrackingService : LifecycleService() {
         val state = TrackerState.currentStatus(now)
         val enabled = TrackerState.externalActionsAllowed() && !TrackerState.speaking
         val showPoint = TrackerState.controls && !TrackerState.collecting && !TrackerState.precisionTraining && !TrackerState.helpVisible &&
-            !TrackerState.recoveryOpening && state.phase == TrackingPhase.TRACKING
+            !TrackerState.recoveryOpening && TrackerState.sample?.point != null &&
+            TrackerState.sample?.quality in listOf(TrackingQuality.TRACKING, TrackingQuality.CLOSED, TrackingQuality.UNCERTAIN)
         overlay?.show(if (showPoint) TrackerState.sample?.point else null,
             if (enabled) TrackerState.sample?.dwellProgress ?: 0f else TrackerState.localDwellProgress,
             if (TrackerState.interactionAllowed) state.overlayMessage.ifBlank {

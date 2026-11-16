@@ -2,7 +2,8 @@ package dev.gazedot
 
 import kotlin.math.*
 
-data class EyeFeatures(val x: Double, val y: Double, val faceX: Double, val faceY: Double, val scale: Double)
+data class EyeFeatures(val x: Double, val y: Double, val faceX: Double, val faceY: Double, val scale: Double,
+    val leftX: Double = x, val leftY: Double = y, val rightX: Double = x, val rightY: Double = y)
 data class Anchor(val eye: EyeFeatures, val x: Double, val y: Double)
 
 /** Calibration maps iris displacement inside the eye to display coordinates.
@@ -14,24 +15,37 @@ class GazeModel private constructor(
     private val reference: EyeFeatures,
     val fitError: Double,
     val correction: ResidualCorrection? = null,
+    private val leftModel: GazeModel? = null, private val rightModel: GazeModel? = null,
 ) {
     fun predict(f: EyeFeatures): Pair<Double, Double>? {
         val p=predictUncorrected(f) ?: return null
         val corrected=correction?.apply(p.first,p.second) ?: p
         return corrected.first.coerceIn(0.0,1.0) to corrected.second.coerceIn(0.0,1.0)
     }
-    fun withCorrection(value: ResidualCorrection?) = GazeModel(meanX,meanY,stdX,stdY,wx,wy,reference,fitError,value)
+    fun withCorrection(value: ResidualCorrection?) = GazeModel(meanX,meanY,stdX,stdY,wx,wy,reference,fitError,value,leftModel,rightModel)
     fun predictUncorrected(f: EyeFeatures): Pair<Double, Double>? {
         if (!listOf(f.x, f.y, f.faceX, f.faceY, f.scale).all { it.isFinite() }) return null
         // A changed pose/distance invalidates this simple calibration. Do not invent a point.
         if (f.scale !in reference.scale * 0.72..reference.scale * 1.28 ||
             abs(f.faceX - reference.faceX) > 0.12 || abs(f.faceY - reference.faceY) > 0.12) return null
+        if (leftModel != null && rightModel != null) {
+            val left = leftModel.predictUncorrected(f.copy(x=f.leftX, y=f.leftY)) ?: return null
+            val right = rightModel.predictUncorrected(f.copy(x=f.rightX, y=f.rightY)) ?: return null
+            return (left.first+right.first)/2 to (left.second+right.second)/2
+        }
         val v = doubleArrayOf(1.0, (f.x - meanX) / stdX, (f.y - meanY) / stdY)
         return dot(wx, v) to dot(wy, v)
     }
 
     companion object {
         fun fit(anchors: List<Anchor>): GazeModel? {
+            val base = fitSingle(anchors) ?: return null
+            val left = fitSingle(anchors.map { it.copy(eye=it.eye.copy(x=it.eye.leftX,y=it.eye.leftY)) }) ?: return null
+            val right = fitSingle(anchors.map { it.copy(eye=it.eye.copy(x=it.eye.rightX,y=it.eye.rightY)) }) ?: return null
+            return GazeModel(base.meanX,base.meanY,base.stdX,base.stdY,base.wx,base.wy,base.reference,
+                maxOf(base.fitError,left.fitError,right.fitError),leftModel=left,rightModel=right)
+        }
+        private fun fitSingle(anchors: List<Anchor>): GazeModel? {
             if (anchors.size < 5 || anchors.any { a ->
                 !listOf(a.eye.x, a.eye.y, a.eye.faceX, a.eye.faceY, a.eye.scale, a.x, a.y).all { it.isFinite() }
             }) return null
@@ -75,5 +89,6 @@ class GazeModel private constructor(
 
 fun medianFeatures(samples: List<EyeFeatures>): EyeFeatures {
     fun median(selector: (EyeFeatures) -> Double): Double = samples.map(selector).sorted()[samples.size / 2]
-    return EyeFeatures(median { it.x }, median { it.y }, median { it.faceX }, median { it.faceY }, median { it.scale })
+    return EyeFeatures(median { it.x }, median { it.y }, median { it.faceX }, median { it.faceY }, median { it.scale },
+        median { it.leftX }, median { it.leftY }, median { it.rightX }, median { it.rightY })
 }
