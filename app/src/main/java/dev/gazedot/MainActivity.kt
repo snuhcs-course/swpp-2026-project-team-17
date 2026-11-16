@@ -127,6 +127,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun showHome() {
+        GazeDiagnostics.event("screen=home model=${if (TrackerState.model != null) "yes" else "no"} running=${TrackerState.running}")
         tutorial?.close()
         tutorial = null
         TrackerState.cancelActions?.invoke()
@@ -378,6 +379,7 @@ class MainActivity : ComponentActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         calibration = CalibrationView(session)
         setContentView(calibration)
+        GazeDiagnostics.event("screen=calibration session=$session id=${CalibrationPlan.ID}")
     }
 
     private inner class CalibrationView(private val session: Long) : View(this@MainActivity) {
@@ -426,6 +428,9 @@ class MainActivity : ComponentActivity() {
                 TrackerState.finishCalibration(session, model)
             }
             TrackerState.status = saved.exceptionOrNull()?.let { "보정 적용 실패: ${it.message}" } ?: message
+            // Keep the failure visible; the next frame's status would otherwise replace it at once.
+            if (!saved.getOrDefault(false)) TrackerState.calibrationFailed(TrackerState.status)
+            GazeDiagnostics.calibration(outcome, saved.getOrDefault(false))
             // Match the exact normalization dimensions used for the calibration anchors above.
             val bounds = DisplaySpace.bounds(this@MainActivity)
             if (saved.getOrDefault(false) && model != null) {
@@ -442,6 +447,7 @@ class MainActivity : ComponentActivity() {
                     onRecalibrate = { startCalibration() },
                     onFinished = { window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) })
                 setContentView(tutorial)
+                GazeDiagnostics.event("screen=tutorial")
             } else showHome()
         }
         override fun onDraw(canvas: Canvas) {

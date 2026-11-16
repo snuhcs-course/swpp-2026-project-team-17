@@ -100,6 +100,8 @@ internal class PostCalibrationTutorialView(
         if (closed || step !in listOf(Step.BUTTON, Step.SCROLL)) return
         val now = SystemClock.uptimeMillis()
         if (sample == null || now - sample.timestampMs !in 0..250 || !TrackerState.running) {
+            GazeDiagnostics.tutorial(now) { "tutorial step=$step frame_unusable sample=${sample != null} " +
+                "age_ms=${sample?.let { now - it.timestampMs }} running=${TrackerState.running}" }
             dwell.reset(); retryGesture.reset(); scrolling.reset()
             animation?.cancel(); animation = null
             TrackerState.localDwellProgress = 0f
@@ -135,6 +137,8 @@ internal class PostCalibrationTutorialView(
             TutorialButtonBounds(location[0], location[1], button.width, button.height)
                 .contains(gaze, displayWidth, displayHeight, rounded = false)
         val selected = dwell.update(inside, sample.timestampMs, now)
+        GazeDiagnostics.tutorial(now) { "tutorial step=$step quality=${sample.quality} point=${gaze?.let { "${it.x},${it.y}" } ?: "none"} " +
+            "inside_button=$inside dwell=${dwell.progress}" }
         TrackerState.localDwellProgress = dwell.progress
         button.setProgress(dwell.progress)
         if (selected) showStep(Step.SCROLL)

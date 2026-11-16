@@ -213,15 +213,7 @@ class TrackingService : LifecycleService() {
                 val sample = pipeline.process(now, at, observation, model, enabled,
                     ControlAccessibilityService.instance?.let { service -> { p -> service.dwellTargetKey(p) } })
                 sample.actions.forEach(::perform)
-                val message = when (sample.quality) {
-                    TrackingQuality.LOST -> "얼굴 검출 대기"
-                    TrackingQuality.CLOSED -> "눈 감김 감지"
-                    TrackingQuality.UNCERTAIN -> "눈 상태 확인 중"
-                    TrackingQuality.STALE -> "영상 처리가 지연됩니다 · 조작 일시 대기"
-                    TrackingQuality.OUT_OF_RANGE -> if (model == null) "눈 검출됨 · 9점 보정을 시작해 주세요"
-                        else "얼굴 위치가 달라졌습니다 · 원래 위치로 돌아오거나 재보정하세요"
-                    TrackingQuality.TRACKING -> "추적 중 · 홈으로 나가도 빨간 점이 표시됩니다"
-                }
+                val message = TrackerState.frameStatus(sample.quality, model != null)
                 val label = when {
                     TrackerState.collecting -> ""
                     EvaluationState.active -> ""
@@ -232,6 +224,11 @@ class TrackingService : LifecycleService() {
                 }
                 // Blind evaluation withholds the pointer from the participant; the coordinate itself is unchanged.
                 val visible = if (TrackerState.collecting || EvaluationState.hidesPointer) null else sample.point
+                GazeDiagnostics.live(at) {
+                    GazeDiagnostics.liveLine(sample, at - now, observation.state, model, visible != null, enabled,
+                        TrackerState.collecting, EvaluationState.mode, TrackerState.interactionAllowed,
+                        TrackerState.listener != null)
+                }
                 TrackerState.publishSample(sample, message)
                 // UI listeners may select Stop or start calibration while handling this frame.
                 if (!closing && TrackerState.running) overlay?.show(

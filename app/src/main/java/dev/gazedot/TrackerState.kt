@@ -46,6 +46,29 @@ object TrackerState {
     /** Set by TrackingService: on-screen origin and size of the pointer overlay view, or null. */
     var overlayBounds: (() -> IntArray?)? = null
 
+    /**
+     * Message of the last calibration attempt that ended without a new model. Shown by [frameStatus] while eyes are
+     * detected, until the next calibration starts or tracking stops, so the per-frame status cannot hide the failure.
+     */
+    var calibrationFailure: String? = null
+        private set
+    fun calibrationFailed(message: String) { calibrationFailure = message }
+
+    /** Status text for one processed frame (the per-frame messages of feature/home-screen, unchanged). */
+    fun frameStatus(quality: TrackingQuality, hasModel: Boolean): String {
+        val failure = calibrationFailure
+        if (failure != null && quality in listOf(TrackingQuality.TRACKING, TrackingQuality.OUT_OF_RANGE)) return failure
+        return when (quality) {
+            TrackingQuality.LOST -> "얼굴 검출 대기"
+            TrackingQuality.CLOSED -> "눈 감김 감지"
+            TrackingQuality.UNCERTAIN -> "눈 상태 확인 중"
+            TrackingQuality.STALE -> "영상 처리가 지연됩니다 · 조작 일시 대기"
+            TrackingQuality.OUT_OF_RANGE -> if (!hasModel) "눈 검출됨 · 9점 보정을 시작해 주세요"
+                else "얼굴 위치가 달라졌습니다 · 원래 위치로 돌아오거나 재보정하세요"
+            TrackingQuality.TRACKING -> "추적 중 · 홈으로 나가도 빨간 점이 표시됩니다"
+        }
+    }
+
     fun calibrationCompleted(record: CalibrationRecord) {
         calibrationRecord = record
         calibrationSerial++
@@ -74,6 +97,7 @@ object TrackerState {
         running = false
         controls = false
         calibrationRecord = null
+        calibrationFailure = null
         cancelCalibration()
         collecting = false
         clearCoordinates()
@@ -83,6 +107,7 @@ object TrackerState {
     fun beginCalibration(): Long {
         cancelCalibration()
         calibrationRecord = null
+        calibrationFailure = null
         val session = ++nextCalibration
         calibration = session
         collecting = true
@@ -96,6 +121,7 @@ object TrackerState {
         try {
             if (result == null) return false
             model = result
+            calibrationFailure = null
             return true
         } finally {
             cancelCalibration()
