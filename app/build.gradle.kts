@@ -21,8 +21,9 @@ android {
         applicationId = "dev.gazedot"
         minSdk = 26
         targetSdk = 35
-        versionCode = 17
-        versionName = "0.11.0-itracker-research"
+        versionCode = 18
+        versionName = "0.11.1-frame-lifetime-fix"
+        testInstrumentationRunner = "dev.gazedot.FrameLifetimeInstrumentation"
         buildConfigField("String", "PREDICTION_SERVER_URL", "\"$predictionUrl\"")
         buildConfigField("String", "PREDICTION_CLIENT_TOKEN", "\"$predictionToken\"")
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }

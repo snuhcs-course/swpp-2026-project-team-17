@@ -29,6 +29,9 @@ class DeveloperSettingsActivity : ComponentActivity() {
         }
         button("도움 · 인식 문제 해결하기") { startActivity(Intent(this, RecoveryActivity::class.java)) }
         button("시선 모델 상태 · iTracker") { status.text=TrackerState.inferenceStatus+"\n사전학습 가중치 고정 · 5점은 화면 좌표 맞춤만 수행" }
+        button("최근 영상 처리 오류") {
+            status.text=getSharedPreferences("personal",MODE_PRIVATE).getString("last_frame_error","기록된 오류 없음")
+        }
         root.addView(TextView(this).apply {text="시선 모델: iTracker / Eye Tracking for Everyone (Krafka et al., CVPR 2016). 연구용 모델 · 폰 안에서 실행합니다."})
         button("홍채 기준 측정 결과") {
             val prefs=getSharedPreferences("personal",MODE_PRIVATE)

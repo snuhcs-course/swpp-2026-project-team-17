@@ -59,6 +59,7 @@ class ITrackerEngine(context:Context):AutoCloseable {
     }
 
     fun predict(image:Bitmap,p:List<NormalizedLandmark>):Pair<Double,Double>? {
+        check(!image.isRecycled) { "iTracker received a released camera bitmap" }
         if(p.size<478 || p.take(478).any{!it.x().isFinite() || !it.y().isFinite()}) return null
         val w=image.width;val h=image.height
         fun x(i:Int)=p[i].x().toDouble()*w

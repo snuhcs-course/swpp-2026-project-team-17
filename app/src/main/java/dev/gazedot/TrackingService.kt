@@ -17,6 +17,7 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleService
 import com.google.mediapipe.framework.image.BitmapImageBuilder
+import com.google.mediapipe.framework.image.MPImage
 import com.google.mediapipe.tasks.core.BaseOptions
 import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarker
@@ -212,6 +213,8 @@ class TrackingService : LifecycleService() {
 
     private fun process(frame: ImageProxy) {
         var raw: Bitmap? = null; var upright: Bitmap? = null
+        var sharedImage: MPImage? = null
+        var stage = "카메라 영상 변환"
         val epoch = trackingEpoch
         try {
             val now = SystemClock.uptimeMillis()
@@ -220,8 +223,11 @@ class TrackingService : LifecycleService() {
             raw = frame.toBitmap()
             val matrix = Matrix().apply { postRotate(frame.imageInfo.rotationDegrees.toFloat()) }
             upright = Bitmap.createBitmap(raw, 0, 0, raw.width, raw.height, matrix, true)
+            // MPImage owns this bitmap: close() recycles it. Both models must finish first.
             val image = BitmapImageBuilder(upright).build()
-            val result = try { landmarker?.detectForVideo(image, now) } finally { image.close() }
+            sharedImage = image
+            stage = "MediaPipe 얼굴 검출"
+            val result = landmarker?.detectForVideo(image, now)
             val landmarks=result?.faceLandmarks()?.firstOrNull()
             val transform=result?.facialTransformationMatrixes()?.orElse(null)?.firstOrNull()
             val blends=result?.faceBlendshapes()?.orElse(null)?.firstOrNull()?.associate { it.categoryName() to it.score() } ?: emptyMap()
@@ -230,6 +236,7 @@ class TrackingService : LifecycleService() {
                 EyeObservations.observe(it, upright.width, upright.height,face,TrackerState.eyeProfile)
             } ?: EyeObservation(EyeState.LOST, null, 0.0, 0.0)
             val cnnStart=SystemClock.uptimeMillis()
+            stage = "iTracker 영상 전처리·추론"
             val cnn = if(landmarkObservation.state == EyeState.OPEN && landmarkObservation.features != null && landmarks != null)
                 iTracker?.predict(upright,landmarks) else null
             val cnnMs=SystemClock.uptimeMillis()-cnnStart
@@ -274,11 +281,20 @@ class TrackingService : LifecycleService() {
                 renderOverlay(at)
             }
         } catch (e: Exception) {
-            main.post { if (!closing && epoch == trackingEpoch) fail("영상 처리 중 오류가 발생했어요") }
+            val detail="$stage · ${e.javaClass.simpleName}: ${e.message.orEmpty().take(400)}"
+            android.util.Log.e("NoTouchFrame",detail,e)
+            main.post { if (!closing && epoch == trackingEpoch) {
+                TrackerState.inferenceStatus=detail
+                getSharedPreferences("personal",MODE_PRIVATE).edit().putString("last_frame_error",detail).apply()
+                fail("$stage 오류 · ${e.javaClass.simpleName}")
+            } }
         } finally {
-            if (upright !== raw) upright?.recycle()
-            raw?.recycle()
-            frame.close()
+            try { sharedImage?.close() } finally {
+                try {
+                    if (upright !== raw && upright?.isRecycled == false) upright?.recycle()
+                    if (raw?.isRecycled == false) raw?.recycle()
+                } finally { frame.close() }
+            }
         }
     }
 
