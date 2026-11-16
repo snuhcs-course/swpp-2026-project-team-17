@@ -13,14 +13,21 @@ class GazeModel private constructor(
     private val wx: DoubleArray, private val wy: DoubleArray,
     private val reference: EyeFeatures,
     val fitError: Double,
+    val correction: ResidualCorrection? = null,
 ) {
     fun predict(f: EyeFeatures): Pair<Double, Double>? {
+        val p=predictUncorrected(f) ?: return null
+        val corrected=correction?.apply(p.first,p.second) ?: p
+        return corrected.first.coerceIn(0.0,1.0) to corrected.second.coerceIn(0.0,1.0)
+    }
+    fun withCorrection(value: ResidualCorrection?) = GazeModel(meanX,meanY,stdX,stdY,wx,wy,reference,fitError,value)
+    fun predictUncorrected(f: EyeFeatures): Pair<Double, Double>? {
         if (!listOf(f.x, f.y, f.faceX, f.faceY, f.scale).all { it.isFinite() }) return null
         // A changed pose/distance invalidates this simple calibration. Do not invent a point.
         if (f.scale !in reference.scale * 0.72..reference.scale * 1.28 ||
             abs(f.faceX - reference.faceX) > 0.12 || abs(f.faceY - reference.faceY) > 0.12) return null
         val v = doubleArrayOf(1.0, (f.x - meanX) / stdX, (f.y - meanY) / stdY)
-        return dot(wx, v).coerceIn(0.0, 1.0) to dot(wy, v).coerceIn(0.0, 1.0)
+        return dot(wx, v) to dot(wy, v)
     }
 
     companion object {

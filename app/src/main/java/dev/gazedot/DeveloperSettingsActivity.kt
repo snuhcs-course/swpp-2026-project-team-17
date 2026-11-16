@@ -9,7 +9,7 @@ import android.widget.*
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 
-/** Local interaction settings. No learned models or network gaze correction. */
+/** Local interaction and personal-model settings; no network inference. */
 class DeveloperSettingsActivity : ComponentActivity() {
     private lateinit var status: TextView
     private val microphone = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -28,6 +28,30 @@ class DeveloperSettingsActivity : ComponentActivity() {
             root.addView(Button(this).apply { text = label; setOnClickListener { action() } })
         }
         button("도움 · 인식 문제 해결하기") { startActivity(Intent(this, RecoveryActivity::class.java)) }
+        val personal=getSharedPreferences("personal",MODE_PRIVATE)
+        root.addView(Switch(this).apply {
+            text="개인화 버튼 추천·확인 학습"; isChecked=personal.getBoolean("enabled",true)
+            setOnCheckedChangeListener { _,enabled ->
+                personal.edit().putBoolean("enabled",enabled).apply()
+                ControlAccessibilityService.instance?.closeSelection()
+            }
+        })
+        root.addView(TextView(this).apply { text="기기 내 학습: 후보 중 직접 확인한 선택만 학습합니다. 추천창 밖을 본 뒤 항목을 1초 바라보거나 터치하세요. 화면·입력 내용은 서버로 보내지 않습니다." })
+        button("정확도 추가 보정 · 5점 학습 + 4점 확인") { startActivity(Intent(this,AccuracyActivity::class.java)) }
+        button("추가 정확도 보정만 해제") {
+            TrackerState.model=TrackerState.model?.withCorrection(null)
+            TrackerState.cancelActions?.invoke(); TrackerState.clearCoordinates()
+            status.text="기본 9점 보정으로 돌아왔습니다"
+        }
+        button("최근 정확도 결과") { status.text=personal.getString("accuracy_report","측정 기록 없음") }
+        button("버튼 학습 횟수 확인") {
+            val model=PersonalTargetRanker().apply { restore(personal.getString("ranker","").orEmpty()) }
+            status.text="명시적으로 확인한 선택 ${model.confirmations}회 · 폰 안에 저장됨"
+        }
+        button("버튼 선택 학습 초기화") {
+            ControlAccessibilityService.instance?.closeSelection(); personal.edit().remove("ranker").apply()
+            status.text="버튼 선택 학습을 초기화했습니다"
+        }
         root.addView(TextView(this).apply {
             text = "9점 보정 후 사용하세요.\n1초 응시: 클릭 · 윙크: 스크롤 모드 · 양눈 두 번 깜빡임: 받아쓰기"
         })

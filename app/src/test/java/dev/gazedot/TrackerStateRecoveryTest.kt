@@ -14,6 +14,7 @@ class TrackerStateRecoveryTest {
         TrackerState.model = null
         TrackerState.fault = null
         TrackerState.speaking = false
+        TrackerState.precisionTraining = false
         TrackerState.interactionAllowed = false
         TrackerState.writingOwnsInput = false
     }
@@ -25,6 +26,18 @@ class TrackerStateRecoveryTest {
         TrackerState.model = GazeModel.fit(listOf(-.05, 0.0, .05).flatMap { x ->
             listOf(-.04, 0.0, .04).map { y -> Anchor(EyeFeatures(x, y, .5, .5, .3), .5 + x * 6, .5 + y * 7) }
         })!!
+    }
+    @Test fun precisionMeasurementBlocksActionsAndRecoveryThenReleasesToWriting() {
+        enabled()
+        TrackerState.precisionTraining = true
+        assertFalse(TrackerState.externalActionsAllowed())
+        assertFalse(TrackerState.recognitionHelpEligible(true))
+        TrackerState.precisionTraining = false
+        assertTrue(TrackerState.externalActionsAllowed())
+        TrackerState.writingOwnsInput = true
+        assertFalse(TrackerState.externalActionsAllowed())
+        TrackerState.writingOwnsInput = false
+        assertTrue(TrackerState.externalActionsAllowed())
     }
     @Test fun helpAndRecoveryTransitionBlockExternalActions() {
         enabled()

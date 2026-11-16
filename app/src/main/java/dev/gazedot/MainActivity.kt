@@ -299,7 +299,10 @@ class MainActivity : ComponentActivity() {
         addStep("2", "시선 보정", "기기를 움직이지 말고 얼굴을 카메라에서 약\n30~50cm 떨어진 위치에 맞춰 주세요.", 26, "보정 시작") {
             startCalibration()
         }
-        addStep("3", "시선 테스트", "회색 점이 시선을 잘 따라오는지 확인해 주세요.\n잘 맞지 않는다면 다시 보정해 주세요.", 26)
+        addStep("3", "시선 테스트", "추가 보정 후 새 목표에서 오차를 확인합니다.", 26, "정밀 보정") {
+            if (TrackerState.model == null) status.text = "먼저 9점 보정을 완료해 주세요"
+            else startActivity(Intent(this, AccuracyActivity::class.java))
+        }
 
         stopButton = pill("추적 중지") {
             TrackerState.status = "추적 중지됨"

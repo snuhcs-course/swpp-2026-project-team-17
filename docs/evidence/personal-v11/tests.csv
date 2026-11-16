@@ -1,0 +1,8 @@
+suite,tests,failures,errors,skipped
+dev.gazedot.ControlReadinessTest,4,0,0,0
+dev.gazedot.EyeGesturesTest,15,0,0,0
+dev.gazedot.GazeMathTest,3,0,0,0
+dev.gazedot.InteractionEngineTest,18,0,0,0
+dev.gazedot.NaiveGazePipelineTest,4,0,0,0
+dev.gazedot.PersonalModelsTest,11,0,0,0
+dev.gazedot.TutorialDwellTest,9,0,0,0

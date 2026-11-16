@@ -121,6 +121,7 @@ class TrackingService : LifecycleService() {
             TrackerState.cancelPendingClick = { pipeline.cancelPendingClick() }
             TrackerState.cancelActions = {
                 trackingEpoch++
+                ControlAccessibilityService.instance?.closeSelection()
                 pipeline.cancelInteraction()
                 TrackerState.localDwellProgress = 0f
                 TrackerState.localScrollMode = false
@@ -236,7 +237,7 @@ class TrackingService : LifecycleService() {
                 TrackerState.eyeState = observation.state
                 val model = TrackerState.model
                 val enabled = TrackerState.externalActionsAllowed() &&
-                    !TrackerState.speaking && ControlAccessibilityService.instance != null
+                    !TrackerState.speaking && ControlAccessibilityService.instance != null && ControlAccessibilityService.instance?.choosing != true
                 val sample = pipeline.process(now, at, observation, model, enabled,
                     ControlAccessibilityService.instance?.let { service -> { p -> service.dwellTargetKey(p) } })
                 val message = when (sample.quality) {
@@ -249,6 +250,7 @@ class TrackingService : LifecycleService() {
                     TrackingQuality.TRACKING -> "추적 중 · 홈으로 나가도 빨간 점이 표시됩니다"
                 }
                 TrackerState.publishSample(sample, message)
+                ControlAccessibilityService.instance?.updateSelection(TrackerState.gaze, at)
                 updateHelp(at)
                 // Publishing can navigate, pause, or start calibration. Recheck before dispatch.
                 if (!closing && epoch == trackingEpoch && TrackerState.externalActionsAllowed())
@@ -270,6 +272,7 @@ class TrackingService : LifecycleService() {
         val bounds = DisplaySpace.bounds(this)
         when(action) {
             is EyeAction.Click -> {
+                if (service.offerSelection(action.point)) return
                 val ok = service.tap((action.point.first * bounds.width()).toFloat(), (action.point.second * bounds.height()).toFloat())
                 TrackerState.actionStatus = if(ok) "클릭 요청" else "클릭을 실행하지 못했습니다"
             }
@@ -369,7 +372,7 @@ class TrackingService : LifecycleService() {
         if (closing) return
         val state = TrackerState.currentStatus(now)
         val enabled = TrackerState.externalActionsAllowed() && !TrackerState.speaking
-        val showPoint = TrackerState.controls && !TrackerState.collecting && !TrackerState.helpVisible &&
+        val showPoint = TrackerState.controls && !TrackerState.collecting && !TrackerState.precisionTraining && !TrackerState.helpVisible &&
             !TrackerState.recoveryOpening && state.phase == TrackingPhase.TRACKING
         overlay?.show(if (showPoint) TrackerState.sample?.point else null,
             if (enabled) TrackerState.sample?.dwellProgress ?: 0f else TrackerState.localDwellProgress,
@@ -380,6 +383,7 @@ class TrackingService : LifecycleService() {
     }
 
     private fun resetTracking() {
+        ControlAccessibilityService.instance?.closeSelection()
         trackingEpoch++
         pipeline.reset()
         TrackerState.clearCoordinates()

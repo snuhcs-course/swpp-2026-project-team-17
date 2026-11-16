@@ -13,6 +13,7 @@ object TrackerState {
             notifyListeners()
         }
     var collecting = false
+    var precisionTraining = false
     var interactionAllowed = false
     // A local writing overlay (or its entry button under gaze) owns all gaze actions.
     var writingOwnsInput = false
@@ -36,10 +37,10 @@ object TrackerState {
     fun notifyListeners() { listener?.invoke(); observers.toList().forEach { it() } }
     fun currentStatus(now: Long) = trackingStatus(running, controls, collecting, model != null,
         sample, eyeState, now, fault, signalPending)
-    fun externalActionsAllowed() = running && controls && interactionAllowed && !collecting &&
+    fun externalActionsAllowed() = running && controls && interactionAllowed && !collecting && !precisionTraining &&
         !helpVisible && !recoveryOpening && !writingOwnsInput && fault == null && !signalPending
     fun recognitionHelpEligible(accessibilityReady: Boolean) = running && controls && interactionAllowed &&
-        !collecting && !speaking && !recoveryOpening && !writingOwnsInput && model != null && fault == null &&
+        !collecting && !precisionTraining && !speaking && !recoveryOpening && !writingOwnsInput && model != null && fault == null &&
         !signalPending && accessibilityReady
     fun settingsStarted() {
         settingsScreens++

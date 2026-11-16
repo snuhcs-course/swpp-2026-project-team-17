@@ -107,7 +107,7 @@ internal class WritingController(private val service: ControlAccessibilityServic
         val display = DisplaySpace.bounds(service)
         return view.isShown && view.getGlobalVisibleRect(rect) && rect.contains((gaze.x * display.width()).toInt(), (gaze.y * display.height()).toInt())
     }
-    private fun validGaze(now: Long) = TrackerState.running && TrackerState.controls && !TrackerState.collecting &&
+    private fun validGaze(now: Long) = TrackerState.running && TrackerState.controls && !TrackerState.collecting && !TrackerState.precisionTraining && !service.choosing &&
         !TrackerState.speaking && !TrackerState.helpVisible && !TrackerState.recoveryOpening &&
         TrackerState.fault == null && !TrackerState.signalPending && TrackerState.gaze?.fresh(now) == true
 
@@ -164,7 +164,7 @@ internal class WritingController(private val service: ControlAccessibilityServic
         val now = SystemClock.uptimeMillis()
         if (now - lastProbe < 300) return
         lastProbe = now
-        if (TrackerState.collecting || TrackerState.helpVisible || TrackerState.recoveryOpening) { removePrompt(); return }
+        if (TrackerState.collecting || TrackerState.precisionTraining || service.choosing || TrackerState.helpVisible || TrackerState.recoveryOpening) { removePrompt(); return }
         val found = runCatching { WritingTarget.capture(service) }.getOrNull()
         val snapshot = found?.expected
         found?.close()

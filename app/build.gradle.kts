@@ -18,8 +18,8 @@ android {
         applicationId = "dev.gazedot"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 12
+        versionName = "0.9.0-texting-personal"
         buildConfigField("String", "PREDICTION_SERVER_URL", "\"$predictionUrl\"")
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
     }
