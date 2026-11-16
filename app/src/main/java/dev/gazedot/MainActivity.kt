@@ -458,6 +458,7 @@ class MainActivity : ComponentActivity() {
         private var blinkBreakUntil = 0L
         private val samples = mutableListOf<EyeFeatures>()
         private val anchors = mutableListOf<Anchor>()
+        private var poseReference: HeadPose? = null
         private var lastSampleAt = 0L
         private var closed = false
         private var hint = "머리는 고정하고 파란 점을 바라보세요"
@@ -497,8 +498,24 @@ class MainActivity : ComponentActivity() {
             val elapsed = now - since
             // Keep collecting open-eye features even when the old model rejects this pose.
             val f = sample?.calibrationFeatures(now, lastSampleAt)
-            if (f == null) { hint = "눈 검출 대기 · 눈을 뜨고 얼굴을 카메라로 향해 주세요"; return }
+            if (f == null) {
+                samples.clear(); since = now
+                hint = "눈 검출 대기 · 눈을 뜨고 얼굴을 카메라로 향해 주세요"
+                invalidate(); return
+            }
             lastSampleAt = sample.timestampMs
+            val head = f.head
+            if (head == null) {
+                samples.clear(); since = now
+                hint = "머리 자세 검출 대기 · 얼굴 전체가 보이게 해 주세요"
+                invalidate(); return
+            }
+            if (poseReference == null) poseReference = head
+            if (!CalibrationPose.stable(head, poseReference!!)) {
+                samples.clear(); since = now
+                hint = "처음 머리 위치로 돌아오세요 · 고개는 고정하고 눈만 점으로"
+                invalidate(); return
+            }
             hint = "${index + 1} / 9 · 파란 점을 계속 바라보세요"
             if (elapsed < 1000) return
             samples += f

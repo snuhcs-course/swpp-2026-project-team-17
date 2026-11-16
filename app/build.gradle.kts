@@ -20,8 +20,8 @@ android {
         applicationId = "dev.gazedot"
         minSdk = 26
         targetSdk = 35
-        versionCode = 15
-        versionName = "0.10.0-head-motion"
+        versionCode = 16
+        versionName = "0.10.1-calibration-fix"
         buildConfigField("String", "PREDICTION_SERVER_URL", "\"$predictionUrl\"")
         buildConfigField("String", "PREDICTION_CLIENT_TOKEN", "\"$predictionToken\"")
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }

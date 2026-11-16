@@ -5,6 +5,9 @@ import kotlin.math.*
 
 data class HeadPose(val yaw:Double,val pitch:Double,val roll:Double,val x:Double,val y:Double,val iris:Double) {
     fun vector()=doubleArrayOf(yaw/15,pitch/12,roll/12,x/.08,y/.08,ln(iris)/.2)
+    fun relativeTo(r:HeadPose)=doubleArrayOf(CalibrationPose.angle(yaw,r.yaw)/15,
+        CalibrationPose.angle(pitch,r.pitch)/12,CalibrationPose.angle(roll,r.roll)/12,
+        (x-r.x)/.08,(y-r.y)/.08,ln(iris/r.iris)/.2)
     companion object {
         // FaceLandmarkerResult matrices are column-major. Translation is not assumed to be measured cm.
         fun angles(m:FloatArray?):Triple<Double,Double,Double>? {
@@ -60,7 +63,7 @@ data class MotionAnchor(val head:HeadPose,val rawX:Double,val rawY:Double,val ta
 /** User-fitted head/eye residuals. Uses the paper's head-reference idea, not its physical projection equations. */
 class HeadCorrection private constructor(val reference:HeadPose,private val wx:DoubleArray,private val wy:DoubleArray,
     private val ranges:DoubleArray) {
-    private fun delta(h:HeadPose)=h.vector().zip(reference.vector()).map{it.first-it.second}.toDoubleArray()
+    private fun delta(h:HeadPose)=h.relativeTo(reference)
     fun apply(h:HeadPose,p:Pair<Double,Double>):Pair<Double,Double>? {
         if(h.iris<=0 || !h.vector().all{it.isFinite()}) return null
         val d=delta(h)
@@ -72,8 +75,8 @@ class HeadCorrection private constructor(val reference:HeadPose,private val wx:D
     companion object {
         fun fit(a:List<MotionAnchor>):HeadCorrection? {
             if(a.size<13 || a.any{it.head.iris<=0 || !(it.head.vector().toList()+listOf(it.rawX,it.rawY,it.targetX,it.targetY)).all(Double::isFinite)}) return null
-            val ref=a.first().head;val origin=ref.vector()
-            val rows=a.map{it.head.vector().zip(origin).map{v->v.first-v.second}.toDoubleArray()}
+            val ref=a.first().head
+            val rows=a.map{it.head.relativeTo(ref)}
             val ranges=DoubleArray(6){i->rows.maxOf{abs(it[i])}}
             if(ranges.any { it < .35 }) return null
             fun solve(target:List<Double>):DoubleArray? {
@@ -94,7 +97,7 @@ class HeadCorrection private constructor(val reference:HeadPose,private val wx:D
             for(v in a){val p=candidate.apply(v.head,v.rawX to v.rawY)?:return false
                 val e=hypot(v.rawX.coerceIn(0.0,1.0)-v.targetX,v.rawY.coerceIn(0.0,1.0)-v.targetY)
                 val n=hypot(p.first.coerceIn(0.0,1.0)-v.targetX,p.second.coerceIn(0.0,1.0)-v.targetY)
-                if(n>e+.03)return false;before+=e;after+=n}
+                if(n>e+.005)return false;before+=e;after+=n}
             return after/a.size<=before/a.size-.01
         }
     }
