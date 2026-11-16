@@ -1,0 +1,13 @@
+schema_version,session_id,main_seq,event_uptime_ms,session_elapsed_ms,block_index,phase,event,detail
+4,eval-20261116T012500Z-9ca55817,0,81710148,-83,,,pipeline_reset,session_start
+4,eval-20261116T012500Z-9ca55817,1,81710162,-69,,,unlogged_result_dropped,pre_session accepted_uptime_ms=81710123
+4,eval-20261116T012500Z-9ca55817,2,81710234,3,1,preparation,unlogged_result_dropped,pre_session accepted_uptime_ms=81710191
+4,eval-20261116T012500Z-9ca55817,3,81710238,7,1,preparation,preparation_shown,block=1 head_position=neutral
+4,eval-20261116T012500Z-9ca55817,44,81713618,3387,1,countdown,ready,block=1 head_position=neutral block_start_uptime_ms=81716618
+4,eval-20261116T012500Z-9ca55817,79,81716620,6389,1,settling,pipeline_reset,block_start
+4,eval-20261116T012500Z-9ca55817,1005,81796623,86392,2,preparation,preparation_shown,block=2 head_position=higher
+4,eval-20261116T012500Z-9ca55817,1128,81807358,97127,2,countdown,ready,block=2 head_position=higher block_start_uptime_ms=81810358
+4,eval-20261116T012500Z-9ca55817,1163,81810371,100140,2,settling,pipeline_reset,block_start
+4,eval-20261116T012500Z-9ca55817,2082,81890373,180142,3,preparation,preparation_shown,block=3 head_position=lower
+4,eval-20261116T012500Z-9ca55817,2115,81893127,182896,3,countdown,ready,block=3 head_position=lower block_start_uptime_ms=81896127
+4,eval-20261116T012500Z-9ca55817,2150,81896139,185908,3,settling,pipeline_reset,block_start

@@ -7,3 +7,9 @@ gradlew text eol=lf
 docs/calibration-comparison/data/raw/** -text
 docs/calibration-comparison/data/derived/** -text
 docs/calibration-comparison/tools/testdata/** -text
+# Hashed selection/frozen-input manifests and figures keep their exact bytes on every OS (their checksums are recorded).
+docs/calibration-comparison/data/*.json text eol=lf
+docs/calibration-comparison/data/*.sha256 text eol=lf
+docs/calibration-comparison/data/calibration-attempts/** -text
+docs/calibration-comparison/figures/** -text
+docs/calibration-comparison/figures/**/*.png binary

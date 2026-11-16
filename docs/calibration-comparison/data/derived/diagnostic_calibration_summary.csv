@@ -1,0 +1,39 @@
+calibration_id,participant_id,session_label,session_id,quantity,group,value,unit
+calibration_b_three_pass_positions,ANNA,B1,eval-20261116T012500Z-9ca55817,pass_mean_face_x,pass 1,0.5144764317406548,image-normalized (logged face)
+calibration_b_three_pass_positions,ANNA,B1,eval-20261116T012500Z-9ca55817,pass_mean_face_y,pass 1,0.6692657073338827,image-normalized (logged face)
+calibration_b_three_pass_positions,ANNA,B1,eval-20261116T012500Z-9ca55817,pass_mean_scale,pass 1,0.1577372312325812,image-normalized (logged face)
+calibration_b_three_pass_positions,ANNA,B1,eval-20261116T012500Z-9ca55817,pass_mean_face_x,pass 2,0.508227010567983,image-normalized (logged face)
+calibration_b_three_pass_positions,ANNA,B1,eval-20261116T012500Z-9ca55817,pass_mean_face_y,pass 2,0.661423126856486,image-normalized (logged face)
+calibration_b_three_pass_positions,ANNA,B1,eval-20261116T012500Z-9ca55817,pass_mean_scale,pass 2,0.1546720712353546,image-normalized (logged face)
+calibration_b_three_pass_positions,ANNA,B1,eval-20261116T012500Z-9ca55817,pass_mean_face_x,pass 3,0.5116462972429063,image-normalized (logged face)
+calibration_b_three_pass_positions,ANNA,B1,eval-20261116T012500Z-9ca55817,pass_mean_face_y,pass 3,0.7339422172970242,image-normalized (logged face)
+calibration_b_three_pass_positions,ANNA,B1,eval-20261116T012500Z-9ca55817,pass_mean_scale,pass 3,0.161396419666309,image-normalized (logged face)
+calibration_b_three_pass_positions,ANNA,B1,eval-20261116T012500Z-9ca55817,row_mean_f_y,target y 0.15,-0.06624010232097365,iris feature f_y
+calibration_b_three_pass_positions,ANNA,B1,eval-20261116T012500Z-9ca55817,row_mean_f_y,target y 0.5,-0.051155878291544554,iris feature f_y
+calibration_b_three_pass_positions,ANNA,B1,eval-20261116T012500Z-9ca55817,row_mean_f_y,target y 0.85,-0.03894260014330311,iris feature f_y
+calibration_b_three_pass_positions,ANNA,B1,eval-20261116T012500Z-9ca55817,column_mean_f_x,target x 0.15,0.017873094545212045,iris feature f_x
+calibration_b_three_pass_positions,ANNA,B1,eval-20261116T012500Z-9ca55817,column_mean_f_x,target x 0.5,0.005098569987804655,iris feature f_x
+calibration_b_three_pass_positions,ANNA,B1,eval-20261116T012500Z-9ca55817,column_mean_f_x,target x 0.85,-0.0072092301497889855,iris feature f_x
+calibration_b_three_pass_positions,ANNA,B1,eval-20261116T012500Z-9ca55817,between_pass_range_f_x,"target (0.15, 0.15)",0.008884850824969828,iris feature f_x
+calibration_b_three_pass_positions,ANNA,B1,eval-20261116T012500Z-9ca55817,between_pass_range_f_y,"target (0.15, 0.15)",0.012144939776377428,iris feature f_y
+calibration_b_three_pass_positions,ANNA,B1,eval-20261116T012500Z-9ca55817,between_pass_range_f_x,"target (0.5, 0.15)",0.010647640982969366,iris feature f_x
+calibration_b_three_pass_positions,ANNA,B1,eval-20261116T012500Z-9ca55817,between_pass_range_f_y,"target (0.5, 0.15)",0.011115228041893993,iris feature f_y
+calibration_b_three_pass_positions,ANNA,B1,eval-20261116T012500Z-9ca55817,between_pass_range_f_x,"target (0.85, 0.15)",0.005584254688197992,iris feature f_x
+calibration_b_three_pass_positions,ANNA,B1,eval-20261116T012500Z-9ca55817,between_pass_range_f_y,"target (0.85, 0.15)",0.005428495170518646,iris feature f_y
+calibration_b_three_pass_positions,ANNA,B1,eval-20261116T012500Z-9ca55817,between_pass_range_f_x,"target (0.15, 0.5)",0.011285539218332412,iris feature f_x
+calibration_b_three_pass_positions,ANNA,B1,eval-20261116T012500Z-9ca55817,between_pass_range_f_y,"target (0.15, 0.5)",0.008766257252372331,iris feature f_y
+calibration_b_three_pass_positions,ANNA,B1,eval-20261116T012500Z-9ca55817,between_pass_range_f_x,"target (0.5, 0.5)",0.01176087100317419,iris feature f_x
+calibration_b_three_pass_positions,ANNA,B1,eval-20261116T012500Z-9ca55817,between_pass_range_f_y,"target (0.5, 0.5)",0.007376975929663729,iris feature f_y
+calibration_b_three_pass_positions,ANNA,B1,eval-20261116T012500Z-9ca55817,between_pass_range_f_x,"target (0.85, 0.5)",0.009334494788366416,iris feature f_x
+calibration_b_three_pass_positions,ANNA,B1,eval-20261116T012500Z-9ca55817,between_pass_range_f_y,"target (0.85, 0.5)",0.010484369771457058,iris feature f_y
+calibration_b_three_pass_positions,ANNA,B1,eval-20261116T012500Z-9ca55817,between_pass_range_f_x,"target (0.15, 0.85)",0.02071460742676725,iris feature f_x
+calibration_b_three_pass_positions,ANNA,B1,eval-20261116T012500Z-9ca55817,between_pass_range_f_y,"target (0.15, 0.85)",0.004233448236806506,iris feature f_y
+calibration_b_three_pass_positions,ANNA,B1,eval-20261116T012500Z-9ca55817,between_pass_range_f_x,"target (0.5, 0.85)",0.013813413749093444,iris feature f_x
+calibration_b_three_pass_positions,ANNA,B1,eval-20261116T012500Z-9ca55817,between_pass_range_f_y,"target (0.5, 0.85)",0.007490085518409434,iris feature f_y
+calibration_b_three_pass_positions,ANNA,B1,eval-20261116T012500Z-9ca55817,between_pass_range_f_x,"target (0.85, 0.85)",0.015762811536295857,iris feature f_x
+calibration_b_three_pass_positions,ANNA,B1,eval-20261116T012500Z-9ca55817,between_pass_range_f_y,"target (0.85, 0.85)",0.009172927039497389,iris feature f_y
+calibration_b_three_pass_positions,ANNA,B1,eval-20261116T012500Z-9ca55817,model_sensitivity,x per f_x,-21.746447382483087,"normalized screen units per unit of the feature (linear output, before the clamp)"
+calibration_b_three_pass_positions,ANNA,B1,eval-20261116T012500Z-9ca55817,model_sensitivity,x per f_y,-3.3125254272959146,"normalized screen units per unit of the feature (linear output, before the clamp)"
+calibration_b_three_pass_positions,ANNA,B1,eval-20261116T012500Z-9ca55817,model_sensitivity,y per f_x,1.9016134407691914,"normalized screen units per unit of the feature (linear output, before the clamp)"
+calibration_b_three_pass_positions,ANNA,B1,eval-20261116T012500Z-9ca55817,model_sensitivity,y per f_y,22.81012113150412,"normalized screen units per unit of the feature (linear output, before the clamp)"
+calibration_b_three_pass_positions,ANNA,B1,eval-20261116T012500Z-9ca55817,fit_error_diagnostic,all anchors,0.16314242655795308,RMS residual of the fit inputs (not gaze accuracy)

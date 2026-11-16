@@ -1,0 +1,138 @@
+{
+  "tool": "calib_eval_figures",
+  "tool_version": "1.1.1",
+  "view": "session_summary",
+  "adapted_from": "tools/gaze_eval/gaze_eval_figures.py 1.0.0 at 72411ec35d5d6e9547c322de3d7a14e65812b82e",
+  "versions": {
+    "python": "3.14.6",
+    "matplotlib": "3.11.2",
+    "numpy": "2.5.4"
+  },
+  "inputs": {
+    "summary": {
+      "path": "docs/calibration-comparison/data/derived/summary.json",
+      "sha256": "9ac14d60296f14c6acc9bf3c45eb785a5880aeec1ff23675237dc78658f0631a",
+      "analyzer_version": "1.0.0",
+      "source_label": "ANNA B1 eval-20261116T012500Z-9ca55817, build 011fa7cddd03d662c437bc9ed64704292485b8bd, selection analysis-inputs.json",
+      "measured_coordinate": "smoothed_x_norm/smoothed_y_norm: GazePipeline's smoothed output, which inherits GazeModel's [0, 1] clamp (not an unclamped raw output)"
+    },
+    "selection": {
+      "path": "docs/calibration-comparison/data/analysis-inputs.json",
+      "sha256": "cbc9e2c164bfb5ecd52c85d623344ead29254e9eee1b96bfbc7a6a30f5610600"
+    },
+    "protocol": {
+      "path": "docs/calibration-comparison/protocol.json",
+      "id": "notouch-calibration-comparison-eval",
+      "version": "1.0.0",
+      "sha256_lf": "651e4402c8208538ccca1d7e204141315e649c8f15cd3e835f795c689046c547"
+    },
+    "frozen_raw_inputs": "docs/calibration-comparison/data/raw-inputs.sha256"
+  },
+  "session": {
+    "calibration_id": "calibration_b_three_pass_positions",
+    "participant_id": "ANNA",
+    "session_label": "B1",
+    "session_id": "eval-20261116T012500Z-9ca55817",
+    "short_id": "9ca55817",
+    "start_wall_time_utc": "2026-11-16T01:25:00.876Z",
+    "mode": "blind_measurement",
+    "block_order": "nhl",
+    "official": true,
+    "official_exclusions": [],
+    "designation": "Official session",
+    "build": {
+      "git_commit": "011fa7cddd03d662c437bc9ed64704292485b8bd",
+      "git_dirty_at_build": "false",
+      "source_base": "e8fa01ef1e397f508aa5a3b3a595539b4ef4490a",
+      "source_base_is_ancestor": "true",
+      "evaluation_reference": "72411ec35d5d6e9547c322de3d7a14e65812b82e",
+      "build_type": "debug"
+    },
+    "calibration_inputs_sha256": "d69d4cf11ea28f1deee56083505269934287e6178b3d877280f05772601f24b3",
+    "conditions": {
+      "viewing_distance_cm": 30.0,
+      "lighting": "room with normal light",
+      "glasses": "none",
+      "head_position_markers": "-",
+      "notes": "",
+      "head_positions": "instructed (neutral, slightly higher, slightly lower), not measured; face_x/face_y/scale are logged per attempt",
+      "declared": "entered by the operator before the session"
+    },
+    "raw_path": "calibration_b_three_pass_positions/ANNA/eval-20261116T012500Z-9ca55817"
+  },
+  "acceptance": {
+    "note": "copied unchanged from summary.json; this view computes no pooled metric or verdict",
+    "block_verdicts": [
+      {
+        "block_index": 1,
+        "head_position": "neutral",
+        "verdict": "NOT_MET"
+      },
+      {
+        "block_index": 2,
+        "head_position": "higher",
+        "verdict": "NOT_MET"
+      },
+      {
+        "block_index": 3,
+        "head_position": "lower",
+        "verdict": "NOT_MET"
+      }
+    ],
+    "session_verdict": "NOT_MET"
+  },
+  "aggregation": {
+    "presentations_per_target": 6,
+    "matching": "presentations are assigned to targets by their canonical grid coordinates (target_x_norm, target_y_norm); the protocol target id at those coordinates must agree",
+    "eligibility": "the analyzer's technical eligibility, unchanged; ineligible presentations are left out and counted, never replaced by zero",
+    "gaze_map_estimate": "per target: equal-weight mean, over the target's technically eligible presentations in every block and pass, of the analyzer centroid (mean smoothed x, y of the presentation's valid measurement samples)",
+    "target_error_bar": "per target: equal-weight mean, over the same presentations, of the analyzer presentation mean error (mean over valid samples of sqrt((smoothed_x - target_x)^2 + (smoothed_y - target_y)^2)); not the distance from the target to the averaged position",
+    "measured_coordinate": "GazePipeline's smoothed output, which inherits GazeModel's [0, 1] clamp"
+  },
+  "shared_scales": {
+    "error_axis_norm": [
+      0.0,
+      0.5
+    ],
+    "error_reference_norm": 0.1,
+    "display": {
+      "identical": true,
+      "displays": [
+        {
+          "session_id": "eval-20261116T012500Z-9ca55817",
+          "width_px": 1080,
+          "height_px": 2316,
+          "rotation": 0
+        }
+      ]
+    }
+  },
+  "outputs": {
+    "table": {
+      "path": "docs/calibration-comparison/figures/final/ANNA_B1_9ca55817/target_summary.csv",
+      "sha256": "6b9167543581c9703d987eb713848c737eab35c091e8b705b7be2b668a44607b"
+    },
+    "figures": [
+      {
+        "path": "docs/calibration-comparison/figures/final/ANNA_B1_9ca55817/cand_b_anna_b1_9ca55817_all_poses_gaze_map.svg",
+        "sha256": "a78626194c35c647acdf190d7f7e2d339d23145b8dcd787d184bcf6dadc3b3d1",
+        "figure": "gaze_map"
+      },
+      {
+        "path": "docs/calibration-comparison/figures/final/ANNA_B1_9ca55817/cand_b_anna_b1_9ca55817_all_poses_gaze_map.png",
+        "sha256": "71afcd8310135317e2ce9205c52df2c3d99a944ef899bd7f7be3c32b7226a72b",
+        "figure": "gaze_map"
+      },
+      {
+        "path": "docs/calibration-comparison/figures/final/ANNA_B1_9ca55817/cand_b_anna_b1_9ca55817_all_poses_target_error.svg",
+        "sha256": "32fbec8b960c0757e9d2caae402ff21326b82ee3c960b2190353205573c7db30",
+        "figure": "target_error"
+      },
+      {
+        "path": "docs/calibration-comparison/figures/final/ANNA_B1_9ca55817/cand_b_anna_b1_9ca55817_all_poses_target_error.png",
+        "sha256": "2a407efd17a14e02d6ea8ff382575357d9b57769d84aeec818267e316588938a",
+        "figure": "target_error"
+      }
+    ]
+  }
+}

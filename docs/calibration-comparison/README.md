@@ -4,303 +4,315 @@
 |---|---|
 | Candidate ID | `calibration_b_three_pass_positions` |
 | Branch | `experiment/calibration-b-three-poses` |
-| `BASE_SHA` | `e8fa01ef1e397f508aa5a3b3a595539b4ef4490a` (`origin/feature/home-screen`, fetched 2026-11-14) |
-| Calibration implementation | `752d1743b7e79f7deb11a86e0dcd345da2a16ceb` (unchanged by the evaluation integration) |
-| Evaluation integration | Ported selectively from candidate A: `188898b5444015f9d4f07b44dba9c2e323760d7b` (evaluation) and `f3b224c4801570c57a192d354eb848b30c90b3c3` (home-screen layout fix) on `experiment/calibration-a-three-pass` |
-| Evaluation protocol | `notouch-calibration-comparison-eval` 1.0.0 ([`protocol.json`](protocol.json)), **the same file as candidate A** (SHA-256 after CRLF→LF `651e4402c8208538ccca1d7e204141315e649c8f15cd3e835f795c689046c547`), log schema 4, snapshot schema 2 |
-| Collection plan | [`collection-plan-b.json`](collection-plan-b.json) 1.0.0: ANNA / B1, ANNA / B2 (official), PILOT01 / TB1 (technical pilot) |
-| Sibling candidate | A, `calibration_a_three_pass_static` on `experiment/calibration-a-three-pass`, same `BASE_SHA` |
-| Status | Calibration and evaluation integration **checked offline only**. On-device behaviour is **awaiting validation**. No candidate B evaluation session has been recorded. |
-| Accuracy | **NOT_MEASURED** |
+| `BASE_SHA` | `e8fa01ef1e397f508aa5a3b3a595539b4ef4490a` (`origin/feature/home-screen`) |
+| Calibration implementation | `752d1743b7e79f7deb11a86e0dcd345da2a16ceb` |
+| Evaluation integration | `8cbfd087b00a4cff50183b4a77f94750a64726eb` (candidate A's evaluation, ported) |
+| Measured build | `011fa7cddd03d662c437bc9ed64704292485b8bd` (`git_dirty_at_build` false; APK SHA-256 `9e910a10dbae31cc3fd6a061777fe400a76fb6915a0bc66738d01664a3688cee`): `8cbfd08` plus debug logging and a visible calibration-failure message. Prediction, calibration, evaluation logging and protocol code are byte-identical to `8cbfd08`, and the session replays exactly under both commits |
+| Evaluation protocol | `notouch-calibration-comparison-eval` 1.0.0 ([`protocol.json`](protocol.json), SHA-256 of LF bytes `651e4402c8208538ccca1d7e204141315e649c8f15cd3e835f795c689046c547`, the same file as candidate A), log schema 4, snapshot schema 2; plan [`collection-plan-b.json`](collection-plan-b.json); unchanged |
+| Data | One complete **official** session, ANNA / B1 (`eval-20261116T012500Z-9ca55817`, 2026-11-16). B2 and the technical pilot were not recorded |
+| Result | **NOT_MET in all three head-position blocks.** Tracking criteria (jitter, availability, sample rate, latency) met everywhere; presentation success (4, 11 and 3 of 32) and p95 error (0.307, 0.280, 0.278) failed everywhere |
+| Evidence level | Preliminary: one participant, one phone, one session, one calibration. No winner is declared; the comparison with candidate A is a separate step |
 
-## 1. Purpose and hypothesis
+## 1. Purpose and scope
 
-The Iteration 3 evaluation of the nine-point home-screen calibration (branch
-`feature/gaze-evaluation-home-screen-iter3`) did not meet its accuracy targets. Most of the error was a systematic
-offset, and it grew during each session. This experiment asks one question about calibration data:
+The question of this experiment is whether 27 calibration anchors are better collected in one head position
+(candidate A) or spread over three (candidate B), with everything else unchanged. **Candidate B** shows the existing
+nine calibration targets three times: pass 1 in an ordinary head position, pass 2 slightly higher, pass 3 slightly
+lower, with the phone fixed and the head moving only in the 3 s breaks between passes. One `GazeModel.fit` then runs on
+all 27 labelled anchors.
 
-> With the same amount of calibration data, 27 anchors (three passes through the existing nine targets), is it
-> better to repeat the calibration in one head position (A) or to spread it over several head positions (B)?
+The prediction model is the **original, unchanged** one: per screen axis, a linear regression on the two
+standardized iris features; face position and scale serve only as a validity check (a frame is rejected if its face
+is more than 0.12 from the anchors' mean position in x or y, or its scale outside 0.72–1.28 of the mean). The fit is
+rejected if its RMS residual exceeds 0.18. No head-aware prediction is part of these results.
 
-- **Candidate A** repeats the nine targets three times without deliberately moving the head.
-- **Candidate B (this branch)** collects one pass in an ordinary, a slightly higher and a slightly lower head
-  position. Expected effect: the fit sees how small head-position changes shift the iris features, which might
-  reduce offsets when the head drifts. The cost may be a worse fit in any single position.
-- Neither effect is established. "No difference" is a possible result.
+The evaluation measures, for the model of one fresh calibration, target-referenced gaze accuracy, stability,
+availability and latency in three instructed head positions, with the protocol's six acceptance criteria per block.
 
-`GazeModel` regresses screen coordinates on the two iris features only (`x`, `y`). Face position and scale are used
-only for its runtime validity check, against the mean of all anchors; in B that mean combines the three positions.
-Both candidates are evaluated with the same protocol in the same three instructed head positions (section 5).
+## 2. Method and metrics
 
-## 2. Calibration procedure (Candidate B, unchanged since `752d174`)
+**Calibration** (unchanged since `752d174`): nine targets per pass in the original order; per point 1 s settling, at
+least 22 samples and 2.5 s, per-feature median; a face shift above 0.045 within a point restarts it; a point over 9 s
+fails the calibration; a 2 s blink break after the 4th point of each pass and a 3 s break after passes 1 and 2, the
+only moments the head moves. Nothing is fitted before the 27th anchor.
 
-Operator setup:
+**Evaluation session** (identical to candidate A): one fresh calibration, then three 80 s blocks with the same model.
+Each block shows 16 targets at x, y ∈ {0.2, 0.4, 0.6, 0.8}, pass 1 serpentine and pass 2 reversed: 32 presentations of
+1.0 s settling + 1.5 s measurement. Before each block a preparation screen names the position, the operator taps
+**준비 완료** (Ready) and a 3 s countdown follows; none of this enters a metric. Blind mode: no pointer, gaze clicks,
+scrolling and dictation suppressed. The smoothing filter is reset at the session start and every block start.
 
-1. Fix the phone on the stand in portrait orientation. **The phone must not move until the evaluation ends**; only
-   the head moves.
-2. In NoTouch, tap **카메라 시작** (Start camera) and complete the permission steps (accessibility service
-   **NoTouch 눈 조작**, display over other apps, camera).
-3. Seat the participant facing the screen at about 30–50 cm (the home screen's guidance).
-4. When the eyes are detected (**보정 시작** is enabled), tap **보정 시작** (Start calibration).
+**Recorded session.** Order NEUTRAL → HIGHER → LOWER (`nhl`, as planned for B1). Declared conditions (entered before
+the session): eye–screen distance 30.0 cm, lighting "room with normal light", no glasses, position markers "-" (none
+written), no notes. Preparation took 3.4 s, 10.7 s and 2.8 s; the blocks started 99.5 s, 193.2 s and 279.0 s after
+the calibration finished.
 
-Participant:
+**Calibration attempts behind this session** (debug log of `011fa7c`: excerpt in
+[`data/calibration-attempts/`](data/calibration-attempts/README.md), table in
+[`diagnostic_calibration_attempts.csv`](data/derived/diagnostic_calibration_attempts.csv), anchors in
+[`diagnostic_calibration_attempt_anchors.csv`](data/derived/diagnostic_calibration_attempt_anchors.csv)). Fit errors of
+rejected attempts are recomputed with a replica of the unchanged `GazeModel.fit` that reproduces B1's snapshot bit for
+bit. Face height is the logged image-normalized face_y, larger = lower in the image.
 
-1. **Pass 1, ordinary position.** A comfortable, front-facing head position. Nine targets.
-2. **Break (3 s).** Move the head slightly **upward** relative to the phone, approximately front-facing, then hold still.
-3. **Pass 2, higher position.** Nine targets.
-4. **Break (3 s).** Move the head slightly **below the original (ordinary) position**, then hold still.
-5. **Pass 3, lower position.** Nine targets. A successful calibration then opens the existing tutorial.
+| Attempt (2026-11-16 KST) | Result | Fit error | Higher pass vs ordinary | Lower pass vs ordinary |
+|---|---|---|---|---|
+| 10:05–10:07 | rejected | 0.235 (recomputed) | −0.090 | +0.058 |
+| 10:08–10:10 | rejected | 0.257 (recomputed) | −0.025 | +0.099 |
+| 10:18–10:20 | accepted; discarded when tracking stopped at 10:21 | 0.144 | −0.014 | +0.045 |
+| 10:21–10:23 | **accepted; used by B1** | **0.163** | **−0.008** | **+0.065** |
 
-```
-pass 1 (ordinary): P1 P2 P3 P4 [blink break 2 s] P5 P6 P7 P8 P9 [inter-pass break 3 s: move slightly up]
-pass 2 (higher):   P1 P2 P3 P4 [blink break 2 s] P5 P6 P7 P8 P9 [inter-pass break 3 s: move below the original]
-pass 3 (lower):    P1 P2 P3 P4 [blink break 2 s] P5 P6 P7 P8 P9 -> one GazeModel.fit on all 27 anchors
-```
+Two more attempts on 2026-11-15 with build `8cbfd08` most likely ended the same way (inferred from system logs). The
+rejected fits failed the unchanged 0.18 limit, mostly vertically; in their higher pass the iris features barely
+followed the targets. After the rejections the participant reduced the head movements, so the calibration used here
+spans little vertical range: its higher pass is almost at the ordinary position.
 
-- The existing nine targets in the existing order in every pass: centre (.5, .5), (.15, .15), (.5, .15), (.85, .15),
-  (.85, .5), (.85, .85), (.5, .85), (.15, .85), (.15, .5) as fractions of the calibration view.
-- Movement instructions appear **only in the two inter-pass breaks** ("머리를 조금 위로 옮겨 주세요" / "머리를 조금
-  아래로 옮겨 주세요"). The required position is shown under the title throughout each pass ("자세: 기본 위치 /
-  조금 높은 위치 / 조금 낮은 위치 · 정면을 보고 그대로 유지"); the blink break keeps it. Positions are qualitative;
-  no pose gate exists.
-- Each of the 27 anchors is kept separately, labelled pass, point and position (`ordinary`, `higher`, `lower`), with
-  its genuine median features (face position and scale included, nothing normalized across passes). They go to one
-  `GazeModel.fit` in collection order. **No model is fitted or activated after pass 1 or 2.**
-- Per point, unchanged from `BASE_SHA`: 1,000 ms settling; ≥ 22 samples **and** ≥ 2,500 ms; per-feature median;
-  samples 0–250 ms old, newer than the last, quality TRACKING or OUT_OF_RANGE; missing input pauses collection without
-  resetting the clocks; a face shift > 0.045 from the point median restarts the point; > 9,000 ms fails the whole
-  calibration (never checked during a break). No samples during any break; the next point's clocks start when a break
-  ends. Back, leaving the screen or stopping tracking cancels; a failed or cancelled calibration keeps the previous
-  model, as before.
+**Metrics** (committed analyzer, protocol thresholds, unchanged). The measured coordinate is the pipeline's smoothed
+output, clamped to [0, 1] per axis by the model. Errors are normalized per axis (x / display width, y / display
+height; on this 1080 × 2316 px display 0.10 is 108 px horizontally or 231.6 px vertically).
 
-The candidate ID is drawn in small grey text at the bottom of the calibration screen.
-
-## 3. What this branch changes
-
-| Stage | Files |
-|---|---|
-| Three-position calibration (commit `752d174`) | `CalibrationController.kt`, `CalibrationPlan.kt`, `MainActivity.kt` (calibration view), `CalibrationControllerTest.kt`, `CalibrationPlanTest.kt`, `CalibrationTestHarness.kt` |
-| Evaluation integration (this stage) | below |
-
-The evaluation is candidate A's committed evaluation, ported file by file (not merged: candidate A's calibration
-commit, its uncommitted plotting work and its recorded data and results were not copied). Of the 44 files ported, 29
-are identical to candidate A's `f3b224c` apart from line endings, including `TrackingService.kt`, `TrackerState.kt`,
-`EvaluationLog.kt`, `GazeMath.kt`, `MainActivity.kt`, `DotOverlay.kt`, `ControlAccessibilityService.kt`,
-`DeveloperSettingsActivity.kt`, `AndroidManifest.xml`, `protocol.json`, `analyze_calibration_eval.py` and the
-Iteration 3 regression fixture. So reset policy, in-flight-frame handling, logging, finalization and metrics are the
-same code as in candidate A.
-
-| File | Role (as in candidate A unless noted) |
-|---|---|
-| `Evaluation.kt` (new) | Protocol constants, head positions and block orders, the session timeline (preparation → Ready → countdown → 80 s block, ×3), evaluation state and guards, the start gate, the 27-anchor `CalibrationRecord` and model snapshot. **B:** `CALIBRATION_ID` = this build's candidate only; the gate also requires each pass's calibration position (`ordinary`, `higher`, `lower`); `EvaluationPlan` lists the three plan sessions; NEUTRAL instruction names calibration pass 1 |
-| `EvaluationActivity.kt` (new) | Setup, preparation/Ready, countdown and target screens; every exit finalizes the record. **B:** the setup offers exactly the plan's sessions (no free-text participant, label or order, nothing preselected) |
-| `EvaluationLog.kt`, `EvaluationDiagnostics.kt` (new) | Schema 4 logger (`attempts.csv`, `events.csv`, `metadata.json`, `model_snapshot.json`, `SHA256SUMS`), block-start admission, counters; read-only feature-rejection names |
-| `GazeMath.kt` | Additions only: read-only `rejection`, `linearOutput`, `parameters`; `fit` and `predict` unchanged |
-| `CalibrationController.kt` | Observation only: start/finish times, per-point movement retries, acceptance times. Schedule, rules and the single fit unchanged |
-| `TrackerState.kt`, `TrackingService.kt` | Calibration record and serials; named, logged pipeline resets; block-start admission; pointer and action guards around the unchanged `pipeline.process(...)` |
-| `MainActivity.kt` | Records the `CalibrationRecord` after a successful calibration installs its model; layout fix keeps **설정 · 개발자 기능** above the navigation bar (from `f3b224c`) |
-| `DotOverlay.kt`, `ControlAccessibilityService.kt` | Read-only overlay geometry; `allowed()` = original condition + evaluation guard |
-| `DeveloperSettingsActivity.kt`, `AndroidManifest.xml` | Debug-only entry **시선 정확도 평가 · 보정 비교 (개발용)**; `EvaluationActivity` (not exported) |
-| `app/build.gradle.kts` | `BuildConfig` provenance (commit, dirty flag, base ancestry, protocol and model hashes); test inputs and replay properties; test-only `org.json:json:20240303` (not packaged). **B:** the plan file is a test input |
-| `collection-plan-b.json` (new, B only) | Candidate B's collection plan (section 4) |
-| `tools/calib_eval_data.py` | **B:** additive, opt-in `import --calibration-id` (section 7); without it, behaviour is candidate A's |
-| `tools/testdata/synthetic_session/` | Golden session regenerated by B's logger (section 8) |
-| Tests | Candidate A's evaluation tests, adapted to B's identity and labels, plus B checks (section 8) |
-
-**Preserved.** Unchanged against `BASE_SHA`: `GazePipeline.kt` (smoothing, stale rule), `LandmarkFeatures.kt`,
-`EyeObservation.kt`, `EyeGestures.kt`, `InteractionEngine.kt`, `DisplaySpace.kt`, `ScreenGaze.kt`, text entry, the
-tutorial, dependencies of the app, Gradle/AGP versions, application ID and signing. `CandidateBehaviorTest` requires
-`GazeModel.fit`/`predict`, feature extraction and `medianFeatures` to equal frozen `BASE_SHA` copies bit for bit. No
-feature extraction, fit mathematics, regression parameter, prediction, validity gate, smoothing, coordinate mapping,
-clicking, scrolling or text entry was changed for the head positions. The 24 calibration tests of `752d174` are
-unchanged and pass. Outside a session nothing is logged and the guards are inactive.
-
-## 4. Evaluation protocol and collection plan
-
-**Protocol.** `protocol.json` 1.0.0 was declared before any session and already names both candidates:
-`calibration_b_three_pass_positions` is an allowed calibration ID and ANNA / B1 (`nhl`) and ANNA / B2 (`lhn`) are
-official sessions. It is therefore used **unchanged**, byte for byte the manifest of candidate A's build, so A and B
-sessions carry the same protocol hash and are analyzed by the same tool in one run, side by side (never pooled: the
-calibration ID is part of the compatibility group). Candidate A's protocol and the status of its recording are not
-touched.
-
-**What was A-specific, and how B handles it.** The protocol's only technical-pilot entry is PILOT01 / T1 with
-candidate A's calibration. Rather than change the hashed manifest, candidate B's plan is declared in
-[`collection-plan-b.json`](collection-plan-b.json), committed before any B session:
-
-| Entry | Participant / label | Order | Role |
-|---|---|---|---|
-| B1 | ANNA / B1 | NEUTRAL → HIGHER → LOWER (`nhl`) | official (as in protocol 1.0.0) |
-| B2 | ANNA / B2 | LOWER → HIGHER → NEUTRAL (`lhn`) | official (as in protocol 1.0.0) |
-| Pilot | PILOT01 / TB1 | `nhl` | technical pilot; never official (protocol rule: every `PILOT*` participant) |
-
-The B app's setup screen offers exactly these three choices; participant, label and order come from the entry and
-nothing is preselected, so no session can be recorded under a custom label outside the plan. Tests require the app's
-choices, the plan file and the protocol's B entries to agree, and the plan to name the embedded protocol hash.
-
-**Session** (identical to candidate A). One fresh, successful 27-anchor calibration of this candidate, then one
-session of three head-position blocks with the same model throughout.
-
-| | |
-|---|---|
-| Blocks | NEUTRAL (기본 위치), HIGHER (조금 높은 위치), LOWER (조금 낮은 위치), in the planned order |
-| Each block | The unchanged Iteration 3 schedule: 16 targets at x, y ∈ {0.2, 0.4, 0.6, 0.8}, pass 1 serpentine, pass 2 reversed, 32 presentations of 1.0 s settling + 1.5 s measurement, 80 s |
-| Case IDs | `<position>-pass<p>-r<row>c<col>`, e.g. `higher-pass1-r0c0` (96 unique per session) |
-| Before each block | Preparation screen naming the position, **준비 완료** (Ready), then a 3 s countdown; logged, never part of a block metric or denominator |
-| Filter reset | A logged `pipeline_reset` at the session start and at every block start; results accepted before a block start and handled after it are dropped before smoothing (`discarded_block_start`) |
-| Eligibility | One session per fresh calibration. Starting a session consumes it, even if interrupted. A new calibration attempt (failed, cancelled or successful) voids the previous record, so a failed recalibration cannot make the retained model eligible. Stopping tracking voids it too |
-| Interaction | Blind mode hides the pointer for the whole session; gaze clicks, scrolling and dictation are suppressed by explicit guards during preparation, countdown and measurement. The accessibility service stays enabled; completion or any interruption restores normal interaction |
-| Pose | Instructed only; `f_face_x`, `f_face_y`, `f_scale` are logged per attempt and summarized per block and phase as diagnostics; never an acceptance filter |
-
-**Acceptance criteria** (protocol 1.0.0, unchanged from Iteration 3, evaluated per block):
-
-| Criterion | Target |
-|---|---|
-| Successful presentations (complete, ≥ 10 valid samples, coverage ≥ 0.80, mean error ≤ 0.10) / 32 | ≥ 0.80 |
-| Nearest-rank p95 of presentation mean errors (technically eligible presentations: complete, ≥ 10 valid, coverage ≥ 0.5; INSUFFICIENT_DATA if fewer than 26) | ≤ 0.20 |
-| Mean per-presentation jitter RMS (eligible presentations; same insufficient-data rule) | ≤ 0.05 |
-| Tracking availability: valid / all measurement-phase attempts, invalid outcomes included | ≥ 0.90 |
-| Valid sample rate: valid measurement samples / 48 s | ≥ 10 /s |
-| p95 processing latency over all block attempts (settling and measurement, invalid and discarded included; no preparation/countdown) | ≤ 200 ms |
-
-A block is MET only if all six are MET; a session is MET only if all three blocks are MET; block verdicts are always
-reported separately. Missing coordinates never count as zero error. Incomplete sessions are INCOMPLETE; logging loss,
-unassigned rows or checksum mismatches make a session INSUFFICIENT_DATA. Pilot sessions, sessions outside the plan or
-with another order, shared calibrations, dirty builds and live-preview sessions are never official.
-
-**Records** (app-private `files/evaluation/calibration-comparison/<participant>/<session_id>/`): `attempts.csv`,
-`events.csv`, `metadata.json` (build commit and dirty flag, protocol hash, candidate ID and
-`calibration_positions_by_pass` = `["ordinary", "higher", "lower"]`, session identity and block timeline, device,
-display, declared conditions, calibration timing and retries, frame and attempt counters, invalid reasons, logging
-accounting), `model_snapshot.json` (all 27 anchors with pass, point, `calibration_position`, retries, acceptance time
-and features, plus fitted parameters) and `SHA256SUMS`. Replay refits `GazeModel.fit` on the 27 anchors in recorded
-order, requires every parameter bit for bit, and re-runs the unchanged `GazePipeline.process` over the logged inputs.
-
-## 5. Differences from candidate A's evaluation build
-
-| Item | Candidate A (`f3b224c`) | Candidate B (this branch) |
+| Criterion, per 80 s block | Definition | Target |
 |---|---|---|
-| Calibration ID / positions by pass | `calibration_a_three_pass_static` / `same, same, same` | `calibration_b_three_pass_positions` / `ordinary, higher, lower` |
-| Protocol manifest and hash | 1.0.0, `651e4402…c547` | identical file and hash |
-| Collection-plan choices in the app | presets ANNA A1/A2, PILOT01 T1 plus free-text participant, label and order (remembered between sessions) | exactly ANNA B1, ANNA B2, PILOT01 TB1; no free text; nothing preselected or remembered |
-| Candidate check | gate: own ID and in the protocol's allowed list; replay: any allowed ID | gate and replay: own ID only (that the protocol declares it is a test), plus the per-pass calibration positions |
-| NEUTRAL block instruction, 2nd line | 보정할 때와 같은 기본 위치입니다 (as during calibration) | 보정 1회차와 같은 기본 위치입니다 (as in calibration pass 1) |
-| Setup intro | 새 보정(3회차 × 9점) | 새 보정(3회차 × 9점: 기본 → 조금 높게 → 조금 낮게) |
-| Data tool | `import` files every declared candidate | same, plus opt-in `--calibration-id` |
-| Golden synthetic session | A identity | `attempts.csv` and `events.csv` byte-identical to A's; metadata/snapshot differ only in calibration ID, the 27 position labels and the inputs hash that covers them |
+| Presentation success rate | Successful / 32. Success: complete, ≥ 10 valid samples, valid coverage ≥ 0.80, mean sample error ≤ 0.10 | ≥ 0.80 |
+| p95 error | Nearest-rank p95 of presentation mean errors over technically eligible presentations (complete, ≥ 10 valid samples, coverage ≥ 0.5); INSUFFICIENT_DATA below 26 eligible | ≤ 0.20 |
+| Jitter | Mean over eligible presentations of the RMS distance of valid samples from their centroid | ≤ 0.05 |
+| Availability | Valid / all measurement-phase attempts (invalid and out-of-range included) | ≥ 0.90 |
+| Valid samples per second | Valid measurement samples / 48 s | ≥ 10 /s |
+| p95 processing latency | Frame acceptance to publication, all settling and measurement attempts | ≤ 200 ms |
 
-Schedules, timings, thresholds, criteria, eligibility rules, insufficient-data handling, log and snapshot schemas,
-resets, guards and metric code are the same.
+A block is MET only if all six criteria are MET; a session is MET only if all three blocks are MET. Percentiles are
+never averaged and no pooled metric replaces a criterion.
 
-## 6. Phone procedure: fresh calibration and one session
+## 3. Sessions and results
 
-1. Start tracking (**카메라 시작**) with the phone fixed on the stand; measure the eye–screen distance at the neutral
-   position with a ruler.
-2. **보정 시작**: complete all three passes (ordinary → higher → lower, moving only in the 3 s breaks) until "보정
-   완료" and the tutorial appear. Do not choose recalibration in the tutorial.
-3. Leave the tutorial with Back, tap **설정 · 개발자 기능**, then **시선 정확도 평가 · 보정 비교 (개발용)**.
-4. Check the status lines: "이 빌드의 보정 후보: calibration_b_three_pass_positions", "새 보정: 준비됨 · 27점 · …" and
-   "평가를 시작할 수 있습니다." If it says 시작 불가 (cannot start), follow the message (usually: calibrate again).
-5. Under **세션 선택**, choose exactly one: **PILOT01 · TB1 · 기술 시험 (공식 아님)** for the technical pilot, or
-   **ANNA · B1 · 기본 → 위 → 아래 (공식)** / **ANNA · B2 · 아래 → 위 → 기본 (공식)**. Fill in 눈–화면 거리 (cm),
-   조명, 안경 and **자세 기준 메모** (the same physical markers as candidate A's sessions). Keep **블라인드 측정
-   (기본)**. Tap **평가 시작**.
-6. For each block: "블록 k/3 준비 · <position>" with the instruction (NEUTRAL: "편한 정면 자세를 잡아 주세요 / 보정
-   1회차와 같은 기본 위치입니다"). The participant moves (phone untouched), the operator taps **준비 완료** gently, a
-   3-2-1 countdown follows, then 32 blue dots (80 s). No pointer; gaze clicks, scrolling and dictation are off.
-7. After block 3: "평가 완료 · ANNA B1 · 3블록 96개 목표" and the session folder. Back, leaving the screen,
-   screen-off, rotation or stopping tracking end the session as incomplete; the calibration is then used up.
+All recordings were exported read-only on 2026-11-16 at 01:34:37 UTC and left on the phone (archive outside the
+repository: `C:\Users\user\Desktop\calibartion\phone-exports\candidate-b-collection-20261116T013436Z\export-20261116T013437Z.tar`,
+SHA-256 `2b6cbf241212cfe517398d2bd609a73e3281472e9f38ada926198610828bf56f`). The phone holds both candidates' data
+(same app ID); `import --calibration-id calibration_b_three_pass_positions` copied only B.
 
-Each official session (B1, then B2) needs its own fresh calibration. Keep stand, distance, lighting and markers the
-same as for candidate A.
+| Session ID | Participant / label | Recorded (UTC) | State | Official | Use |
+|---|---|---|---|---|---|
+| `eval-20261116T012500Z-9ca55817` | ANNA / B1 | 2026-11-16 01:25:00–01:29:27 | complete: 3/3 blocks, 96/96 presentations, `completed` | **yes** (analyzer: planned label and order, clean build, fresh verified calibration, blind mode) | **Selected** |
+| `eval-20261115T093800Z-761b3d19`, `eval-20261115T130702Z-4ee40520` | ANNA (candidate A) | 2026-11-15 | complete | — | Not B data: skipped by the import, never copied |
 
-## 7. Export, verify, import, freeze, replay, analyze
-
-From the repository root (PowerShell). Set `JAVA_HOME` only in the build shell; the SDK path comes from the ignored
-`local.properties`.
-
-```powershell
-# 1. Read-only export of all sessions on the phone (adb exec-out run-as ... tar), then verify checksums.
-python -B docs\calibration-comparison\tools\calib_eval_data.py export --adb "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" --serial <serial> --out docs\calibration-comparison\data\incoming
-python -B docs\calibration-comparison\tools\calib_eval_data.py verify docs\calibration-comparison\data\incoming\export-<UTC>
-
-# 2. Import candidate B sessions only. Both candidates use app ID dev.gazedot, so if B was installed over A the export
-#    also holds A's sessions; --calibration-id lists them as skipped and never copies them into this branch.
-python -B docs\calibration-comparison\tools\calib_eval_data.py import docs\calibration-comparison\data\incoming\export-<UTC>\files\evaluation\calibration-comparison\PILOT01 --raw docs\calibration-comparison\data\pilot --allow-pilot --calibration-id calibration_b_three_pass_positions
-python -B docs\calibration-comparison\tools\calib_eval_data.py import docs\calibration-comparison\data\incoming\export-<UTC>\files\evaluation\calibration-comparison\ANNA --raw docs\calibration-comparison\data\raw --calibration-id calibration_b_three_pass_positions
-
-# 3. Freeze the official inputs before analysis, and check them later.
-python -B docs\calibration-comparison\tools\calib_eval_data.py freeze docs\calibration-comparison\data\raw --out docs\calibration-comparison\data\raw-inputs.sha256
-python -B docs\calibration-comparison\tools\calib_eval_data.py check-frozen docs\calibration-comparison\data\raw docs\calibration-comparison\data\raw-inputs.sha256
-
-# 4. Exact numerical replay with the app's own GazeModel.fit / GazePipeline.process.
-.\gradlew.bat :app:testDebugUnitTest --tests dev.gazedot.EvaluationReplayRunner -PgazeReplaySession=docs/calibration-comparison/data/raw -PgazeReplayOut=docs/calibration-comparison/data/derived/replay
-
-# 5. Analysis by candidate and head position (select sessions in data\analysis-inputs.json: {"included": [{"session_id": "..."}]}).
-python -B docs\calibration-comparison\tools\analyze_calibration_eval.py docs\calibration-comparison\data\raw --out docs\calibration-comparison\data\derived --selection docs\calibration-comparison\data\analysis-inputs.json --source-label "<build commit, selection>"
-```
-
-For the pilot, run steps 4 and 5 on `data\pilot` with `--out` outside `data\derived`. Keep the export archive and its
-`.sha256` outside the repository as the backup. Data layout: [`data/raw/`](data/raw/README.md) (official, byte-exact),
-[`data/pilot/`](data/pilot/README.md) and [`data/incoming/`](data/incoming/README.md) (Git-ignored),
-[`data/derived/`](data/derived/README.md) (generated), [`figures/`](figures/README.md) (none yet for B). Synthetic
-fixtures live only in [`tools/testdata/`](tools/testdata/README.md).
-
-## 8. Build and automated checks
-
-```powershell
-$env:JAVA_HOME = "<path to JDK 17 or 21>"   # this shell only
-.\gradlew.bat :app:assembleDebug :app:testDebugUnitTest :app:lintDebug
-python -B -m unittest discover -s docs\calibration-comparison\tools -v
-```
-
-Results on 2026-11-15 (Windows 11, Microsoft OpenJDK 21.0.12.1, Gradle 8.13, AGP 8.9.2, Python 3.14), offline, all
-data synthetic, no phone involved:
+No B2, no technical pilot, no incomplete or interrupted session. Selection is by session ID, fixed from metadata and
+checksums before any metric was computed ([`data/analysis-inputs.json`](data/analysis-inputs.json)).
 
 | Check | Result |
 |---|---|
-| `:app:assembleDebug` | BUILD SUCCESSFUL |
-| `:app:testDebugUnitTest` | 129 tests, 0 failures, 0 errors, 2 skipped (the opt-in `EvaluationReplayRunner` and `SyntheticSessionWriter`). The 73 tests of `752d174` (49 base + 19 `CalibrationControllerTest` + 5 `CalibrationPlanTest`) are unchanged and pass |
-| `:app:lintDebug` | 0 errors, 30 warnings, identical to `752d174` by issue ID and file |
-| Kotlin compiler | only the pre-existing `setDecorFitsSystemWindows` deprecation warning in `MainActivity.kt` |
-| Python tool tests | 49 tests OK (analyzer 38, data tool 11) |
-| End-to-end, synthetic | Kotlin writer → export layout (plus a sibling-candidate session) → verify → `import --calibration-id` (B imported, sibling skipped) → freeze/check-frozen → analyze → Kotlin replay: replay `ok`, parameters bit-identical, 0 mismatches (3,783 and 1,777 processed attempts). Candidate A's committed analyzer gives byte-identical outputs on the same input |
+| Checksums and frozen inputs | Device `SHA256SUMS` verified in the export and after the byte-for-byte import; [`data/raw-inputs.sha256`](data/raw-inputs.sha256) (5 files) still matches after analysis and plotting |
+| Identity | Candidate `calibration_b_three_pass_positions`, positions by pass `ordinary, higher, lower`; build `011fa7c`, clean; protocol hash, pipeline `home_screen_gaze_pipeline_e8fa01e`, predictor `GazeModel`; snapshot with 27 anchors labelled pass 1–3 × point 1–9 and their positions |
+| Accounting | 3,058 attempts accepted = recorded = written, 0 rows lost; preparation 193, countdown 105, settling 1,110, measurement 1,650; 3,055 processed, 3 dropped at block starts by design, 0 processing errors; 4 pipeline resets; analyzer: 0 integrity errors, 0 issues, 0 unassigned rows; 32 of 32 presentations technically eligible in every block |
+| Exact replay | All 27 anchors refit to bit-identical parameters; 3,055 processed attempts re-run through `GazePipeline.process` with **0 mismatches** (exact strings), 4 resets. The source of the original APK (`8cbfd08`, separate checkout) gives a byte-identical replay report ([report](data/derived/replay/calibration_b_three_pass_positions/ANNA/eval-20261116T012500Z-9ca55817/replay_report.json)) |
 
-What the B checks cover, beyond candidate A's evaluation tests:
+| Session | Pose | Success | p95 error | Jitter | Availability | Valid samples/s | p95 latency | Verdict |
+|---|---|---|---|---|---|---|---|---|
+| B1 `9ca55817` | NEUTRAL (block 1) | 4/32 (0.125) ✗ | 0.307 ✗ | 0.035 ✓ | 1.000 ✓ | 11.4 ✓ | 57.5 ms ✓ | NOT_MET |
+| B1 `9ca55817` | HIGHER (block 2) | 11/32 (0.344) ✗ | 0.280 ✗ | 0.035 ✓ | 1.000 ✓ | 11.4 ✓ | 57.9 ms ✓ | NOT_MET |
+| B1 `9ca55817` | LOWER (block 3) | 3/32 (0.094) ✗ | 0.278 ✗ | 0.045 ✓ | 0.998 ✓ | 11.5 ✓ | 58.5 ms ✓ | NOT_MET |
+| Target | | ≥ 0.80 | ≤ 0.20 | ≤ 0.05 | ≥ 0.90 | ≥ 10 | ≤ 200 ms | |
 
-- **Calibration.** Three passes × nine targets in the original order, `ordinary`/`higher`/`lower` per pass,
-  movement instructions only in the inter-pass breaks, original per-point rules, and exactly one fit after the 27th
-  anchor (`752d174` tests); the real controller's outcome is accepted by the evaluation gate and its snapshot refits
-  exactly (`EvaluationStateTest`).
-- **Gating.** Fresh calibration only; one session per calibration; a failed or cancelled recalibration cannot pass
-  off the retained model; the sibling candidate's ID and wrongly labelled passes are refused.
-- **Protocol and plan.** Kotlin constants equal the shared manifest; the plan's official entries are the protocol's
-  B entries, its pilot is `PILOT*` and disjoint; the setup offers exactly the plan; the plan names the embedded
-  protocol hash.
-- **Equivalence with A.** B's logger writes the golden session with `attempts.csv` and `events.csv` byte-identical to
-  candidate A's committed fixture; the Python tests analyze equivalent synthetic sessions (and the golden session)
-  under both candidate IDs and require identical metrics, verdicts and aggregates.
-- During development, injected faults (positions ignored by the eligibility check, B2's order changed, the identity
-  check removed) each made at least one of these tests fail.
+**Session verdict: NOT_MET** (official session; not met in NEUTRAL, HIGHER and LOWER).
 
-## 9. Known limitations and on-device checks still needed
+Supporting values (equal weight per presentation; NEUTRAL / HIGHER / LOWER): mean presentation error 0.196 / 0.136 /
+0.178; median 0.179 / 0.129 / 0.186; horizontal bias −0.128 / +0.072 / −0.144 and vertical bias −0.121 / +0.080 /
+−0.041 (positive = estimate right of or below the target); model clamp active for 4.9% / 0.5% / 3.8% of valid
+samples. Every presentation had at least 16 valid samples and coverage of at least 0.94, so all 78 unsuccessful
+presentations failed on the error condition alone.
 
-- **No evaluation session has run on a phone, and B's calibration has not run on a phone.** Layout and legibility of
-  the calibration and evaluation screens, real per-point and break timing, repositioning within the 3 s breaks, the
-  setup radio list, preparation/Ready/countdown, block transitions, Back/background/screen-off handling, file
-  finalization and `export` (`run-as` + `tar`) on the device are verified offline only. The technical pilot
-  (PILOT01 / TB1) is the first check.
-- Whether the higher and lower positions stay within the model's unchanged validity range (face within ±0.12 of the
-  mean of the three calibration positions, scale 0.72–1.28) is unknown; out-of-range frames count as invalid
-  (`out_of_range`). The rule is deliberately not loosened. The unchanged fit thresholds may reject more B than A
-  calibrations; that would be a result, not a reason to change them.
-- One timeout among 27 points fails the whole calibration; repositioning that is still under way when a pass starts
-  restarts or times out the first point.
-- Candidates A, B and the baseline share application ID `dev.gazedot` and the debug signature. Installing B over A
-  (`adb install -r`) keeps A's app data, including A's session files and remembered conditions (B reads only distance,
-  lighting, glasses and markers from them); uninstalling A deletes A's on-phone sessions, so A's export and backup must
-  be complete first. Only one candidate can be installed at a time.
-- The Ready button is tapped on the fixed phone; tap gently.
-- The root `README.md` still describes the nine-point flow, and some status texts still say "9점 보정".
+Complete numerical outputs (generated, never edited by hand) in [`data/derived/`](data/derived/README.md):
+[`report.md`](data/derived/report.md) · [`summary.json`](data/derived/summary.json) (everything, unrounded) ·
+[`sessions.csv`](data/derived/sessions.csv) · [`blocks.csv`](data/derived/blocks.csv) ·
+[`presentations.csv`](data/derived/presentations.csv) · descriptive `diagnostic_*.csv` (region and pass, pass
+comparison, clamp edges, axis gain, face position by block, calibration anchors and summary) · plotted values in
+[`target_summary.csv`](figures/final/ANNA_B1_9ca55817/target_summary.csv) with
+[`figures-manifest.json`](figures/final/ANNA_B1_9ca55817/figures-manifest.json).
 
-Accuracy remains **NOT_MEASURED**. No candidate B session results, figures or conclusions exist.
+## 4. Figures
+
+The two summary figures of candidate A's report, drawn by the same tool ([`figures/`](figures/README.md)). Per target
+they combine the session's three blocks and two passes (six presentations, all eligible here), matched by grid
+position, each presentation weighted equally:
+
+- **Target vs average estimated gaze.** The screen to scale (x right, y down). Blue crosses: the 16 targets; orange
+  circles: mean of the six presentation centroids; arrows: target → average.
+- **Average target error.** One bar per target: mean of the six presentation mean sample errors (not the distance
+  to the averaged position, in which opposite errors cancel). Dashed line: the 0.10 per-presentation error condition,
+  for reference only.
+
+In this session HIGHER's horizontal offset has the opposite sign to NEUTRAL's and LOWER's, so the circles sit closer
+to the targets than any single block's estimates; the bars and the per-block table above are the basis for
+conclusions. Per-block values are in the derived tables (no per-block figures were drawn).
+
+### Session ANNA / B1 (`eval-20261116T012500Z-9ca55817`, official)
+
+<a href="figures/final/ANNA_B1_9ca55817/cand_b_anna_b1_9ca55817_all_poses_gaze_map.svg"><img src="figures/final/ANNA_B1_9ca55817/cand_b_anna_b1_9ca55817_all_poses_gaze_map.png" alt="Target vs average estimated gaze, candidate B, ANNA B1, all head positions combined" width="380"></a>
+
+[![Average target error across the six presentations, candidate B, ANNA B1](figures/final/ANNA_B1_9ca55817/cand_b_anna_b1_9ca55817_all_poses_target_error.png)](figures/final/ANNA_B1_9ca55817/cand_b_anna_b1_9ca55817_all_poses_target_error.svg)
+
+The error axis is the tool's default 0–0.5 (largest bar 0.22, nothing cropped). Candidate A's final figure needed
+0–0.65; a side-by-side comparison should redraw both on one axis.
+
+## 5. Analysis
+
+One official session. Section 5.1 reports measurements; 5.2 lists possible explanations, none established.
+
+### 5.1 Observations
+
+**Tracking was not the problem.** No attempt in the whole session was out of the model's validity range; invalid
+measurement attempts were 0, 0 and 1 (a blink). Valid sample rates 11.4–11.5 /s, latency p95 57.5–58.5 ms and jitter
+0.035–0.045 met their targets (LOWER's jitter is closest to the 0.05 limit).
+
+**Accuracy failed through systematic offsets.** The distance from target to presentation centroid averages 0.189 /
+0.132 / 0.172, almost the whole mean error (0.196 / 0.136 / 0.178), while jitter is about 0.04. Presentations with a
+mean error of at most 0.20: 18, 27 and 20 of 32; at most 0.10 (success): 4, 11 and 3.
+
+| Block | Horizontal bias | Vertical bias | Main pattern |
+|---|---|---|---|
+| NEUTRAL | −0.128 (≈ 138 px left) | −0.121 (≈ 281 px up) | Error grows from left to right (columns 1–4: 0.099, 0.171, 0.222, 0.290); the leftward bias grows with it (−0.052 → −0.228) |
+| HIGHER | +0.072 (≈ 78 px right) | +0.080 (≈ 186 px down) | Error grows from right to left (columns 4 → 1: 0.078 → 0.211); best block (11 successes, 8 of them in pass 2) |
+| LOWER | −0.144 (≈ 155 px left) | −0.041 (≈ 95 px up) | Error grows to the right (0.142 → 0.217) and downward (rows A–D: 0.115, 0.158, 0.213, 0.226) |
+
+The horizontal estimate is compressed: the slope of the mean estimate on the target is 0.72, 0.75 and 0.81 in x
+against 0.97, 0.89 and 0.92 in y. In NEUTRAL and LOWER the right-hand targets were estimated well left of their
+position; in HIGHER the whole pattern shifted right and down. Combined over the session, per-target errors range
+from 0.109 (A2) to 0.220 (D4), lower in the top row (0.109–0.159) than in rows C–D (0.152–0.220).
+
+**Clamping is minor.** The model clamp acted on 4.9% / 0.5% / 3.8% of valid samples (NEUTRAL: 27 samples above the
+top edge, 20% of row A; LOWER: 13 left of the screen). The unclamped linear output's mean error (0.204 / 0.134 /
+0.184) is close to the measured one, so the clamp neither hides nor causes the offsets.
+
+**The evaluation positions did not match the calibration positions.** Logged face_y relative to the calibration
+reference (mean of the 27 anchors, face_y 0.688, scale 0.158; larger = lower in the image):
+
+| | Ordinary / NEUTRAL | Higher / HIGHER | Lower / LOWER |
+|---|---|---|---|
+| Calibration passes | −0.019 | −0.027 | +0.046 |
+| Evaluation blocks (valid measurement samples) | −0.052 | −0.083 | −0.043 |
+
+All three evaluation blocks had the face higher in the image than the calibration's ordinary pass. HIGHER was 0.032
+above NEUTRAL, but LOWER only 0.009 below it and 0.088 above the calibration's lower pass. Face scale stayed within
+1.00–1.03 of the reference. The instructed positions were therefore realised differently in calibration and
+evaluation, and the evaluation covered a narrow, upward-shifted range.
+
+**Passes.** Pass 2 was worse than pass 1 in NEUTRAL (0.205 vs 0.187; 11 of 16 targets) and LOWER (0.192 vs 0.164; 13
+of 16; all 3 LOWER successes are pass 1) and better in HIGHER (0.125 vs 0.146; 7 of 16 worse). Pass 2 comes 40 s
+later and in reverse order, so time and order are confounded; the differences are not attributed to drift.
+
+**Calibration diagnostics are not accuracy.** The accepted fit's residual on its own anchors was 0.163 (limit
+0.18). It says nothing direct about evaluation accuracy and is not used as evidence for it. The vertical iris
+feature separated the calibration rows by 0.027 (row means −0.066, −0.051, −0.039), while the three passes differed
+by up to 0.012 at single targets.
+
+**Feasibility.** One usable calibration took four attempts on 2026-11-16; the two with larger head movements were
+rejected by the unchanged fit check. This is part of B's result.
+
+### 5.2 Possible explanations (not established)
+
+1. **Little pose diversity in the calibration actually used.** Its higher pass sits 0.008 from the ordinary one, so
+   it is closer to a two-position calibration (ordinary, lower). These results do not show how a calibration with
+   the intended three distinct positions would perform, because such calibrations were rejected.
+2. **Head-position mismatch.** The iris-only model maps iris features to the screen; the rejected calibrations showed
+   that raising the head shifts the vertical iris feature by about as much as looking from the top to the bottom row.
+   Evaluation blocks held the face higher than all calibration passes, which could contribute to the vertical
+   offsets and the block-to-block differences. True eye direction was not measured.
+3. **Horizontal compression** (slopes 0.72–0.81) could come from the averaged fit across poses or from a viewing
+   geometry different from the calibration's; the data cannot separate these.
+4. **HIGHER's better result** comes mostly from the right-hand targets (column 4: 0.078), where its rightward shift
+   offset the leftward compression seen in the other blocks. With one session this may be chance rather than a
+   property of the higher position.
+
+## 6. Known limitations and future work
+
+- **Size.** One participant, one phone (Samsung SM-S918N, 1080 × 2316 px), one official session (B1) and one
+  calibration. B2 (reversed order, `lhn`) was not recorded, so position and time since calibration are confounded.
+- **Reference.** Errors are measured against instructed fixation targets, not independently measured eye direction;
+  head positions were instructed, only the image-normalized face position is logged.
+- **Positions and conditions.** No physical position markers were written down ("-"); the movements were reduced
+  after rejected calibrations and differed between calibration and evaluation (5.1). Distance was declared (30 cm),
+  not measured; candidate A's sessions declared 20 cm, which matters for the later comparison. Lighting was declared
+  only as "room with normal light".
+- **Build.** Measured with the diagnostics build `011fa7c`; prediction code identical to `8cbfd08` (exact replay
+  under both).
+- **Calibration feasibility.** Larger head movements made the unchanged fit reject B's calibration; only small
+  movements passed.
+- **Future work.** Record B2 under written, physically marked positions and a measured distance shared with
+  candidate A. A head-aware prediction model (using head pose instead of only gating on it) is a separate, proposed
+  experiment and not part of these results. No winner between A and B is declared.
+
+## 7. Reproduction
+
+### 7.1 Environment
+
+Windows 11, PowerShell, from the repository root. Python 3.14 (standard library) for the data, analyzer and
+diagnostics tools and tests; matplotlib 3.11.2 with numpy 2.5.4 for figures only
+([`tools/requirements-plot.txt`](tools/requirements-plot.txt)). Kotlin replay: a JDK 17 or 21 set in the current shell
+only, Gradle wrapper 8.13, Android SDK path in the ignored `local.properties`, on a checkout of the recording's
+`build.git_commit` (`011fa7c`; no APK is built or installed). Phone export: `adb` and the installed debug build.
+
+### 7.2 Inputs and outputs
+
+| What | Path |
+|---|---|
+| Export archive (outside the repository) | `C:\Users\user\Desktop\calibartion\phone-exports\candidate-b-collection-20261116T013436Z\export-20261116T013437Z.tar` (+ `.sha256`) |
+| Raw session (byte-exact) | [`data/raw/`](data/raw/README.md)`calibration_b_three_pass_positions/ANNA/eval-20261116T012500Z-9ca55817/` |
+| Frozen raw-input list | [`data/raw-inputs.sha256`](data/raw-inputs.sha256) |
+| Selection manifest | [`data/analysis-inputs.json`](data/analysis-inputs.json) |
+| Calibration-attempt log excerpt | [`data/calibration-attempts/`](data/calibration-attempts/README.md) |
+| Analyzer, replay and diagnostic outputs | [`data/derived/`](data/derived/README.md) |
+| Figures | [`figures/final/ANNA_B1_9ca55817/`](figures/final/ANNA_B1_9ca55817/) |
+
+Tools in [`tools/`](tools/): `calib_eval_data.py` (export, verify, import with `--calibration-id`, freeze,
+check-frozen), `analyze_calibration_eval.py` (identical to candidate A's), `calib_eval_figures.py` 1.1.1 and
+`calib_eval_diagnostics.py` (candidate A's tools at `91994ea`: the diagnostics tool identical, the figure tool apart
+from its usage example; tests adapted to B's identity),
+`calib_eval_attempts.py` (calibration attempts from the debug log, B only), tests `test_*.py`.
+Staging and pilots: [`data/incoming/`](data/incoming/README.md), [`data/pilot/`](data/pilot/README.md) (Git-ignored).
+
+### 7.3 Commands
+
+```powershell
+# Export every recording read-only (archive and checksum outside the repository); import candidate B only.
+python -B docs\calibration-comparison\tools\calib_eval_data.py export --adb "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" --serial R3CW80G6PGW --out <new folder outside the repository>
+python -B docs\calibration-comparison\tools\calib_eval_data.py import C:\Users\user\Desktop\calibartion\phone-exports\candidate-b-collection-20261116T013436Z\export-20261116T013437Z --raw docs\calibration-comparison\data\raw --calibration-id calibration_b_three_pass_positions
+
+# Integrity. The frozen list was written once, after the import and before analysis, with
+# calib_eval_data.py freeze docs\calibration-comparison\data\raw --out docs\calibration-comparison\data\raw-inputs.sha256 (do not rerun).
+python -B docs\calibration-comparison\tools\calib_eval_data.py verify docs\calibration-comparison\data\raw
+python -B docs\calibration-comparison\tools\calib_eval_data.py check-frozen docs\calibration-comparison\data\raw docs\calibration-comparison\data\raw-inputs.sha256
+
+# Exact numerical replay with the app's own GazeModel.fit / GazePipeline.process (JVM unit test at the recorded build).
+$env:JAVA_HOME = "<path to JDK 17 or 21>"   # this shell only
+.\gradlew.bat :app:testDebugUnitTest --tests dev.gazedot.EvaluationReplayRunner -PgazeReplaySession=docs/calibration-comparison/data/raw/calibration_b_three_pass_positions/ANNA/eval-20261116T012500Z-9ca55817 -PgazeReplayOut=docs/calibration-comparison/data/derived/replay
+
+# Metrics (selection by session ID), descriptive diagnostics and the two summary figures.
+python -B docs\calibration-comparison\tools\analyze_calibration_eval.py docs\calibration-comparison\data\raw --out docs\calibration-comparison\data\derived --selection docs\calibration-comparison\data\analysis-inputs.json --source-label "ANNA B1 eval-20261116T012500Z-9ca55817, build 011fa7cddd03d662c437bc9ed64704292485b8bd, selection analysis-inputs.json"
+python -B docs\calibration-comparison\tools\calib_eval_diagnostics.py --summary docs\calibration-comparison\data\derived\summary.json --selection docs\calibration-comparison\data\analysis-inputs.json --raw docs\calibration-comparison\data\raw --derived docs\calibration-comparison\data\derived
+python -B docs\calibration-comparison\tools\calib_eval_figures.py --summary docs\calibration-comparison\data\derived\summary.json --selection docs\calibration-comparison\data\analysis-inputs.json --figures docs\calibration-comparison\figures\final
+
+# Calibration attempts behind the session (debug-log excerpt; refit replica checked against the session snapshot).
+python -B docs\calibration-comparison\tools\calib_eval_attempts.py --log docs\calibration-comparison\data\calibration-attempts\notouchdiag-calibration-20261116.log --raw docs\calibration-comparison\data\raw --selection docs\calibration-comparison\data\analysis-inputs.json --derived docs\calibration-comparison\data\derived
+
+# Tool tests (synthetic sessions, plus a check of the repository's selection manifest and frozen list).
+python -B -m unittest discover -s docs\calibration-comparison\tools -v
+```
+
+On 2026-11-16 these commands produced the outputs above; rerunning the replay, analyzer, diagnostics and figures
+reproduces every file byte for byte, and the 85 Python tests pass (analyzer 38, data tool 11, figures 26,
+diagnostics 5, calibration attempts 5).
+
+### 7.4 Recording another session (B2)
+
+1. Fix the phone on its stand in portrait orientation; tap **카메라 시작** (Start camera); measure the eye–screen
+   distance at the ordinary position.
+2. Tap **보정 시작** (Start calibration) and complete the three passes (ordinary → slightly higher → slightly lower,
+   moving only in the 3 s breaks). A rejected fit now stays on the home screen as "보정 실패 · …"; calibrate again.
+3. After "시선 보정이 완료되었습니다!", press Back, then **설정 · 개발자 기능** → **시선 정확도 평가 · 보정 비교
+   (개발용)**. The status must read "이 빌드의 보정 후보: calibration_b_three_pass_positions", "새 보정: 준비됨 ·
+   27점 · …" and "평가를 시작할 수 있습니다."
+4. Choose **ANNA · B2 · 아래 → 위 → 기본 (공식)** (or **PILOT01 · TB1 · 기술 시험 (공식 아님)** for a technical pilot),
+   overwrite the pre-filled distance, lighting and **자세 기준 메모** with the actual values, keep **블라인드 측정
+   (기본)**, and tap **평가 시작**.
+5. For each block take the position shown, tap **준비 완료**, then follow 32 dots (80 s). Back, leaving the screen,
+   screen-off or stopping tracking end the session as incomplete and use up the calibration.
+6. Export and import as in 7.3; add the session to a new selection manifest and frozen list for the new scope (never
+   edit the existing ones) and record any excluded or incomplete session with its reason.

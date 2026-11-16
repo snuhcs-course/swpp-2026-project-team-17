@@ -1,0 +1,53 @@
+{
+  "manifest_schema_version": 1,
+  "purpose": "Session selection for the candidate B analysis and figures (protocol notouch-calibration-comparison-eval 1.0.0, log schema 4). Selection is by unique session_id. Labels are recorded exactly as in metadata.json and are not renamed.",
+  "selection_rule": "Decided from metadata.json, SHA256SUMS, the export inventory and the import result only, before any metric was computed: include every candidate B (calibration_b_three_pass_positions) session that is complete (final_state complete, 3/3 blocks, 96/96 presentations), finalized with verified device checksums and recorded in blind_measurement mode from a clean build. Accuracy, availability and verdicts play no part in selection. Official status is not changed by selection: the analyzer applies the protocol's unchanged rule and every report states it.",
+  "raw_root": "docs/calibration-comparison/data/raw",
+  "frozen_inputs": "docs/calibration-comparison/data/raw-inputs.sha256",
+  "derived_outputs": "docs/calibration-comparison/data/derived",
+  "figures": "docs/calibration-comparison/figures/final",
+  "included": [
+    {
+      "participant_id": "ANNA",
+      "session_label": "B1",
+      "session_id": "eval-20261116T012500Z-9ca55817",
+      "calibration_id": "calibration_b_three_pass_positions",
+      "raw_path": "docs/calibration-comparison/data/raw/calibration_b_three_pass_positions/ANNA/eval-20261116T012500Z-9ca55817",
+      "designation": "complete; ANNA / B1 is a planned official session (collection plan and collection-plan-b.json, order nhl), recorded with order nhl",
+      "reason": "Complete blind_measurement session (3/3 blocks, 96/96 presentations, end_reason completed) after a fresh 27-anchor candidate B calibration (positions ordinary, higher, lower; calibration serial 2 of the tracking process, 0 sessions before on it, refit verified, fit_error 0.16314242655795308), build 011fa7cddd03d662c437bc9ed64704292485b8bd with git_dirty_at_build false and source base ancestor true, device checksums verified on export and import, 0 logging rows lost. The only candidate B session on the phone.",
+      "measured_build_note": "011fa7c is the diagnostics build installed on 2026-11-16, not the original evaluation APK 8cbfd08. Between the two commits every prediction, calibration, evaluation-logging and protocol source file is identical (git diff 8cbfd08 011fa7c touches only GazeDiagnostics.kt, the status-message fix in TrackerState/TrackingService/MainActivity, two tutorial log lines and their tests). The predictor is the original iris-based GazeModel; no face-position model exists in the app."
+    }
+  ],
+  "excluded": [],
+  "pilot_sessions": [],
+  "incomplete_sessions": [],
+  "calibration_attempts_before_the_session": {
+    "source": "logcat tag NoTouchDiag of build 011fa7c, captured to C:\\Users\\user\\Desktop\\calibartion\\phone-debug\\b-after-calibration-20261116T004033Z\\diagnostics-011fa7c\\notouchdiag-live.log (outside the repository). Context only; calibration attempts are not sessions and play no part in selection.",
+    "attempts": [
+      {"time_kst": "2026-11-16 10:05:59-10:07:28", "result": "FIT_REJECTED", "fit_error_offline_replica": 0.2354, "face_y_higher_minus_ordinary": -0.090, "face_y_lower_minus_ordinary": 0.058},
+      {"time_kst": "2026-11-16 10:08:37-10:10:06", "result": "FIT_REJECTED", "fit_error_offline_replica": 0.2567, "face_y_higher_minus_ordinary": -0.025, "face_y_lower_minus_ordinary": 0.099},
+      {"time_kst": "2026-11-16 10:18:47-10:20:15", "result": "accepted", "fit_error": 0.14378287145383617, "face_y_higher_minus_ordinary": -0.014, "face_y_lower_minus_ordinary": 0.045, "note": "tracking stopped at 10:21:20, which discards the model; never used by a session"},
+      {"time_kst": "2026-11-16 10:21:59-10:23:27", "result": "accepted", "fit_error": 0.16314242655795308, "face_y_higher_minus_ordinary": -0.008, "face_y_lower_minus_ordinary": 0.065, "note": "the calibration of eval-20261116T012500Z-9ca55817"}
+    ],
+    "earlier": "Two calibration attempts on 2026-11-15 23:37-23:40 with build 8cbfd08 ended on the home screen without a model (inferred from logs; see the phone-debug README)."
+  },
+  "export_provenance": {
+    "archive": "C:\\Users\\user\\Desktop\\calibartion\\phone-exports\\candidate-b-collection-20261116T013436Z\\export-20261116T013437Z.tar",
+    "archive_sha256": "2b6cbf241212cfe517398d2bd609a73e3281472e9f38ada926198610828bf56f",
+    "exported_utc": "2026-11-16T01:34:37Z",
+    "sessions_in_export": [
+      "ANNA/eval-20261115T093800Z-761b3d19 (candidate A, skipped by --calibration-id)",
+      "ANNA/eval-20261115T130702Z-4ee40520 (candidate A, skipped by --calibration-id)",
+      "ANNA/eval-20261116T012500Z-9ca55817 (candidate B, imported)"
+    ],
+    "temporary_or_unfinalized_files_in_export": [],
+    "phone": "Samsung SM-S918N (serial R3CW80G6PGW); recordings left on the phone"
+  },
+  "never_included": [
+    "Candidate A sessions (other calibration ID; separate compatibility group, never pooled)",
+    "Technical-pilot sessions (PILOT01 / TB1, stored under data/pilot/); none were recorded",
+    "Iteration 3 sessions (schema 3, another application base)",
+    "Synthetic fixtures (tools/testdata/ and test-generated sessions)",
+    "Offline exploratory models (the face-position variant in phone-debug/ was never part of the app)"
+  ]
+}

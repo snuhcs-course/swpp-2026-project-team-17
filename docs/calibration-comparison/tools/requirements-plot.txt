@@ -1,0 +1,4 @@
+# Plotting dependency for calib_eval_figures.py only (the analyzer, data, diagnostics and test tools use the standard
+# library). Tested with Python 3.14.6, matplotlib 3.11.2 and numpy 2.5.4 (installed with matplotlib); the figure
+# checksums in data/derived/figures-manifest.json were produced with exactly these versions.
+matplotlib==3.11.2
