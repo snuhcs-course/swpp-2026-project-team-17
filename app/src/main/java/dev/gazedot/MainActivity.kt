@@ -59,11 +59,8 @@ class MainActivity : ComponentActivity() {
         }
     }
     private val faceSetup = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if(result.resultCode == android.app.Activity.RESULT_OK && TrackerState.running) startNinePointCalibration()
+        if(result.resultCode == android.app.Activity.RESULT_OK && TrackerState.running) startScreenCalibration()
         else { TrackerState.status="얼굴 기준 측정 취소 · 기존 보정 유지"; showHome() }
-    }
-    private val headSetup = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        if (intent.hasExtra(EXTRA_RECOVERY_ACTION)) finish() else showCalibrationTutorial()
     }
     private fun showCalibrationTutorial() {
         if(!TrackerState.running) { showHome(); return }
@@ -162,7 +159,7 @@ class MainActivity : ComponentActivity() {
             calibration?.close()
             calibration = null
             TrackerState.cancelCalibration()
-            TrackerState.status = "보정이 중단되었습니다. 다시 9점 보정을 시작하세요."
+            TrackerState.status = "보정이 중단되었습니다. 다시 5점 보정을 시작하세요."
             showHome()
         }
     }
@@ -314,7 +311,7 @@ class MainActivity : ComponentActivity() {
             startCalibration()
         }
         addStep("3", "시선 테스트", "추가 보정 후 새 목표에서 오차를 확인합니다.", 26, "정밀 보정") {
-            if (TrackerState.model == null) status.text = "먼저 9점 보정을 완료해 주세요"
+            if (TrackerState.model == null) status.text = "먼저 5점 보정을 완료해 주세요"
             else startActivity(Intent(this, AccuracyActivity::class.java))
         }
 
@@ -434,7 +431,7 @@ class MainActivity : ComponentActivity() {
         tutorial?.close();tutorial=null
         faceSetup.launch(Intent(this,FaceSetupActivity::class.java))
     }
-    private fun startNinePointCalibration() {
+    private fun startScreenCalibration() {
         if (!TrackerState.running || TrackerState.fault != null) {
             if (::status.isInitialized) status.text = "보정을 시작할 수 없어요. 카메라를 시작하고 눈이 검출되면 다시 선택해 주세요."
             return
@@ -450,12 +447,9 @@ class MainActivity : ComponentActivity() {
 
     private inner class CalibrationView(private val session: Long) : View(this@MainActivity) {
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-        private val targets = listOf(.5 to .5, .15 to .15, .5 to .15, .85 to .15,
-            .85 to .5, .85 to .85, .5 to .85, .15 to .85, .15 to .5)
+        private val targets = listOf(.5 to .5, .18 to .18, .82 to .18, .82 to .82, .18 to .82)
         private var index = 0
         private var since = SystemClock.uptimeMillis()
-        private val blinkBreakDurationMs = 2_000L
-        private var blinkBreakUntil = 0L
         private val samples = mutableListOf<EyeFeatures>()
         private val anchors = mutableListOf<Anchor>()
         private var poseReference: HeadPose? = null
@@ -466,7 +460,7 @@ class MainActivity : ComponentActivity() {
             override fun run() {
                 if (closed || calibration !== this@CalibrationView) return
                 val now = SystemClock.uptimeMillis()
-                if (!isTakingBlinkBreak(now) && now - since > 9000) {
+                if (now - since > 15000) {
                     finish(null, "눈 표본이 부족합니다. 조명·거리·안경 반사를 확인하고 다시 보정하세요.")
                     return
                 }
@@ -479,22 +473,12 @@ class MainActivity : ComponentActivity() {
             removeCallbacks(tick)
             samples.clear()
             anchors.clear()
-            blinkBreakUntil = 0L
         }
         override fun onDetachedFromWindow() { close(); super.onDetachedFromWindow() }
-        private fun isTakingBlinkBreak(now: Long): Boolean {
-            if (blinkBreakUntil == 0L) return false
-            if (now < blinkBreakUntil) return true
-            blinkBreakUntil = 0L
-            // Start point five's settling and timeout clocks after the break, even without eye detection.
-            since = now
-            hint = "${index + 1} / 9 · 파란 점을 계속 바라보세요"
-            return false
-        }
         fun onFrame(sample: GazeSample?) {
             if (closed || index >= targets.size || width == 0 || height == 0) return
             val now = SystemClock.uptimeMillis()
-            if (isTakingBlinkBreak(now)) return
+            if (sample != null && sample.timestampMs <= lastSampleAt && now-sample.timestampMs in 0..250) return
             val elapsed = now - since
             // Keep collecting open-eye features even when the old model rejects this pose.
             val f = sample?.calibrationFeatures(now, lastSampleAt)
@@ -503,6 +487,7 @@ class MainActivity : ComponentActivity() {
                 hint = "눈 검출 대기 · 눈을 뜨고 얼굴을 카메라로 향해 주세요"
                 invalidate(); return
             }
+            if(f.source != GazeSource.ITRACKER) { samples.clear(); hint="iTracker 출력 대기"; return }
             lastSampleAt = sample.timestampMs
             val head = f.head
             if (head == null) {
@@ -516,7 +501,7 @@ class MainActivity : ComponentActivity() {
                 hint = "처음 머리 위치로 돌아오세요 · 고개는 고정하고 눈만 점으로"
                 invalidate(); return
             }
-            hint = "${index + 1} / 9 · 파란 점을 계속 바라보세요"
+            hint = "${index + 1} / 5 · 파란 점을 계속 바라보세요"
             if (elapsed < 1000) return
             samples += f
             if (samples.size >= 22 && elapsed >= 2500) {
@@ -534,7 +519,7 @@ class MainActivity : ComponentActivity() {
                     .normalize(location[0] + width * xy.first, location[1] + height * xy.second)
                 anchors += Anchor(eye, point.first, point.second)
                 index++; samples.clear(); since = SystemClock.uptimeMillis()
-                if (index == 4) blinkBreakUntil = since + blinkBreakDurationMs
+                // Five-point screen mapping; no head-motion training or mid-session break.
                 if (index == targets.size) {
                     val model = GazeModel.fit(anchors)
                     finish(model, if (model == null) "보정 실패 · 시선 변화가 불충분하거나 오차가 큽니다. 기기를 고정하고 다시 시도하세요."
@@ -548,31 +533,17 @@ class MainActivity : ComponentActivity() {
                 TrackerState.finishCalibration(session, model)
             }
             TrackerState.status = saved.exceptionOrNull()?.let { "보정 적용 실패: ${it.message}" } ?: message
-            // Match the exact normalization dimensions used for the calibration anchors above.
-            val bounds = DisplaySpace.bounds(this@MainActivity)
             close()
             calibration = null
             if (saved.getOrDefault(false) && TrackerState.running) {
-                headSetup.launch(Intent(this@MainActivity,HeadMotionActivity::class.java))
+                if (intent.hasExtra(EXTRA_RECOVERY_ACTION)) finish() else showCalibrationTutorial()
             } else if (intent.hasExtra(EXTRA_RECOVERY_ACTION)) finish() else showHome()
         }
         override fun onDraw(canvas: Canvas) {
             val target = targets.getOrNull(index) ?: return
             val d = resources.displayMetrics.density
             paint.color = Color.WHITE; paint.textSize = 15 * d; paint.textAlign = Paint.Align.CENTER
-            if (blinkBreakUntil != 0L) {
-                val secondsLeft = ((blinkBreakUntil - SystemClock.uptimeMillis() + 999) / 1000).coerceAtLeast(1)
-                canvas.drawText("시선 보정 4/9 완료 · 잠시 쉬어가기", width / 2f, 55 * d, paint)
-                paint.textSize = 20 * d
-                canvas.drawText("눈을 편하게 깜빡여 주세요", width / 2f, height / 2f, paint)
-                paint.textSize = 14 * d
-                canvas.drawText("${secondsLeft}초 후 나머지 5개를 이어서 진행합니다", width / 2f, height / 2f + 32 * d, paint)
-                paint.textSize = 12 * d
-                canvas.drawText("머리와 기기는 그대로 유지해 주세요", width / 2f, height - 70 * d, paint)
-                canvas.drawText("중단하려면 뒤로 가기", width / 2f, height - 45 * d, paint)
-                return
-            }
-            canvas.drawText("시선 보정 ${index + 1}/9", width / 2f, 55 * d, paint)
+            canvas.drawText("iTracker 화면 맞춤 ${index + 1}/5", width / 2f, 55 * d, paint)
             paint.textSize = 12 * d
             canvas.drawText(hint, width / 2f, height - 70 * d, paint)
             canvas.drawText("중단하려면 뒤로 가기", width / 2f, height - 45 * d, paint)

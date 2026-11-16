@@ -1,4 +1,5 @@
 import java.util.Properties
+import java.security.MessageDigest
 
 plugins {
     id("com.android.application")
@@ -20,8 +21,8 @@ android {
         applicationId = "dev.gazedot"
         minSdk = 26
         targetSdk = 35
-        versionCode = 16
-        versionName = "0.10.1-calibration-fix"
+        versionCode = 17
+        versionName = "0.11.0-itracker-research"
         buildConfigField("String", "PREDICTION_SERVER_URL", "\"$predictionUrl\"")
         buildConfigField("String", "PREDICTION_CLIENT_TOKEN", "\"$predictionToken\"")
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
@@ -40,5 +41,25 @@ dependencies {
     implementation("androidx.camera:camera-camera2:1.4.2")
     implementation("androidx.camera:camera-lifecycle:1.4.2")
     implementation("com.google.mediapipe:tasks-vision:0.10.26")
+    implementation("org.opencv:opencv:4.12.0")
     testImplementation("junit:junit:4.13.2")
 }
+
+val verifyITrackerAssets by tasks.registering {
+    val assetDir = layout.projectDirectory.dir("src/main/assets/itracker")
+    inputs.dir(assetDir)
+    doLast {
+        val weights = assetDir.file("weights.caffemodel").asFile
+        check(weights.isFile) { "Run python tools/itracker/prepare.py before building this research APK" }
+        val hash = MessageDigest.getInstance("SHA-256").digest(weights.readBytes())
+            .joinToString("") { "%02x".format(it) }
+        check(hash == "d748042ebd402a4b6418cdff44a6e64f9bca1256fd3761f7ddc68fd5519ef98a") {
+            "Wrong or incomplete official iTracker checkpoint"
+        }
+        for (name in listOf("left", "right", "face"))
+            check(assetDir.file("mean_$name.f32").asFile.length() == 602112L)
+        check(assetDir.file("deploy.prototxt").asFile.isFile)
+        check(assetDir.file("LICENSE.md").asFile.isFile)
+    }
+}
+tasks.named("preBuild").configure { dependsOn(verifyITrackerAssets) }

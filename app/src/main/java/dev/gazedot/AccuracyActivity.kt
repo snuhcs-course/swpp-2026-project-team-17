@@ -33,7 +33,7 @@ class AccuracyActivity : ComponentActivity() {
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
         val model=TrackerState.model
-        if(model==null || !TrackerState.running) { setContentView(TextView(this).apply { text="먼저 카메라와 9점 보정을 완료해 주세요." }); return }
+        if(model==null || !TrackerState.running) { setContentView(TextView(this).apply { text="먼저 카메라와 5점 보정을 완료해 주세요." }); return }
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         view=MeasurementView(model); setContentView(view)
     }

@@ -30,6 +30,7 @@ class TrackingService : LifecycleService() {
     private val main = Handler(Looper.getMainLooper())
     @Volatile private var closing = false
     private var landmarker: FaceLandmarker? = null
+    private var iTracker: ITrackerEngine? = null
     private var cameraProvider: ProcessCameraProvider? = null
     private var analysis: ImageAnalysis? = null
     private var overlay: DotOverlay? = null
@@ -154,8 +155,9 @@ class TrackingService : LifecycleService() {
                             .setOutputFaceBlendshapes(true).setOutputFacialTransformationMatrixes(true)
                             .setMinFaceDetectionConfidence(0.6f).setMinFacePresenceConfidence(0.6f)
                             .setMinTrackingConfidence(0.6f).build())
-                    main.post { if (!closing) bindCamera() }
-                } catch (e: Exception) { main.post { fail("눈 검출 모델을 시작하지 못했어요") } }
+                    iTracker = ITrackerEngine(this)
+                    main.post { if (!closing) {TrackerState.inferenceStatus="iTracker 사전학습 모델 준비 완료";bindCamera()} }
+                } catch (e: Exception) { main.post { fail("MediaPipe/iTracker 모델 로딩 실패 · ${e.javaClass.simpleName}") } }
             }
         } catch (e: SecurityException) { fail("카메라·실행 권한을 확인해 주세요", RecoverySetting.CAMERA) }
         catch (e: Exception) { fail("추적을 시작하지 못했어요") }
@@ -224,12 +226,20 @@ class TrackingService : LifecycleService() {
             val transform=result?.facialTransformationMatrixes()?.orElse(null)?.firstOrNull()
             val blends=result?.faceBlendshapes()?.orElse(null)?.firstOrNull()?.associate { it.categoryName() to it.score() } ?: emptyMap()
             val face=landmarks?.let { FaceGeometry.extract(it,upright.width,upright.height,now,transform,blends) }
-            val observation = landmarks?.let {
+            val landmarkObservation = landmarks?.let {
                 EyeObservations.observe(it, upright.width, upright.height,face,TrackerState.eyeProfile)
             } ?: EyeObservation(EyeState.LOST, null, 0.0, 0.0)
+            val cnnStart=SystemClock.uptimeMillis()
+            val cnn = if(landmarkObservation.state == EyeState.OPEN && landmarkObservation.features != null && landmarks != null)
+                iTracker?.predict(upright,landmarks) else null
+            val cnnMs=SystemClock.uptimeMillis()-cnnStart
+            val observation=landmarkObservation.copy(features=if(cnn==null)null else landmarkObservation.features?.copy(
+                x=cnn.first,y=cnn.second,leftX=cnn.first,leftY=cnn.second,rightX=cnn.first,rightY=cnn.second,source=GazeSource.ITRACKER))
             main.post {
                 if (closing || epoch != trackingEpoch || cameraFault != null) return@post
                 val at = SystemClock.uptimeMillis()
+                TrackerState.inferenceStatus=if(cnn!=null) "iTracker %.2f, %.2f cm · %d ms".format(cnn.first,cnn.second,cnnMs)
+                    else "iTracker 대기 · 양쪽 눈/얼굴이 온전히 보여야 합니다"
                 if (at - now > 250) {
                     resetTracking()
                     TrackerState.signalPending = true
@@ -251,7 +261,7 @@ class TrackingService : LifecycleService() {
                     TrackingQuality.CLOSED -> "눈 감김 감지"
                     TrackingQuality.UNCERTAIN -> "눈 상태 확인 중"
                     TrackingQuality.STALE -> "영상 처리가 지연됩니다 · 조작 일시 대기"
-                    TrackingQuality.OUT_OF_RANGE -> if (model == null) "눈 검출됨 · 9점 보정을 시작해 주세요"
+                    TrackingQuality.OUT_OF_RANGE -> if (model == null) "눈 검출됨 · 5점 보정을 시작해 주세요"
                         else "시선 좌표를 사용할 수 없어요 · 얼굴 위치를 확인해 주세요"
                     TrackingQuality.TRACKING -> "추적 중 · 홈으로 나가도 빨간 점이 표시됩니다"
                 }
@@ -438,7 +448,7 @@ class TrackingService : LifecycleService() {
         TrackerState.microphoneReady = false
         TrackerState.controls = false
         overlay?.close()
-        worker.execute { landmarker?.close(); landmarker = null }
+        worker.execute { landmarker?.close(); landmarker = null; iTracker?.close();iTracker=null }
         worker.shutdown()
         TrackerState.publish(null, if (TrackerState.status.startsWith("추적 중")) "추적 중지됨" else TrackerState.status)
         stopForeground(STOP_FOREGROUND_REMOVE)

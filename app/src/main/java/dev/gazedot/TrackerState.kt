@@ -6,6 +6,7 @@ object TrackerState {
     var model: GazeModel? = null
     @Volatile var eyeProfile: EyeProfile? = null
     var faceFrame: FaceFrame? = null
+    var inferenceStatus = "iTracker 준비 전"
     var controls = false
         set(value) {
             if (field == value) return

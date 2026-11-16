@@ -28,10 +28,11 @@ class DeveloperSettingsActivity : ComponentActivity() {
             root.addView(Button(this).apply { text = label; setOnClickListener { action() } })
         }
         button("도움 · 인식 문제 해결하기") { startActivity(Intent(this, RecoveryActivity::class.java)) }
-        button("머리 움직임 보정") { startActivity(Intent(this,HeadMotionActivity::class.java)) }
-        button("홍채 기준·머리 보정 결과") {
+        button("시선 모델 상태 · iTracker") { status.text=TrackerState.inferenceStatus+"\n사전학습 가중치 고정 · 5점은 화면 좌표 맞춤만 수행" }
+        root.addView(TextView(this).apply {text="시선 모델: iTracker / Eye Tracking for Everyone (Krafka et al., CVPR 2016). 연구용 모델 · 폰 안에서 실행합니다."})
+        button("홍채 기준 측정 결과") {
             val prefs=getSharedPreferences("personal",MODE_PRIVATE)
-            status.text=prefs.getString("eye_profile_report","홍채 측정 전")+"\n"+prefs.getString("head_report","머리 보정 전")
+            status.text=prefs.getString("eye_profile_report","홍채 측정 전")
         }
         val personal=getSharedPreferences("personal",MODE_PRIVATE)
         root.addView(Switch(this).apply {
@@ -46,7 +47,7 @@ class DeveloperSettingsActivity : ComponentActivity() {
         button("추가 정확도 보정만 해제") {
             TrackerState.model=TrackerState.model?.withCorrection(null)
             TrackerState.cancelActions?.invoke(); TrackerState.clearCoordinates()
-            status.text="기본 9점 보정으로 돌아왔습니다"
+            status.text="기본 5점 보정으로 돌아왔습니다"
         }
         button("최근 정확도 결과") { status.text=personal.getString("accuracy_report","측정 기록 없음") }
         button("버튼 학습 횟수 확인") {
@@ -58,7 +59,7 @@ class DeveloperSettingsActivity : ComponentActivity() {
             status.text="버튼 선택 학습을 초기화했습니다"
         }
         root.addView(TextView(this).apply {
-            text = "9점 보정 후 사용하세요.\n1초 응시: 클릭 · 윙크: 스크롤 모드 · 양눈 두 번 깜빡임: 받아쓰기"
+            text = "5점 보정 후 사용하세요.\n1초 응시: 클릭 · 윙크: 스크롤 모드 · 양눈 두 번 깜빡임: 받아쓰기"
         })
         button("접근성 서비스 설정") { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
         button("받아쓰기 마이크 권한 허용") {

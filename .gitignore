@@ -17,3 +17,5 @@ online-prediction.properties
 server/.venv/
 __pycache__/
 *.pyc
+# Upstream research-only assets are fetched locally, never published in Git.
+app/src/main/assets/itracker/
