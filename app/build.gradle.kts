@@ -11,6 +11,8 @@ val predictionProperties = Properties().apply {
 }
 val predictionUrl = predictionProperties.getProperty("PREDICTION_SERVER_URL", "")
     .replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "").replace("\r", "")
+val predictionToken = predictionProperties.getProperty("PREDICTION_CLIENT_TOKEN", "").trim()
+require(predictionToken.isEmpty() || predictionToken.matches(Regex("[A-Za-z0-9_-]{43}")))
 android {
     namespace = "dev.gazedot"
     compileSdk = 35
@@ -18,9 +20,10 @@ android {
         applicationId = "dev.gazedot"
         minSdk = 26
         targetSdk = 35
-        versionCode = 12
-        versionName = "0.9.0-texting-personal"
+        versionCode = 13
+        versionName = "0.9.1-texting-online"
         buildConfigField("String", "PREDICTION_SERVER_URL", "\"$predictionUrl\"")
+        buildConfigField("String", "PREDICTION_CLIENT_TOKEN", "\"$predictionToken\"")
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
     }
     compileOptions {

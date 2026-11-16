@@ -31,9 +31,10 @@ internal class WritingPredictions(private val changed: () -> Unit) {
         val c = URL(endpoint + path).openConnection() as HttpsURLConnection
         connection = c
         try {
-            c.connectTimeout = 2_000; c.readTimeout = 3_000
+            c.connectTimeout = 3_000; c.readTimeout = 22_000
             c.instanceFollowRedirects = false
             c.setRequestProperty("X-NoTouch-Session", session)
+            if (BuildConfig.PREDICTION_CLIENT_TOKEN.isNotBlank()) c.setRequestProperty("Authorization", "Bearer " + BuildConfig.PREDICTION_CLIENT_TOKEN)
             if (body != null) {
                 c.requestMethod = "POST"; c.doOutput = true
                 c.setRequestProperty("Content-Type", "application/json; charset=utf-8")
@@ -85,7 +86,7 @@ internal class WritingPredictions(private val changed: () -> Unit) {
                     changed()
                 }
             }
-            main.postDelayed(timeout, 5_000)
+            main.postDelayed(timeout, 25_000)
             worker.execute {
                 if (ticket != generation || !active) return@execute
                 val outcome = runCatching {
