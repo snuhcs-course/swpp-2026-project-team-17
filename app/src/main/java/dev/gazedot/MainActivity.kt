@@ -382,7 +382,7 @@ class MainActivity : ComponentActivity() {
     private fun homeStatus(): String {
         val current = TrackerState.currentStatus(SystemClock.uptimeMillis())
         val calibrationMessage = TrackerState.status.takeIf { it.startsWith("보정 실패") || it.startsWith("보정 취소") || it.startsWith("보정이 중단") || it.startsWith("눈 표본이 부족") }
-        return calibrationMessage ?: listOf(current.message, current.advice).filter { it.isNotBlank() }.joinToString("\n")
+        return calibrationMessage ?: listOf(current.message, current.advice, if(TrackerState.running) TrackerState.inferenceStatus else "").filter { it.isNotBlank() }.joinToString("\n")
     }
 
     private fun reportPermissionFault(message: String, setting: RecoverySetting) {

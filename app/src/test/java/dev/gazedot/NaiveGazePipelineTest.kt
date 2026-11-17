@@ -56,4 +56,23 @@ class NaiveGazePipelineTest {
         val next = pipeline.process(2166, 2166, observation(eye(0.0, 0.0)), model, true)
         assertEquals(0f, next.dwellProgress)
     }
+    @Test fun extendedTrackingDisplaysDelayedResultsWithoutClicking() {
+        val p=GazePipeline(750); val m=model()
+        for(t in 1000L..3000L step 100) {
+            val s=p.process(t,t+400,observation(eye(0.0,0.0)),m,true)
+            assertEquals(TrackingQuality.TRACKING,s.quality)
+            assertNotNull(s.point)
+            assertFalse(s.actions.any{it is EyeAction.Click || it is EyeAction.Scroll || it is EyeAction.Dictate})
+            assertEquals(0f,s.dwellProgress)
+        }
+        val expired=p.process(3100,3851,observation(eye(0.0,0.0)),m,true)
+        assertEquals(TrackingQuality.STALE,expired.quality);assertNull(expired.point)
+    }
+    @Test fun extendedTrackingStillRejectsDuplicatesFutureAndFaceLoss() {
+        val p=GazePipeline(750);val m=model()
+        p.process(1000,1400,observation(eye(0.0,0.0)),m,true)
+        assertEquals(TrackingQuality.STALE,p.process(1000,1450,observation(eye(0.0,0.0)),m,true).quality)
+        assertEquals(TrackingQuality.STALE,p.process(2000,1900,observation(eye(0.0,0.0)),m,true).quality)
+        assertNull(p.process(2100,2300,observation(null),m,true).point)
+    }
 }

@@ -19,7 +19,7 @@ data class GazeSample(
 }
 
 /** The original calibrated predictor and 0.28 smoothing, followed by interaction only. */
-class GazePipeline {
+class GazePipeline(private val trackingMaxAgeMs: Long = 250) {
     private val interaction = InteractionEngine()
     private var smoothed: Pair<Double, Double>? = null
     private var lastTimestamp: Long? = null
@@ -41,7 +41,7 @@ class GazePipeline {
     fun process(timestampMs: Long, nowMs: Long, observation: EyeObservation,
         predictor: GazeModel?, actionsEnabled: Boolean,
         targetKey: ((Pair<Double, Double>) -> String?)? = null): GazeSample {
-        if (timestampMs > nowMs || nowMs - timestampMs > 250 ||
+        if (timestampMs > nowMs || nowMs - timestampMs > trackingMaxAgeMs ||
             lastTimestamp?.let { timestampMs <= it } == true) {
             val previous = lastTimestamp
             val hadDwell = pending
@@ -50,7 +50,7 @@ class GazePipeline {
             return GazeSample(timestampMs, TrackingQuality.STALE, null, null, null, 0f,
                 if (hadDwell) listOf(EyeAction.Cancel) else emptyList())
         }
-        if (model !== predictor || lastTimestamp?.let { timestampMs - it > 250 } == true) reset()
+        if (model !== predictor || lastTimestamp?.let { timestampMs - it > trackingMaxAgeMs } == true) reset()
         model = predictor
         lastTimestamp = timestampMs
         if (observation.state == EyeState.LOST) {
@@ -75,7 +75,7 @@ class GazePipeline {
             observation.state == EyeState.CLOSED -> TrackingQuality.CLOSED
             else -> TrackingQuality.UNCERTAIN
         }
-        val actions = if (actionsEnabled && predictor != null) {
+        val actions = if (actionsEnabled && predictor != null && nowMs-timestampMs in 0..250) {
             val eye = if (quality == TrackingQuality.OUT_OF_RANGE) EyeState.LOST else observation.state
             interaction.update(timestampMs, eye, if (quality == TrackingQuality.TRACKING) smoothed else null, targetKey = if (quality == TrackingQuality.TRACKING) smoothed?.let { targetKey?.invoke(it) } else null, receivedAt = nowMs)
         } else {

@@ -35,7 +35,7 @@ class TrackingStatusTest {
         assertEquals(TrackingPhase.ERROR, status(result = lost, eye = EyeState.LOST,
             fault = TrackingFault("camera", "retry")).phase)
         assertEquals(TrackingPhase.SIGNAL_PENDING, status(result = lost, eye = EyeState.LOST, signal = true).phase)
-        assertEquals(TrackingPhase.SIGNAL_PENDING, status(result = sample(at = 500), eye = EyeState.LOST).phase)
+        assertEquals(TrackingPhase.SIGNAL_PENDING, status(result = sample(at = 249), eye = EyeState.LOST).phase)
     }
     @Test fun stoppedPausedAndCalibratingRemainExplicit() {
         assertEquals(TrackingPhase.STOPPED, status(running = false).phase)
