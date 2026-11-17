@@ -74,7 +74,7 @@ class TrackingService : LifecycleService() {
                 TrackerState.recoveryOpening = false
                 TrackerState.cancelActions?.invoke()
             }
-            val waiting = if (lastResult == 0L) now - startedAt > 3_000 else now - lastResult > 250
+            val waiting = if (lastResult == 0L) now - startedAt > 3_000 else now - lastResult > (if(TrackerState.faceSetupActive) 750 else 250)
             if (waiting && !TrackerState.signalPending) {
                 resetTracking()
                 TrackerState.signalPending = true
@@ -216,6 +216,7 @@ class TrackingService : LifecycleService() {
         var sharedImage: MPImage? = null
         var stage = "카메라 영상 변환"
         val epoch = trackingEpoch
+        val setupOnly = TrackerState.faceSetupActive
         try {
             val now = SystemClock.uptimeMillis()
             if (closing || now - lastFrame < 66) return
@@ -237,14 +238,23 @@ class TrackingService : LifecycleService() {
             } ?: EyeObservation(EyeState.LOST, null, 0.0, 0.0)
             val cnnStart=SystemClock.uptimeMillis()
             stage = "iTracker 영상 전처리·추론"
-            val cnn = if(landmarkObservation.state == EyeState.OPEN && landmarkObservation.features != null && landmarks != null)
+            val cnn = if(!setupOnly && landmarkObservation.state == EyeState.OPEN && landmarkObservation.features != null && landmarks != null)
                 iTracker?.predict(upright,landmarks) else null
             val cnnMs=SystemClock.uptimeMillis()-cnnStart
             val observation=landmarkObservation.copy(features=if(cnn==null)null else landmarkObservation.features?.copy(
                 x=cnn.first,y=cnn.second,leftX=cnn.first,leftY=cnn.second,rightX=cnn.first,rightY=cnn.second,source=GazeSource.ITRACKER))
             main.post {
-                if (closing || epoch != trackingEpoch || cameraFault != null) return@post
+                if (closing || epoch != trackingEpoch || cameraFault != null || setupOnly != TrackerState.faceSetupActive) return@post
                 val at = SystemClock.uptimeMillis()
+                if(setupOnly) {
+                    lastResult=at
+                    TrackerState.signalPending=false
+                    TrackerState.faceFrame=face?.takeIf{at-now in 0..750}
+                    TrackerState.frameAt=now
+                    TrackerState.inferenceStatus="홍채 기준 측정 · MediaPipe만 실행 중"
+                    TrackerState.publish(null,"얼굴·홍채 기준 측정 중")
+                    return@post
+                }
                 TrackerState.inferenceStatus=if(cnn!=null) "iTracker %.2f, %.2f cm · %d ms".format(cnn.first,cnn.second,cnnMs)
                     else "iTracker 대기 · 양쪽 눈/얼굴이 온전히 보여야 합니다"
                 if (at - now > 250) {

@@ -24,16 +24,24 @@ data class FaceFrame(val at:Long,val width:Int,val height:Int,val outline:List<P
     val head:HeadPose,val leftDiameter:Double,val rightDiameter:Double,val leftRatio:Double,val rightRatio:Double,
     val leftOpen:Double,val rightOpen:Double,val leftBlink:Double,val rightBlink:Double,
     val faceWidth:Double,val faceHeight:Double) {
-    fun aligned()=abs(head.x-.5)<.07 && abs(head.y-.5)<.12 && faceWidth in .30.. .68 &&
-        faceHeight in .42.. .88 && abs(head.yaw)<12 && abs(head.pitch)<12 && abs(head.roll)<10 &&
-        leftBlink<.25 && rightBlink<.25 && leftOpen>.07 && rightOpen>.07 &&
-        leftDiameter>=5 && rightDiameter>=5 && leftRatio in .15.. .65 && rightRatio in .15.. .65
+    fun setupIssue():String? = when {
+        !listOf(head.x,head.y,head.yaw,head.pitch,head.roll,leftDiameter,rightDiameter,leftRatio,rightRatio,leftOpen,rightOpen,leftBlink,rightBlink,faceWidth,faceHeight).all{it.isFinite()} -> "얼굴 측정값 확인 중"
+        leftBlink>=.25 || rightBlink>=.25 || leftOpen<=.07 || rightOpen<=.07 -> "눈을 자연스럽게 떠 주세요 · 깜빡임은 괜찮아요"
+        faceWidth<.30 || faceHeight<.42 || leftDiameter<5 || rightDiameter<5 -> "얼굴을 조금 가까이 가져와 주세요"
+        faceWidth>.68 || faceHeight>.88 -> "얼굴을 조금 멀리 두세요"
+        abs(head.x-.5)>=.07 || abs(head.y-.5)>=.12 -> "얼굴을 화면 가운데로 옮겨 주세요"
+        abs(head.yaw)>=12 || abs(head.pitch)>=12 || abs(head.roll)>=10 -> "얼굴을 카메라 쪽으로 향해 주세요"
+        leftRatio !in .15.. .65 || rightRatio !in .15.. .65 -> "홍채 경계 확인 중 · 조명이나 반사를 확인하세요"
+        else -> null
+    }
+    fun aligned()=setupIssue()==null
 }
 data class EyeProfile(val leftOpen:Double,val rightOpen:Double,val leftDiameter:Double,val rightDiameter:Double,
     val leftRatio:Double,val rightRatio:Double) {
     companion object {
         fun fit(frames:List<FaceFrame>):EyeProfile? {
-            if(frames.size<30 || frames.any { !it.aligned() } || frames.last().at-frames.first().at<1800) return null
+            if(frames.size<30 || frames.any { !it.aligned() } || frames.zipWithNext().any{it.second.at<=it.first.at} || frames.last().at-frames.first().at<1800) return null
+            if(frames.any{!SetupSamples.samePose(it,frames.first())})return null
             fun med(f:(FaceFrame)->Double)=frames.map(f).sorted()[frames.size/2]
             val l=med{it.leftDiameter};val r=med{it.rightDiameter}
             if(frames.count{abs(it.leftDiameter/l-1)<.08 && abs(it.rightDiameter/r-1)<.08}<frames.size*.9) return null
