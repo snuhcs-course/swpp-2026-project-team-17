@@ -50,7 +50,7 @@ class InteractionEngine {
         targetKey: String? = null,
         receivedAt: Long = now,
     ): List<EyeAction> {
-        if (eye == EyeState.LOST || previousFrame?.let { now - it > 250 || now <= it } == true) {
+        if (eye == EyeState.LOST || previousFrame?.let { now - it > 500 || now <= it } == true) {
             val cancelled = pending
             reset(preserveSelection = true); previousFrame = now
             return if (cancelled) listOf(EyeAction.Cancel) else emptyList()

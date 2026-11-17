@@ -105,7 +105,7 @@ internal class PostCalibrationTutorialView(
     fun onFrame(sample: GazeSample?, eye: EyeState) {
         if (closed || step !in listOf(Step.BUTTON, Step.SCROLL)) return
         val now = SystemClock.uptimeMillis()
-        if (sample == null || now - sample.timestampMs !in 0..250 || !TrackerState.running || !TrackerState.controls) {
+        if (sample == null || now - sample.timestampMs !in 0..500 || !TrackerState.running || !TrackerState.controls) {
             dwell.reset(); retryGesture.reset(); scrolling.reset()
             animation?.cancel(); animation = null
             TrackerState.localDwellProgress = 0f

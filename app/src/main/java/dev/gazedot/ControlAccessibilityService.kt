@@ -50,6 +50,7 @@ class ControlAccessibilityService : AccessibilityService() {
         if(choosing || android.os.SystemClock.uptimeMillis()<selectionCooldown) return true
         if(!allowed()) return true
         val all=choices() ?: return false
+        if (SelectionAmbiguity.clearHit(all.choices.map{it.candidate},point.first,point.second)) return false
         val nearby=all.choices.filter { it.candidate.distance(point.first,point.second)<=.16 }
             .sortedBy { it.candidate.distance(point.first,point.second) }.take(4)
         if(nearby.isEmpty()) return false

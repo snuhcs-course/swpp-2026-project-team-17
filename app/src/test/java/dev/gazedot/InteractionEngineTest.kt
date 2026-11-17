@@ -78,7 +78,7 @@ class InteractionEngineTest {
             f.open(1)
             assertEquals(1, f.clicks.size)
         }
-        val f = Feed(); f.open(15); f.frame(EyeState.OPEN, step = 500); f.open(20)
+        val f = Feed(); f.open(15); f.frame(EyeState.OPEN, step = 501); f.open(20)
         assertTrue(f.clicks.isEmpty())
         f.open(1)
         assertEquals(1, f.clicks.size)

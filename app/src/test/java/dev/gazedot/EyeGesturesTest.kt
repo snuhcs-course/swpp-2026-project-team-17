@@ -140,7 +140,7 @@ class EyeGesturesTest {
         val f = Feed(); f.wink(EyeState.LEFT_WINK); f.frame(EyeState.LOST, null)
         assertFalse(f.controller.enabled)
         f.wink(EyeState.RIGHT_WINK)
-        f.controller.update(f.now + 50, f.now + 400, EyeState.OPEN, .5 to .9)
+        f.controller.update(f.now + 50, f.now + 600, EyeState.OPEN, .5 to .9)
         assertFalse(f.controller.enabled)
     }
 

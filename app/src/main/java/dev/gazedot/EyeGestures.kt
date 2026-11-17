@@ -124,8 +124,8 @@ class ScrollController {
     }
 
     fun update(at: Long, receivedAt: Long, eye: EyeState, point: Pair<Double, Double>?): ScrollStep {
-        if (receivedAt - at !in 0..250 || eye == EyeState.LOST ||
-            previousAt?.let { at <= it || at - it > 250 } == true) {
+        if (receivedAt - at !in 0..500 || eye == EyeState.LOST ||
+            previousAt?.let { at <= it || at - it > 500 } == true) {
             val wasEnabled = enabled
             reset(); previousAt = at
             return ScrollStep(modeChanged = if (wasEnabled) false else null)

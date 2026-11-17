@@ -72,7 +72,7 @@ object TrackerState {
     private var nextCalibration = 0L
     private var calibration: Long? = null
 
-    fun hasFreshFeatures(now: Long) = features != null && now - frameAt in 0..250
+    fun hasFreshFeatures(now: Long) = features != null && now - frameAt in 0..500
 
     fun clearCoordinates() {
         localDwellProgress = 0f

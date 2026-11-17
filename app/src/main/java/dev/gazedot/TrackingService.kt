@@ -24,7 +24,7 @@ import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarker
 import java.util.concurrent.Executors
 
 class TrackingService : LifecycleService() {
-    private val pipeline = GazePipeline(750)
+    private val pipeline = GazePipeline(500)
     private lateinit var voice: VoiceInput
     @Volatile private var trackingEpoch = 0L
     private val worker = Executors.newSingleThreadExecutor()
@@ -74,7 +74,7 @@ class TrackingService : LifecycleService() {
                 TrackerState.recoveryOpening = false
                 TrackerState.cancelActions?.invoke()
             }
-            val waiting = if (lastResult == 0L) now - startedAt > 3_000 else now - lastResult > 750
+            val waiting = if (lastResult == 0L) now - startedAt > 3_000 else now - lastResult > 500
             if (waiting && !TrackerState.signalPending) {
                 resetTracking()
                 TrackerState.signalPending = true
@@ -255,7 +255,7 @@ class TrackingService : LifecycleService() {
                     TrackerState.publish(null,"얼굴·홍채 기준 측정 중")
                     return@post
                 }
-                TrackerState.inferenceStatus=if(cnn!=null) "전체 %d ms · iTracker %d ms%s".format(at-now,cnnMs,if(at-now>250) " · 지연: 조작 대기" else "")
+                TrackerState.inferenceStatus=if(cnn!=null) "전체 %d ms · iTracker %d ms%s".format(at-now,cnnMs,if(at-now>500) " · 지연: 조작 대기" else "")
                     else "iTracker 대기 · 양쪽 눈/얼굴이 온전히 보여야 합니다"
                 if (TrackerState.collecting) {
                     lastResult=at
@@ -268,7 +268,7 @@ class TrackingService : LifecycleService() {
                         if(valid) observation.features else null,null,null,0f,emptyList()),TrackerState.inferenceStatus)
                     return@post
                 }
-                if (at - now > 750) {
+                if (at - now > 500) {
                     resetTracking()
                     TrackerState.signalPending = true
                     TrackerState.publish(null, "영상 처리가 지연됩니다 · 조작 일시 대기")

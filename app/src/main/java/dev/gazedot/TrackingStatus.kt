@@ -28,7 +28,7 @@ fun trackingStatus(running: Boolean, controls: Boolean, collecting: Boolean,
     if (collecting) return TrackingStatus(TrackingPhase.CALIBRATING, "시선 보정 중이에요")
     if (!controls) return TrackingStatus(TrackingPhase.PAUSED, "조작을 잠시 멈췄어요",
         "홈이나 추적 알림에서 ‘조작 재개’를 눌러 주세요. 자동으로 재개하지 않아요.")
-    if (signalPending || (sample != null && now - sample.timestampMs !in 0..750))
+    if (signalPending || (sample != null && now - sample.timestampMs !in 0..500))
         return TrackingStatus(TrackingPhase.SIGNAL_PENDING, "영상 입력을 기다리고 있어요",
             "새 영상 결과가 도착하지 않았어요. 계속되면 카메라를 다시 시작해 주세요.")
     if (sample == null) return TrackingStatus(TrackingPhase.STARTING, "카메라·눈 검출 준비 중이에요")
@@ -59,7 +59,7 @@ class RecognitionLossPolicy(private val delayMs: Long = RecognitionHelpSettings.
     fun suspend() { since = null; lastSampleAt = null }
 
     fun update(now: Long, sampleAt: Long?, missing: Boolean, eligible: Boolean): Boolean {
-        if (sampleAt == null || now - sampleAt !in 0..250) { suspend(); return false }
+        if (sampleAt == null || now - sampleAt !in 0..500) { suspend(); return false }
         if (!missing) { reset(); return false }
         if (!eligible) { suspend(); return false }
         val previous = lastSampleAt

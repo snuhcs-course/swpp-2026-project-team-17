@@ -19,7 +19,7 @@ data class GazeSample(
 }
 
 /** The original calibrated predictor and 0.28 smoothing, followed by interaction only. */
-class GazePipeline(private val trackingMaxAgeMs: Long = 250) {
+class GazePipeline(private val trackingMaxAgeMs: Long = 500, private val actionMaxAgeMs: Long = 500) {
     private val interaction = InteractionEngine()
     private var smoothed: Pair<Double, Double>? = null
     private var lastTimestamp: Long? = null
@@ -75,7 +75,7 @@ class GazePipeline(private val trackingMaxAgeMs: Long = 250) {
             observation.state == EyeState.CLOSED -> TrackingQuality.CLOSED
             else -> TrackingQuality.UNCERTAIN
         }
-        val actions = if (actionsEnabled && predictor != null && nowMs-timestampMs in 0..250) {
+        val actions = if (actionsEnabled && predictor != null && nowMs-timestampMs in 0..actionMaxAgeMs) {
             val eye = if (quality == TrackingQuality.OUT_OF_RANGE) EyeState.LOST else observation.state
             interaction.update(timestampMs, eye, if (quality == TrackingQuality.TRACKING) smoothed else null, targetKey = if (quality == TrackingQuality.TRACKING) smoothed?.let { targetKey?.invoke(it) } else null, receivedAt = nowMs)
         } else {
