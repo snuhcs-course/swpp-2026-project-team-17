@@ -76,7 +76,8 @@ class GazePipeline(private val trackingMaxAgeMs: Long = 500, private val actionM
             else -> TrackingQuality.UNCERTAIN
         }
         val actions = if (actionsEnabled && predictor != null && nowMs-timestampMs in 0..actionMaxAgeMs) {
-            val eye = if (quality == TrackingQuality.OUT_OF_RANGE) EyeState.LOST else observation.state
+            // Coordinate conversion failure is not face loss: pause movement without clearing the mode.
+            val eye = observation.state
             interaction.update(timestampMs, eye, if (quality == TrackingQuality.TRACKING) smoothed else null, targetKey = if (quality == TrackingQuality.TRACKING) smoothed?.let { targetKey?.invoke(it) } else null, receivedAt = nowMs)
         } else {
             val hadDwell = pending

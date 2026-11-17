@@ -14,13 +14,15 @@ class EyeGestureDetector {
     private var closedAt = 0L
     private var firstBlinkOpenedAt: Long? = null
     private var uncertainAt: Long? = null
+    private var lastSparseAt: Long? = null
 
     fun reset() {
-        previousAt = null; ready = false; closure = null; firstBlinkOpenedAt = null; uncertainAt = null
+        previousAt = null; ready = false; closure = null; firstBlinkOpenedAt = null; uncertainAt = null; lastSparseAt = null
     }
 
     fun update(at: Long, eye: EyeState): EyeGesture? {
-        if (previousAt?.let { at <= it || at - it > 250 } == true) reset()
+        if (previousAt?.let { at <= it || at - it > 500 } == true) reset()
+        if (previousAt?.let { at-it>250 } == true) lastSparseAt=at
         previousAt = at
         if (eye == EyeState.LOST) {
             ready = false; closure = null; firstBlinkOpenedAt = null
@@ -43,7 +45,7 @@ class EyeGestureDetector {
                 firstBlinkOpenedAt = null
                 return if (duration in WINK_MIN_MS..WINK_MAX_MS) EyeGesture.WINK else null
             }
-            if (duration !in 70..350) { firstBlinkOpenedAt = null; return null }
+            if (lastSparseAt?.let{at-it<1000}==true || duration !in 70..350) { firstBlinkOpenedAt = null; return null }
             val prior = firstBlinkOpenedAt
             if (prior != null && closedAt - prior in 70..450) {
                 firstBlinkOpenedAt = null

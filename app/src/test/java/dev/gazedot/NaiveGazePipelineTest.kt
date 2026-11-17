@@ -83,4 +83,20 @@ class NaiveGazePipelineTest {
         assertEquals(TrackingQuality.STALE,stale.quality)
         assertFalse(stale.actions.any{it is EyeAction.Click || it is EyeAction.Scroll})
     }
+    @Test fun winkModeSurvivesCoordinateFailureAndRecoversWithoutAnotherWink() {
+        val p=GazePipeline();val m=model()
+        fun frame(t:Long,state:EyeState,f:EyeFeatures?=eye(0.0,0.0))=
+            p.process(t,t,EyeObservation(state,f,.2,.2),m,true)
+        frame(1000,EyeState.OPEN)
+        frame(1300,EyeState.LEFT_WINK,null)
+        frame(1600,EyeState.LEFT_WINK,null)
+        val enabled=frame(1900,EyeState.OPEN)
+        assertTrue(enabled.scrollMode)
+        val missing=frame(2100,EyeState.OPEN,eye(0.0,0.0).copy(faceX=.9))
+        assertEquals(TrackingQuality.OUT_OF_RANGE,missing.quality)
+        assertTrue(missing.scrollMode)
+        assertFalse(missing.actions.any{it is EyeAction.Scroll || it is EyeAction.Click})
+        assertTrue(frame(2300,EyeState.OPEN).scrollMode)
+        assertFalse(frame(2400,EyeState.LOST,null).scrollMode)
+    }
 }
