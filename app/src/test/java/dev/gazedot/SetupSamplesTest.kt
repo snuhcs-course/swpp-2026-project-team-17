@@ -50,6 +50,15 @@ class SetupSamplesTest {
         for(i in 1..100){val t=i*80L;assertNull(c.add(frame(t).copy(leftDiameter=if(i%2==0)15.0 else 21.0),t))}
         val rapid=SetupSamples();for(i in 1..35)assertNull(rapid.add(frame(i.toLong()),i.toLong()))
     }
+    @Test fun calibrationLatencyDoesNotRelaxLiveGaze() {
+        val f=EyeFeatures(0.0,0.0,.5,.5,.3)
+        val s=GazeSample(100,TrackingQuality.OUT_OF_RANGE,f,null,null,0f,emptyList())
+        assertNull(s.calibrationFeatures(500,0))
+        assertSame(f,s.calibrationFeatures(500,0,750))
+        assertNull(s.calibrationFeatures(851,0,750))
+        assertNull(s.calibrationFeatures(500,100,750))
+        assertNull(s.copy(quality=TrackingQuality.UNCERTAIN).calibrationFeatures(500,0,750))
+    }
     @Test fun restartRequiresNewSamplesAndRejectsDuplicates() {
         val c=SetupSamples();repeat(20){c.add(frame(100),100)};assertEquals(1,c.count)
         c.reset();assertEquals(0,c.count);assertNull(c.add(frame(100),100));assertEquals(1,c.count)

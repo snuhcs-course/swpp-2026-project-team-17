@@ -24,7 +24,7 @@ class LearnedSelectionPanel(
     private val manager=service.getSystemService(android.view.WindowManager::class.java)
     private val root=LinearLayout(service)
     private val buttons=mutableListOf<Button>()
-    private val dwell=TutorialDwell()
+    private val remote=BlinkRemote(snapshot.choices.size+1)
     private var lastButton: Button?=null
     private var armed=false
     private var closed=false
@@ -38,7 +38,7 @@ class LearnedSelectionPanel(
         root.orientation=LinearLayout.VERTICAL; root.setPadding((16*d).toInt(),(12*d).toInt(),(16*d).toInt(),(12*d).toInt())
         root.setBackgroundColor(Color.rgb(235,242,255))
         root.addView(TextView(service).apply {
-            text="어느 버튼인가요? · 학습 ${ranker.confirmations}회\n먼저 후보 밖을 본 뒤, 원하는 항목을 1초 보세요. 터치도 가능."
+            text="어느 버튼인가요? · 학습 ${ranker.confirmations}회\n짧게 양눈 깜빡임: 다음 번호 · 1초 감았다 뜨기: 확정\n마지막 항목은 취소입니다. 터치도 가능."
             textSize=16f; setTextColor(Color.BLACK)
         })
         order.forEachIndexed { position,index ->
@@ -55,29 +55,24 @@ class LearnedSelectionPanel(
         val p=WindowManager.LayoutParams((minOf(service.resources.displayMetrics.widthPixels/d-32,360f)*d).toInt(),-2,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT).apply { gravity=Gravity.CENTER }
-        manager.addView(root,p); root.postDelayed(timeout,12000)
+        manager.addView(root,p); root.postDelayed(timeout,60000); highlight()
     }
-    fun update(gaze: ScreenGaze?, now: Long) {
-        if(closed) { return }
-        if(now-opened>12000 || !TrackerState.running || !TrackerState.controls || !TrackerState.interactionAllowed || TrackerState.collecting || TrackerState.precisionTraining) { select(-1); return }
-        if(gaze?.fresh(now)!=true) { dwell.reset(); buttons.forEach { it.alpha=1f }; return }
-        val bounds=DisplaySpace.bounds(service)
-        val hit=buttons.firstOrNull {
-            val r=android.graphics.Rect(); it.getGlobalVisibleRect(r)
-            val loc=IntArray(2); it.getLocationOnScreen(loc)
-            TutorialButtonBounds(loc[0],loc[1],it.width,it.height).contains(gaze,bounds.width(),bounds.height())
+    private fun highlight() {
+        buttons.forEachIndexed { i,b ->
+            b.setBackgroundColor(if(i==remote.index) Color.rgb(130,185,255) else Color.rgb(240,240,240))
+            b.contentDescription=(if(i==remote.index) "현재 선택 · " else "")+b.text
         }
-        if(now-opened<600) { return }
-        if(hit==null) { armed=true }
-        if(!armed) { return }
-        if(hit!==lastButton) { dwell.reset(); lastButton=hit }
-        val selected=dwell.update(hit!=null,gaze.uptimeMillis,now)
-        buttons.forEach { it.alpha=if(it===hit) .55f+.45f*dwell.progress else 1f }
-        if(selected && hit!=null) hit.performClick()
+    }
+    fun update(eye: EyeState, at: Long, now: Long) {
+        if(closed)return
+        if(now-opened>60000 || !TrackerState.running || !TrackerState.controls || !TrackerState.interactionAllowed || TrackerState.collecting || TrackerState.precisionTraining) { select(-1); return }
+        if(remote.update(eye,at,now)) {
+            select(order.getOrNull(remote.index) ?: -1)
+        } else highlight()
     }
     private fun select(index: Int) {
         if(closed) { return }
-        val chosen=if(SystemClock.uptimeMillis()-opened<=12000) index else -1
+        val chosen=if(SystemClock.uptimeMillis()-opened<=60000) index else -1
         close()
         done(snapshot.choices.getOrNull(chosen),if(chosen>=0) ranker else null,features,chosen)
     }

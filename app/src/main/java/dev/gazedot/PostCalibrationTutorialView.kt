@@ -17,6 +17,7 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.animation.LinearInterpolator
+import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
@@ -35,6 +36,10 @@ internal class PostCalibrationTutorialView(
     private enum class Step { CALIBRATED, BUTTON, SCROLL, FINISHED }
     private var step = Step.CALIBRATED
     private var closed = false
+    private val exitButton = Button(context).apply {
+        text="튜토리얼 건너뛰기"
+        setOnClickListener { close(); onFinished() }
+    }
     private val dwell = TutorialDwell()
     private val retryGesture = EyeGestureDetector()
     private val scrolling = ScrollController()
@@ -75,6 +80,7 @@ internal class PostCalibrationTutorialView(
             updateLayout()
             insets
         }
+        addView(exitButton, LayoutParams(-1, -2, Gravity.BOTTOM))
         showStep(Step.CALIBRATED)
     }
 
@@ -178,7 +184,6 @@ internal class PostCalibrationTutorialView(
     private fun finishTutorial() {
         if (closed || step != Step.SCROLL) return
         showStep(Step.FINISHED)
-        onFinished()
     }
 
     private fun updateScrollStatus() {
@@ -200,6 +205,7 @@ internal class PostCalibrationTutorialView(
 
     private fun showStep(next: Step) {
         step = next
+        exitButton.text=if(next==Step.FINISHED) "메인으로 돌아가기" else "튜토리얼 건너뛰기"
         removeCallbacks(advance); removeCallbacks(freshnessCheck)
         animation?.cancel(); animation = null
         dwell.reset(); retryGesture.reset(); scrolling.reset()

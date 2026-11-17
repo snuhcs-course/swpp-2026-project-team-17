@@ -12,8 +12,8 @@ data class GazeSample(
     val actions: List<EyeAction>,
     val scrollMode: Boolean = false,
 ) {
-    fun calibrationFeatures(nowMs: Long, after: Long): EyeFeatures? = features?.takeIf {
-        timestampMs > after && nowMs - timestampMs in 0..250 &&
+    fun calibrationFeatures(nowMs: Long, after: Long, maxAgeMs: Long = 250): EyeFeatures? = features?.takeIf {
+        timestampMs > after && nowMs - timestampMs in 0..maxAgeMs &&
             quality in listOf(TrackingQuality.TRACKING, TrackingQuality.OUT_OF_RANGE)
     }
 }

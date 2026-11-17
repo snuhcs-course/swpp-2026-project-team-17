@@ -74,7 +74,7 @@ class TrackingService : LifecycleService() {
                 TrackerState.recoveryOpening = false
                 TrackerState.cancelActions?.invoke()
             }
-            val waiting = if (lastResult == 0L) now - startedAt > 3_000 else now - lastResult > (if(TrackerState.faceSetupActive) 750 else 250)
+            val waiting = if (lastResult == 0L) now - startedAt > 3_000 else now - lastResult > (if(TrackerState.faceSetupActive || TrackerState.collecting) 750 else 250)
             if (waiting && !TrackerState.signalPending) {
                 resetTracking()
                 TrackerState.signalPending = true
@@ -238,7 +238,7 @@ class TrackingService : LifecycleService() {
             } ?: EyeObservation(EyeState.LOST, null, 0.0, 0.0)
             val cnnStart=SystemClock.uptimeMillis()
             stage = "iTracker 영상 전처리·추론"
-            val cnn = if(!setupOnly && landmarkObservation.state == EyeState.OPEN && landmarkObservation.features != null && landmarks != null)
+            val cnn = if(!setupOnly && ControlAccessibilityService.instance?.choosing != true && landmarkObservation.state == EyeState.OPEN && landmarkObservation.features != null && landmarks != null)
                 iTracker?.predict(upright,landmarks) else null
             val cnnMs=SystemClock.uptimeMillis()-cnnStart
             val observation=landmarkObservation.copy(features=if(cnn==null)null else landmarkObservation.features?.copy(
@@ -257,6 +257,17 @@ class TrackingService : LifecycleService() {
                 }
                 TrackerState.inferenceStatus=if(cnn!=null) "iTracker %.2f, %.2f cm · %d ms".format(cnn.first,cnn.second,cnnMs)
                     else "iTracker 대기 · 양쪽 눈/얼굴이 온전히 보여야 합니다"
+                if (TrackerState.collecting) {
+                    lastResult=at
+                    TrackerState.faceFrame=face
+                    TrackerState.eyeState=observation.state
+                    TrackerState.signalPending=at-now>750
+                    val valid=at-now in 0..750 && observation.state==EyeState.OPEN
+                    TrackerState.publishSample(GazeSample(now,
+                        if(valid && observation.features!=null) TrackingQuality.OUT_OF_RANGE else TrackingQuality.UNCERTAIN,
+                        if(valid) observation.features else null,null,null,0f,emptyList()),TrackerState.inferenceStatus)
+                    return@post
+                }
                 if (at - now > 250) {
                     resetTracking()
                     TrackerState.signalPending = true
@@ -283,7 +294,7 @@ class TrackingService : LifecycleService() {
                     TrackingQuality.TRACKING -> "추적 중 · 홈으로 나가도 빨간 점이 표시됩니다"
                 }
                 TrackerState.publishSample(sample, message)
-                ControlAccessibilityService.instance?.updateSelection(TrackerState.gaze, at)
+                ControlAccessibilityService.instance?.updateSelection(observation.state, now, at)
                 updateHelp(at)
                 // Publishing can navigate, pause, or start calibration. Recheck before dispatch.
                 if (!closing && epoch == trackingEpoch && TrackerState.externalActionsAllowed())

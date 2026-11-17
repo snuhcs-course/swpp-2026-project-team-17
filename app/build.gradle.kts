@@ -21,8 +21,8 @@ android {
         applicationId = "dev.gazedot"
         minSdk = 26
         targetSdk = 35
-        versionCode = 19
-        versionName = "0.11.2-face-setup-fix"
+        versionCode = 21
+        versionName = "0.11.4-blink-remote"
         testInstrumentationRunner = "dev.gazedot.FrameLifetimeInstrumentation"
         buildConfigField("String", "PREDICTION_SERVER_URL", "\"$predictionUrl\"")
         buildConfigField("String", "PREDICTION_CLIENT_TOKEN", "\"$predictionToken\"")

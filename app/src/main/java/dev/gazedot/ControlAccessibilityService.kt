@@ -21,7 +21,7 @@ class ControlAccessibilityService : AccessibilityService() {
         return rankerCache
     }
     fun closeSelection() { selectionPanel?.close(); selectionPanel=null; selectionCooldown=android.os.SystemClock.uptimeMillis()+800 }
-    fun updateSelection(gaze: ScreenGaze?,now: Long) { selectionPanel?.update(gaze,now) }
+    fun updateSelection(eye: EyeState, at: Long, now: Long) { selectionPanel?.update(eye,at,now) }
     private fun hash(text: String)=java.security.MessageDigest.getInstance("SHA-256")
         .digest(text.toByteArray()).joinToString("") { "%02x".format(it) }
 
@@ -51,7 +51,7 @@ class ControlAccessibilityService : AccessibilityService() {
         if(!allowed()) return true
         val all=choices() ?: return false
         val nearby=all.choices.filter { it.candidate.distance(point.first,point.second)<=.16 }
-            .sortedBy { it.candidate.distance(point.first,point.second) }.take(3)
+            .sortedBy { it.candidate.distance(point.first,point.second) }.take(4)
         if(nearby.isEmpty()) return false
         val frozen=all.copy(choices=nearby)
         selectionPanel=LearnedSelectionPanel(this,frozen,point.first,point.second,personalRanker()) { selected,ranker,features,index ->

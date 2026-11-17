@@ -66,7 +66,7 @@ class MainActivity : ComponentActivity() {
         if(!TrackerState.running) { showHome(); return }
         val bounds=DisplaySpace.bounds(this)
         tutorial=PostCalibrationTutorialView(this,bounds.width(),bounds.height(),
-            onRecalibrate={startCalibration()},onFinished={window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)})
+            onRecalibrate={startCalibration()},onFinished={window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); showHome()})
         setContentView(tutorial)
     }
     private val accessibilitySettings = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
@@ -478,13 +478,13 @@ class MainActivity : ComponentActivity() {
         fun onFrame(sample: GazeSample?) {
             if (closed || index >= targets.size || width == 0 || height == 0) return
             val now = SystemClock.uptimeMillis()
-            if (sample != null && sample.timestampMs <= lastSampleAt && now-sample.timestampMs in 0..250) return
+            if (sample != null && sample.timestampMs <= lastSampleAt && now-sample.timestampMs in 0..750) return
             val elapsed = now - since
             // Keep collecting open-eye features even when the old model rejects this pose.
-            val f = sample?.calibrationFeatures(now, lastSampleAt)
+            val f = sample?.calibrationFeatures(now, lastSampleAt, 750)
             if (f == null) {
-                samples.clear(); since = now
-                hint = "눈 검출 대기 · 눈을 뜨고 얼굴을 카메라로 향해 주세요"
+                if (lastSampleAt>0 && now-lastSampleAt>1200) { samples.clear(); since=now }
+                hint = "${TrackerState.eyeState} · ${TrackerState.inferenceStatus}"
                 invalidate(); return
             }
             if(f.source != GazeSource.ITRACKER) { samples.clear(); hint="iTracker 출력 대기"; return }
@@ -497,8 +497,8 @@ class MainActivity : ComponentActivity() {
             }
             if (poseReference == null) poseReference = head
             if (!CalibrationPose.stable(head, poseReference!!)) {
-                samples.clear(); since = now
-                hint = "처음 머리 위치로 돌아오세요 · 고개는 고정하고 눈만 점으로"
+                samples.clear(); since = now; poseReference = head
+                hint = "현재 자세에서 잠시 멈추고 점을 바라보세요"
                 invalidate(); return
             }
             hint = "${index + 1} / 5 · 파란 점을 계속 바라보세요"
@@ -518,7 +518,7 @@ class MainActivity : ComponentActivity() {
                 val point = DisplayCoordinates(bounds.width(), bounds.height())
                     .normalize(location[0] + width * xy.first, location[1] + height * xy.second)
                 anchors += Anchor(eye, point.first, point.second)
-                index++; samples.clear(); since = SystemClock.uptimeMillis()
+                index++; samples.clear(); poseReference=null; since = SystemClock.uptimeMillis()
                 // Five-point screen mapping; no head-motion training or mid-session break.
                 if (index == targets.size) {
                     val model = GazeModel.fit(anchors)
