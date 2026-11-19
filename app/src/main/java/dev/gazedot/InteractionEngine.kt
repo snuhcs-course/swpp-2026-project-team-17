@@ -12,9 +12,10 @@ sealed class EyeAction {
 }
 
 /** Dwell uses result receipt time; blink and scroll timing retains camera timestamps. */
-class InteractionEngine {
+class InteractionEngine(useBars:Boolean=false) {
     private val dwell = TutorialDwell()
-    private val scroll = ScrollController()
+    private val scroll = ScrollController(useBars)
+    val bars get()=scroll.bars
     val scrollMode get() = scroll.enabled
     val progress get() = dwell.progress
     val pending get() = anchor != null

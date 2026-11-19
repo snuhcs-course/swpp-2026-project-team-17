@@ -24,7 +24,7 @@ import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarker
 import java.util.concurrent.Executors
 
 class TrackingService : LifecycleService() {
-    private val pipeline = GazePipeline(500)
+    private val pipeline = GazePipeline(500,500,useBars=true)
     private lateinit var voice: VoiceInput
     @Volatile private var trackingEpoch = 0L
     private val worker = Executors.newSingleThreadExecutor()
@@ -433,7 +433,9 @@ class TrackingService : LifecycleService() {
             if (TrackerState.interactionAllowed) state.overlayMessage.ifBlank {
                 if (TrackerState.speaking) TrackerState.actionStatus else ""
             } else "",
-            if (enabled) TrackerState.sample?.scrollMode == true else TrackerState.localScrollMode)
+            if (enabled) TrackerState.sample?.scrollMode == true else TrackerState.localScrollMode,
+            if(enabled) pipeline.bars.direction else TrackerState.localBarDirection,
+            if(enabled) pipeline.bars.progress else TrackerState.localBarProgress)
     }
 
     private fun resetTracking() {

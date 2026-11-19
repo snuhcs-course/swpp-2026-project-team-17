@@ -19,8 +19,9 @@ data class GazeSample(
 }
 
 /** The original calibrated predictor and 0.28 smoothing, followed by interaction only. */
-class GazePipeline(private val trackingMaxAgeMs: Long = 500, private val actionMaxAgeMs: Long = 500) {
-    private val interaction = InteractionEngine()
+class GazePipeline(private val trackingMaxAgeMs: Long = 500, private val actionMaxAgeMs: Long = 500, useBars:Boolean=false) {
+    private val interaction = InteractionEngine(useBars)
+    val bars get()=interaction.bars
     private var smoothed: Pair<Double, Double>? = null
     private var lastTimestamp: Long? = null
     private var model: GazeModel? = null

@@ -108,7 +108,8 @@ object ScrollSettings {
 data class ScrollStep(val modeChanged: Boolean? = null, val direction: ScrollDirection? = null,
     val doubleBlink: Boolean = false, val wink: Boolean = false)
 
-class ScrollController {
+class ScrollController(private val useBars:Boolean=false) {
+    val bars=EdgeScrollBar()
     var enabled = false
         private set
     private val gestures = EyeGestureDetector()
@@ -118,11 +119,11 @@ class ScrollController {
     private var lastScrollAt: Long? = null
 
     fun reset() {
-        enabled = false; previousAt = null; lastScrollAt = null; cancelPending()
+        bars.reset(); enabled = false; previousAt = null; lastScrollAt = null; cancelPending()
     }
 
     fun cancelPending() {
-        gestures.reset(); direction = null
+        bars.reset(); gestures.reset(); direction = null
     }
 
     fun update(at: Long, receivedAt: Long, eye: EyeState, point: Pair<Double, Double>?): ScrollStep {
@@ -134,6 +135,11 @@ class ScrollController {
         }
         previousAt = at
         val gesture = gestures.update(at, eye)
+        if(useBars) {
+            val movement=bars.update(at,receivedAt,eye,point)
+            enabled=bars.ownsInput
+            return ScrollStep(direction=movement,doubleBlink=gesture==EyeGesture.DOUBLE_BLINK)
+        }
         if (gesture == EyeGesture.WINK) {
             enabled = !enabled; direction = null
             return ScrollStep(modeChanged = enabled, wink = true)

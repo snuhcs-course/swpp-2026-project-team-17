@@ -33,9 +33,20 @@ class DotOverlay(context: Context) {
         var position: Pair<Double, Double>? = null
         var progress = 0f
         var scrollMode = false
+        var barDirection:ScrollDirection?=null
+        var barProgress=0f
         override fun onDraw(canvas: Canvas) {
             val d=resources.displayMetrics.density
             getLocationOnScreen(viewOrigin)
+            barDirection?.let {
+                val by=(displayBounds.height()*(if(it==ScrollDirection.UP) .09 else .91)-viewOrigin[1]).toFloat()
+                val l=(displayBounds.width()*.1-viewOrigin[0]).toFloat()
+                val r=(displayBounds.width()*.9-viewOrigin[0]).toFloat()
+                paint.color=Color.rgb(140,160,185)
+                canvas.drawRoundRect(l,by-3*d,r,by+3*d,3*d,3*d,paint)
+                paint.color=Color.rgb(6,108,236)
+                canvas.drawRoundRect(l,by-3*d,l+(r-l)*barProgress,by+3*d,3*d,3*d,paint)
+            }
             val p = position ?: return
             val x = (p.first.coerceIn(0.0,1.0) * displayBounds.width() - viewOrigin[0]).toFloat()
             val y = (p.second.coerceIn(0.0,1.0) * displayBounds.height() - viewOrigin[1]).toFloat()
@@ -87,8 +98,9 @@ class DotOverlay(context: Context) {
         }
     }
     fun show(position: Pair<Double, Double>?, progress: Float=0f, label: String="",
-        scrollMode: Boolean = false) {
+        scrollMode: Boolean = false, barDirection:ScrollDirection?=null, barProgress:Float=0f) {
         dot.position = position; dot.progress=progress.coerceIn(0f,1f)
+        dot.barDirection=barDirection;dot.barProgress=barProgress
         dot.scrollMode=scrollMode; dot.invalidate()
         if (label.isBlank() || card != null) {
             if (statusAttached) { manager.removeView(status); statusAttached = false }

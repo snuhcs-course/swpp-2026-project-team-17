@@ -28,6 +28,8 @@ object TrackerState {
             contextChanged?.invoke()
         }
     var localDwellProgress = 0f
+    var localBarDirection:ScrollDirection?=null
+    var localBarProgress=0f
     var localScrollMode = false
     private var settingsScreens = 0
     var helpVisible = false
