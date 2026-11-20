@@ -28,7 +28,6 @@
         <activity android:name=".PracticeActivity" android:exported="false" />
         <activity android:name=".FaceSetupActivity" android:exported="false" />
         <activity android:name=".HeadMotionActivity" android:exported="false" />
-        <activity android:name=".TextEntryEvaluationActivity" android:exported="false" />
         <activity android:name=".AccuracyActivity" android:exported="false" />
         <service android:name=".ControlAccessibilityService" android:exported="true"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE" android:label="NoTouch 눈 조작">

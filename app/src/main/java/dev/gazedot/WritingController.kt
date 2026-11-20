@@ -71,7 +71,6 @@ internal class WritingController(private val service: ControlAccessibilityServic
     private fun column() = LinearLayout(service).apply { orientation = LinearLayout.VERTICAL }
     private fun text(value: String, size: Float = 18f) = RecoveryUi.text(service, value, size)
     private fun appName(pkg: String) = when (pkg) {
-        "dev.gazedot" -> "NoTouch 평가"
         "com.kakao.talk" -> "카카오톡"
         "com.samsung.android.messaging" -> "삼성 메시지"
         else -> "Google 메시지"
@@ -189,7 +188,6 @@ internal class WritingController(private val service: ControlAccessibilityServic
         if (promptSnapshot?.unchanged(captured.expected) != true) {
             captured.close(); removePrompt(); Toast.makeText(service, "입력칸이 바뀌었어요. 다시 선택해 주세요.", Toast.LENGTH_SHORT).show(); return
         }
-        TextEntryProbe.emit("writing_opened")
         removePrompt(); target = captured
         draft = WritingDraft(memoryDraft ?: store.savedDraft)
         uncertain = if (memoryDraft != null) memoryUncertain else store.uncertain
@@ -385,7 +383,6 @@ internal class WritingController(private val service: ControlAccessibilityServic
                 val key = candidate?.let { "candidate:$slot:${it.version}:${it.replacement}" } ?: "candidate:empty:$slot"
                 button(key, label, column) {
                     if (candidate != null && draft.apply(candidate)) {
-                        TextEntryProbe.emit("prediction_accepted")
                         draftLabel?.text = draft.text
                         if (!persist(draft.text, uncertain)) setStatus("기기 저장 실패 · 초안은 메모리에 보관 중입니다.")
                         predictions.input(PredictionInput(draft.version, draft.text))
@@ -471,9 +468,7 @@ internal class WritingController(private val service: ControlAccessibilityServic
         }
         inFlight = true; lastWriteAt = now
         predictions.stop(); refreshCandidates(); setStatus("입력칸에 추가한 내용을 확인하고 있어요…")
-        TextEntryProbe.emit("writing_insert_requested")
         target.insert(addition) { result ->
-            TextEntryProbe.emit("writing_result_${result.name}")
             inFlight = false
             lastWriteCompletedAt = SystemClock.uptimeMillis()
             var saved = true

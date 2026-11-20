@@ -163,8 +163,8 @@ class ControlAccessibilityService : AccessibilityService() {
         return accepted
     }
     @Suppress("DEPRECATION")
-    fun focusedEditor(forVoiceResult:Boolean=false): AccessibilityNodeInfo? {
-        if(!(if(forVoiceResult) TrackerState.externalActionsAllowed() else allowed())) return null
+    fun focusedEditor(): AccessibilityNodeInfo? {
+        if(!allowed()) return null
         val root=rootInActiveWindow ?: return null
         val node=root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
         root.recycle()
@@ -173,8 +173,8 @@ class ControlAccessibilityService : AccessibilityService() {
     }
     @Suppress("DEPRECATION")
     fun insert(target: AccessibilityNodeInfo, original: String, start: Int, end: Int, spoken: String): Boolean {
-        if(!TrackerState.externalActionsAllowed()) return false
-        val current=focusedEditor(forVoiceResult=true) ?: return false
+        if(!allowed()) return false
+        val current=focusedEditor() ?: return false
         try {
             if(current!=target || !target.refresh() || target.text?.toString().orEmpty()!=original ||
                 (target.textSelectionStart>=0 && target.textSelectionStart!=start) ||

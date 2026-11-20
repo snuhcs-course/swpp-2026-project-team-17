@@ -13,16 +13,15 @@ import java.security.MessageDigest
 /** Explicit app adapters. Unknown IDs/screens fail closed; verify each shipped app version on device. */
 internal object MessagingEditors {
     private val editors = mapOf(
-        "dev.gazedot" to setOf("eval_editor"),
         "com.kakao.talk" to setOf("message_edit_text"),
         "com.samsung.android.messaging" to setOf("message_edit_text", "embedded_text_editor", "message_text"),
         "com.google.android.apps.messaging" to setOf("compose_message_text"),
     )
-    private val headers = setOf("eval_header", "chat_room_title", "chatroom_title", "chat_title", "title", "toolbar_title",
+    private val headers = setOf("chat_room_title", "chatroom_title", "chat_title", "title", "toolbar_title",
         "conversation_title", "conversation_title_text", "recipient_name", "recipient_text", "recipients")
     private val headerContainers = setOf("toolbar", "action_bar", "chat_room_toolbar", "toolbar_container",
         "conversation_toolbar", "top_bar", "title_bar", "chat_room_header")
-    private val specificHeaders = setOf("eval_header", "chat_room_title", "chatroom_title", "chat_title", "conversation_title", "conversation_title_text")
+    private val specificHeaders = setOf("chat_room_title", "chatroom_title", "chat_title", "conversation_title", "conversation_title_text")
     fun supports(packageName: String, id: String, password: Boolean, inputType: Int): Boolean {
         if (password || id !in editors[packageName].orEmpty().map { "$packageName:id/$it" }) return false
         val variation = inputType and InputType.TYPE_MASK_VARIATION
