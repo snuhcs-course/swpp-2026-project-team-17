@@ -18,10 +18,11 @@ data class GazeSample(
     }
 }
 
-/** The original calibrated predictor and 0.28 smoothing, followed by interaction only. */
+/** Calibrated prediction, robust fixation filtering and freshness-gated interaction. */
 class GazePipeline(private val trackingMaxAgeMs: Long = 500, private val actionMaxAgeMs: Long = 500, useBars:Boolean=false) {
     private val interaction = InteractionEngine(useBars)
     val bars get()=interaction.bars
+    private val stabilizer = GazeStabilizer()
     private var smoothed: Pair<Double, Double>? = null
     private var lastTimestamp: Long? = null
     private var model: GazeModel? = null
@@ -34,6 +35,7 @@ class GazePipeline(private val trackingMaxAgeMs: Long = 500, private val actionM
     fun reset() {
         interaction.reset()
         smoothed = null
+        stabilizer.reset()
         lastTimestamp = null
         model = null
         closureAt = null; reopenedAt = null
@@ -55,7 +57,7 @@ class GazePipeline(private val trackingMaxAgeMs: Long = 500, private val actionM
         model = predictor
         lastTimestamp = timestampMs
         if (observation.state == EyeState.LOST) {
-            closureAt = null; reopenedAt = null; smoothed = null
+            closureAt = null; reopenedAt = null; smoothed = null; stabilizer.reset()
         } else if (observation.state != EyeState.OPEN) {
             if (closureAt == null) closureAt = timestampMs
             reopenedAt = null
@@ -65,12 +67,12 @@ class GazePipeline(private val trackingMaxAgeMs: Long = 500, private val actionM
         if (observation.state == EyeState.OPEN && !settling) { closureAt=null; reopenedAt=null }
         val features = observation.features.takeIf { observation.state == EyeState.OPEN && !settling }
         val position = features?.let { predictor?.predict(it) }
-        // Same interpolation and null reset as feature/home-screen TrackingService.
-        smoothed = if (position == null) { if (held) smoothed else null } else smoothed?.let {
-            it.first + 0.28 * (position.first - it.first) to it.second + 0.28 * (position.second - it.second)
-        } ?: position
+        val filtered = position?.let { stabilizer.update(it, timestampMs) }
+        smoothed = if (filtered != null) filtered.point else if (held) smoothed else {
+            stabilizer.reset(); null
+        }
         val quality = when {
-            settling -> TrackingQuality.UNCERTAIN
+            settling || filtered?.confirmed == false -> TrackingQuality.UNCERTAIN
             features != null -> if (position == null) TrackingQuality.OUT_OF_RANGE else TrackingQuality.TRACKING
             observation.state == EyeState.LOST -> TrackingQuality.LOST
             observation.state == EyeState.CLOSED -> TrackingQuality.CLOSED

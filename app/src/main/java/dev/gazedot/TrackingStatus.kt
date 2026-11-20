@@ -71,3 +71,12 @@ class RecognitionLossPolicy(private val delayMs: Long = RecognitionHelpSettings.
         return false
     }
 }
+
+/** Do not let navigation's action gate silence a missing-pointer explanation. */
+fun trackingOverlayLabel(state: TrackingStatus, pointVisible: Boolean, dedicatedScreen: Boolean,
+    speaking: Boolean, actionStatus: String): String {
+    if (dedicatedScreen) return ""
+    if (speaking) return actionStatus
+    if (!pointVisible) return state.message
+    return state.overlayMessage
+}

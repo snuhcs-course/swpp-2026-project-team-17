@@ -10,21 +10,16 @@ class NaiveGazePipelineTest {
     })!!
     private fun observation(f: EyeFeatures?) = EyeObservation(if (f == null) EyeState.LOST else EyeState.OPEN, f, .2, .2)
 
-    @Test fun coordinatesMatchLegacyPredictorAndSmoothing() {
-        val model = model()
-        val pipeline = GazePipeline(250,250)
-        var expected: Pair<Double, Double>? = null
-        listOf(eye(0.0, 0.0), eye(.02, -.01), eye(-.03, .03), null, eye(.04, -.02)).forEachIndexed { i, f ->
-            val raw = f?.let(model::predict)
-            expected = if (raw == null) null else expected?.let {
-                it.first + .28 * (raw.first - it.first) to it.second + .28 * (raw.second - it.second)
-            } ?: raw
-            val at = 1000L + i * 66
-            val sample = pipeline.process(at, at, observation(f), model, false)
-            assertEquals(raw, sample.rawPoint)
-            assertEquals(expected, sample.point)
-            assertTrue(sample.actions.isEmpty())
-        }
+    @Test fun isolatedSpikeIsHeldAndCannotTriggerAnAction() {
+        val m=model();val p=GazePipeline()
+        val initial=p.process(1000,1000,observation(eye(0.0,0.0)),m,true)
+        val spike=p.process(1100,1100,observation(eye(.05,.04)),m,true)
+        assertEquals(initial.point,spike.point)
+        assertEquals(TrackingQuality.UNCERTAIN,spike.quality)
+        assertFalse(spike.actions.any { it is EyeAction.Click || it is EyeAction.Scroll })
+        val recovered=p.process(1200,1200,observation(eye(0.0,0.0)),m,true)
+        assertEquals(initial.point,recovered.point)
+        assertEquals(TrackingQuality.TRACKING,recovered.quality)
     }
     @Test fun calibrationIsRequiredButFreshFeaturesRemainAvailable() {
         val f = eye(0.0, 0.0)

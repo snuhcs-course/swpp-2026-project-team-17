@@ -426,13 +426,14 @@ class TrackingService : LifecycleService() {
         val state = TrackerState.currentStatus(now)
         val enabled = TrackerState.externalActionsAllowed() && !TrackerState.speaking
         val showPoint = TrackerState.controls && !TrackerState.collecting && !TrackerState.precisionTraining && !TrackerState.helpVisible &&
-            !TrackerState.recoveryOpening && TrackerState.sample?.point != null &&
+            !TrackerState.recoveryOpening && !TrackerState.signalPending &&
+            TrackerState.sample?.let { now - it.timestampMs in 0..500 } == true && TrackerState.sample?.point != null &&
             TrackerState.sample?.quality in listOf(TrackingQuality.TRACKING, TrackingQuality.CLOSED, TrackingQuality.UNCERTAIN)
         overlay?.show(if (showPoint) TrackerState.sample?.point else null,
             if (enabled) TrackerState.sample?.dwellProgress ?: 0f else TrackerState.localDwellProgress,
-            if (TrackerState.interactionAllowed) state.overlayMessage.ifBlank {
-                if (TrackerState.speaking) TrackerState.actionStatus else ""
-            } else "",
+            trackingOverlayLabel(state, showPoint, TrackerState.collecting || TrackerState.faceSetupActive ||
+                TrackerState.precisionTraining || TrackerState.helpVisible || TrackerState.recoveryOpening,
+                TrackerState.speaking, TrackerState.actionStatus),
             if (enabled) TrackerState.sample?.scrollMode == true else TrackerState.localScrollMode,
             if(enabled) pipeline.bars.direction else TrackerState.localBarDirection,
             if(enabled) pipeline.bars.progress else TrackerState.localBarProgress)
