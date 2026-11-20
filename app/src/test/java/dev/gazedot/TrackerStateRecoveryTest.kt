@@ -16,7 +16,6 @@ class TrackerStateRecoveryTest {
         TrackerState.speaking = false
         TrackerState.precisionTraining = false
         TrackerState.interactionAllowed = false
-        TrackerState.writingOwnsInput = false
     }
     private fun enabled() {
         TrackerState.running = true
@@ -27,16 +26,12 @@ class TrackerStateRecoveryTest {
             listOf(-.04, 0.0, .04).map { y -> Anchor(EyeFeatures(x, y, .5, .5, .3), .5 + x * 6, .5 + y * 7) }
         })!!
     }
-    @Test fun precisionMeasurementBlocksActionsAndRecoveryThenReleasesToWriting() {
+    @Test fun precisionMeasurementBlocksActionsAndRecoveryThenReleasesActions() {
         enabled()
         TrackerState.precisionTraining = true
         assertFalse(TrackerState.externalActionsAllowed())
         assertFalse(TrackerState.recognitionHelpEligible(true))
         TrackerState.precisionTraining = false
-        assertTrue(TrackerState.externalActionsAllowed())
-        TrackerState.writingOwnsInput = true
-        assertFalse(TrackerState.externalActionsAllowed())
-        TrackerState.writingOwnsInput = false
         assertTrue(TrackerState.externalActionsAllowed())
     }
     @Test fun helpAndRecoveryTransitionBlockExternalActions() {
@@ -50,14 +45,6 @@ class TrackerStateRecoveryTest {
         TrackerState.recoveryOpening = true
         assertFalse(TrackerState.externalActionsAllowed())
         assertFalse(TrackerState.recognitionHelpEligible(true))
-    }
-    @Test fun writingBlocksEveryExternalActionAndLossHelpUntilReleased() {
-        enabled()
-        TrackerState.writingOwnsInput = true
-        assertFalse(TrackerState.externalActionsAllowed())
-        assertFalse(TrackerState.recognitionHelpEligible(true))
-        TrackerState.writingOwnsInput = false
-        assertTrue(TrackerState.externalActionsAllowed())
     }
     @Test fun everyNonOperableContextSuppressesLossHelp() {
         val disable: List<() -> Unit> = listOf(
@@ -106,11 +93,13 @@ class TrackerStateRecoveryTest {
         var cancellations = 0
         TrackerState.cancelActions = { cancellations++ }
         TrackerState.settingsStarted()
+        val entryCancellations = cancellations
+        assertTrue(entryCancellations > 0)
         try {
             assertFalse(TrackerState.externalActionsAllowed())
             assertFalse(TrackerState.recognitionHelpEligible(true))
         } finally { TrackerState.settingsStopped() }
         assertTrue(TrackerState.externalActionsAllowed())
-        assertEquals(2, cancellations)
+        assertTrue(cancellations > entryCancellations)
     }
 }

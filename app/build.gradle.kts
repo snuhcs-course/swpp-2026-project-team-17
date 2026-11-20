@@ -1,19 +1,9 @@
-import java.util.Properties
 import java.security.MessageDigest
 
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
-// TODO: AI provider/model/API key are unset in server/.env. Only a proxy URL belongs in the APK.
-val predictionProperties = Properties().apply {
-    val config = rootProject.file("online-prediction.properties")
-    if (config.isFile) config.inputStream().use { load(it) }
-}
-val predictionUrl = predictionProperties.getProperty("PREDICTION_SERVER_URL", "")
-    .replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "").replace("\r", "")
-val predictionToken = predictionProperties.getProperty("PREDICTION_CLIENT_TOKEN", "").trim()
-require(predictionToken.isEmpty() || predictionToken.matches(Regex("[A-Za-z0-9_-]{43}")))
 android {
     namespace = "dev.gazedot"
     compileSdk = 35
@@ -21,11 +11,9 @@ android {
         applicationId = "dev.gazedot"
         minSdk = 26
         targetSdk = 35
-        versionCode = 25
-        versionName = "0.12.0-edge-scroll-bars"
+        versionCode = 27
+        versionName = "0.12.2-without-texting"
         testInstrumentationRunner = "dev.gazedot.FrameLifetimeInstrumentation"
-        buildConfigField("String", "PREDICTION_SERVER_URL", "\"$predictionUrl\"")
-        buildConfigField("String", "PREDICTION_CLIENT_TOKEN", "\"$predictionToken\"")
         ndk { abiFilters += providers.gradleProperty("targetAbi").orNull?.let { listOf(it) } ?: listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
     }
     compileOptions {

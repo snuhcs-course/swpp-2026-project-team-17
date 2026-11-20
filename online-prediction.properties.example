@@ -1,5 +1,0 @@
-# TODO: AI provider/model and API key are still unset in server/.env.
-# Copy this file to online-prediction.properties and later enter the HTTPS proxy URL.
-# Do not put an AI provider key, model or secret query parameter in this Android configuration.
-# Empty means no online prediction requests. Rebuild the app after changing the URL.
-PREDICTION_SERVER_URL=

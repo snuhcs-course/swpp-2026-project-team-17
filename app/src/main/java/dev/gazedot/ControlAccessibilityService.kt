@@ -75,15 +75,12 @@ class ControlAccessibilityService : AccessibilityService() {
     }
     private var busy=false
     private val handler=Handler(Looper.getMainLooper())
-    private var writing: WritingController? = null
     override fun onServiceConnected() {
         instance=this
-        writing = WritingController(this)
         if (TrackerState.fault?.setting == RecoverySetting.ACCESSIBILITY) TrackerState.fault = null
         TrackerState.notifyListeners()
     }
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        writing?.onEvent(event)
         // Ignore our confirmation overlay's own events, not changes in the source app window.
         if(choosing && event?.packageName?.toString()==packageName && event.windowId!=selectionPanel?.snapshot?.window) return
         if (event?.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
@@ -132,9 +129,9 @@ class ControlAccessibilityService : AccessibilityService() {
         TrackerState.contextChanged?.invoke()
         TrackerState.notifyListeners()
     }
-    override fun onInterrupt() { closeSelection(); writing?.hide(); reportInterrupted() }
+    override fun onInterrupt() { closeSelection(); reportInterrupted() }
     override fun onDestroy() {
-        closeSelection(); writing?.close(); writing = null
+        closeSelection()
         if(instance===this) instance=null
         reportInterrupted()
         handler.removeCallbacksAndMessages(null); super.onDestroy()

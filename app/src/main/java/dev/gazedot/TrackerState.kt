@@ -19,8 +19,6 @@ object TrackerState {
     var collecting = false
     var precisionTraining = false
     var interactionAllowed = false
-    // A local writing overlay (or its entry button under gaze) owns all gaze actions.
-    var writingOwnsInput = false
         set(value) {
             if (field == value) return
             field = value
@@ -44,9 +42,9 @@ object TrackerState {
     fun currentStatus(now: Long) = trackingStatus(running, controls, collecting, model != null,
         sample, eyeState, now, fault, signalPending)
     fun externalActionsAllowed() = running && controls && interactionAllowed && !collecting && !precisionTraining &&
-        !helpVisible && !recoveryOpening && !writingOwnsInput && fault == null && !signalPending
+        !helpVisible && !recoveryOpening && fault == null && !signalPending
     fun recognitionHelpEligible(accessibilityReady: Boolean) = running && controls && interactionAllowed &&
-        !collecting && !precisionTraining && !speaking && !recoveryOpening && !writingOwnsInput && model != null && fault == null &&
+        !collecting && !precisionTraining && !speaking && !recoveryOpening && model != null && fault == null &&
         !signalPending && accessibilityReady
     fun settingsStarted() {
         settingsScreens++
