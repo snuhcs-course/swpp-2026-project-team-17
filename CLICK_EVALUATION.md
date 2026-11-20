@@ -6,14 +6,11 @@ Record one sheet per participant and session. The in-app evaluation presents the
 
 | Item | Record |
 |---|---|
-| Date and time |  |
-| Evaluator |  |
-| Participant code (no name) |  |
-| Device and Android version |  |
-| App version / commit |  |
-| Calibration completed before this run? |  |
-| Lighting and approximate device distance |  |
-| Glasses/contacts or other relevant setup notes |  |
+| Date and time | 20th November 2026 |
+| Evaluator | 조세핀 |
+| App version / commit | based-on home-screen without updated calibration and without retargeting |
+| Calibration completed before this run? | Yes |
+| Glasses/contacts or other relevant setup notes | None |
 
 ## Run the evaluation
 
