@@ -328,6 +328,7 @@ class MainActivity : ComponentActivity() {
             if (TrackerState.running) startService(Intent(this, TrackingService::class.java).setAction(TrackingService.ACTION_RESUME))
         }
         addHomeAction(resumeButton)
+        addHomeAction(pill("텍스트 입력 평가") { startActivity(Intent(this, TextEntryEvaluationActivity::class.java)) })
         addHomeAction(stopButton)
         addHomeAction(pill("설정 · 개발자 기능") {
             startActivity(Intent(this@MainActivity, DeveloperSettingsActivity::class.java))

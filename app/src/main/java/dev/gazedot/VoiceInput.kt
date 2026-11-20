@@ -20,6 +20,7 @@ class VoiceInput(private val context: Context) : RecognitionListener {
     private val timeout=Runnable { cancel("음성 입력 시간 초과") }
 
     fun start() {
+        TextEntryProbe.emit("voice_start_requested")
         if(TrackerState.speaking) return
         if(!TrackerState.microphoneReady || context.checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED) {
             TrackerState.actionStatus="마이크 권한을 허용하고 추적을 다시 시작하세요"; return
@@ -70,12 +71,13 @@ class VoiceInput(private val context: Context) : RecognitionListener {
         target?.recycle(); target=null
         if(message!=null) TrackerState.actionStatus=message
     }
-    override fun onReadyForSpeech(params: Bundle?) { if(TrackerState.speaking) TrackerState.actionStatus="말씀하세요 · 한 문장을 받아적습니다" }
+    override fun onReadyForSpeech(params: Bundle?) { TextEntryProbe.emit("voice_ready"); if(TrackerState.speaking) TrackerState.actionStatus="말씀하세요 · 한 문장을 받아적습니다" }
     override fun onBeginningOfSpeech() = Unit
     override fun onRmsChanged(rmsdB: Float) = Unit
     override fun onBufferReceived(buffer: ByteArray?) = Unit
     override fun onEndOfSpeech() { if(TrackerState.speaking) TrackerState.actionStatus="음성을 글자로 바꾸는 중…" }
     override fun onError(error: Int) {
+        TextEntryProbe.emit("voice_error_$error")
         if(!TrackerState.speaking) return
         val message=when(error) {
             SpeechRecognizer.ERROR_NO_MATCH -> "음성을 알아듣지 못했습니다. 다시 두 번 깜빡여 주세요"
@@ -92,6 +94,7 @@ class VoiceInput(private val context: Context) : RecognitionListener {
         val field=target
         val inserted=!text.isNullOrBlank() && field!=null &&
             ControlAccessibilityService.instance?.insert(field,original,selectionStart,selectionEnd,text)==true
+        TextEntryProbe.emit(if(inserted) "voice_insert_accepted" else "voice_insert_rejected")
         cancel(if(inserted) "음성 입력 완료" else "입력칸이 바뀌었거나 이 앱이 텍스트 입력을 지원하지 않습니다")
     }
     override fun onPartialResults(partialResults: Bundle?) = Unit

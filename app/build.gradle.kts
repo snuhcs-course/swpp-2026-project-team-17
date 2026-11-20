@@ -21,8 +21,8 @@ android {
         applicationId = "dev.gazedot"
         minSdk = 26
         targetSdk = 35
-        versionCode = 25
-        versionName = "0.12.0-edge-scroll-bars"
+        versionCode = 26
+        versionName = "0.12.1-text-entry-evaluation"
         testInstrumentationRunner = "dev.gazedot.FrameLifetimeInstrumentation"
         buildConfigField("String", "PREDICTION_SERVER_URL", "\"$predictionUrl\"")
         buildConfigField("String", "PREDICTION_CLIENT_TOKEN", "\"$predictionToken\"")
