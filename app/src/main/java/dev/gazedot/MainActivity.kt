@@ -451,7 +451,7 @@ class MainActivity : ComponentActivity() {
         private var index = 0
         private var since = SystemClock.uptimeMillis()
         private val samples = mutableListOf<EyeFeatures>()
-        private val anchors = mutableListOf<Anchor>()
+        private val fixations = mutableListOf<CalibrationFixation>()
         private var poseReference: HeadPose? = null
         private var lastSampleAt = 0L
         private var closed = false
@@ -472,7 +472,7 @@ class MainActivity : ComponentActivity() {
             closed = true
             removeCallbacks(tick)
             samples.clear()
-            anchors.clear()
+            fixations.clear()
         }
         override fun onDetachedFromWindow() { close(); super.onDetachedFromWindow() }
         fun onFrame(sample: GazeSample?) {
@@ -517,13 +517,17 @@ class MainActivity : ComponentActivity() {
                 val bounds = DisplaySpace.bounds(this@MainActivity)
                 val point = DisplayCoordinates(bounds.width(), bounds.height())
                     .normalize(location[0] + width * xy.first, location[1] + height * xy.second)
-                anchors += Anchor(eye, point.first, point.second)
+                fixations += CalibrationFixation(samples.toList(), point.first, point.second)
                 index++; samples.clear(); poseReference=null; since = SystemClock.uptimeMillis()
                 // Five-point screen mapping; no head-motion training or mid-session break.
                 if (index == targets.size) {
-                    val model = GazeModel.fit(anchors)
-                    finish(model, if (model == null) "보정 실패 · 시선 변화가 불충분하거나 오차가 큽니다. 기기를 고정하고 다시 시도하세요."
-                        else "보정 완료 · 빨간 점과 실제 시선이 맞는지 확인하세요. 홈으로 나가도 동작합니다.")
+                    val audit = CalibrationAudit.fit(fixations)
+                    getSharedPreferences("personal",MODE_PRIVATE).edit().putString("calibration_audit",audit.report).apply()
+                    val rows=fixations.flatMap { group -> group.samples.map { f -> listOf(group.x,group.y,f.x,f.y,f.faceX,f.faceY,f.scale) } }
+                    runCatching { java.io.File(filesDir,"last-calibration-audit.json").writeText(org.json.JSONObject()
+                        .put("version",29).put("report",audit.report).put("rows",org.json.JSONArray(rows)).toString()) }
+                    finish(audit.model, if (audit.model == null) "보정 실패 · ${audit.report}"
+                        else "보정 완료 · 품질 검사 통과. 실제 오차는 시선 원인 진단에서 확인하세요.")
                 }
             }
             invalidate()
@@ -537,7 +541,13 @@ class MainActivity : ComponentActivity() {
             calibration = null
             if (saved.getOrDefault(false) && TrackerState.running) {
                 if (intent.hasExtra(EXTRA_RECOVERY_ACTION)) finish() else showCalibrationTutorial()
-            } else if (intent.hasExtra(EXTRA_RECOVERY_ACTION)) finish() else showHome()
+            } else if (intent.hasExtra(EXTRA_RECOVERY_ACTION)) finish() else {
+                showHome()
+                android.app.AlertDialog.Builder(this@MainActivity)
+                    .setTitle("새 보정이 적용되지 않았습니다")
+                    .setMessage(message + if(TrackerState.model!=null) "\n이전 보정은 유지됩니다." else "\n적용된 보정이 없습니다.")
+                    .setPositiveButton("확인",null).show()
+            }
         }
         override fun onDraw(canvas: Canvas) {
             val target = targets.getOrNull(index) ?: return

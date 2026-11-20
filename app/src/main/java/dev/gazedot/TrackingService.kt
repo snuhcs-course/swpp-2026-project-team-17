@@ -255,6 +255,7 @@ class TrackingService : LifecycleService() {
                     TrackerState.publish(null,"얼굴·홍채 기준 측정 중")
                     return@post
                 }
+                GazeTrace.record(now,at-now,observation.state,observation.features,TrackerState.model)
                 TrackerState.inferenceStatus=if(cnn!=null) "전체 %d ms · iTracker %d ms%s".format(at-now,cnnMs,if(at-now>500) " · 지연: 조작 대기" else "")
                     else "iTracker 대기 · 양쪽 눈/얼굴이 온전히 보여야 합니다"
                 if (TrackerState.collecting) {

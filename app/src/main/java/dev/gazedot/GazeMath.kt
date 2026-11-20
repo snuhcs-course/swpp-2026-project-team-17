@@ -20,6 +20,12 @@ class GazeModel private constructor(
     private val leftModel: GazeModel? = null, private val rightModel: GazeModel? = null,
     val headCorrection: HeadCorrection? = null,
 ) {
+    /** Largest singular value of the raw-centimetre to screen mapping (before clipping). */
+    val mappingGain: Double get() {
+        val a=wx[1]/stdX;val b=wx[2]/stdY;val c=wy[1]/stdX;val d=wy[2]/stdY
+        val trace=a*a+b*b+c*c+d*d;val determinant=(a*d-b*c).pow(2)
+        return sqrt((trace+sqrt(max(0.0,trace*trace-4*determinant)))/2)
+    }
     fun predict(f: EyeFeatures): Pair<Double, Double>? {
         val p=predictUncorrected(f) ?: return null
         val corrected=correction?.apply(p.first,p.second) ?: p
@@ -82,7 +88,7 @@ class GazeModel private constructor(
         private fun solve(rows: List<DoubleArray>, targets: List<Double>): DoubleArray? {
             val a = Array(3) { i -> DoubleArray(4) { j ->
                 if (j == 3) rows.indices.sumOf { rows[it][i] * targets[it] }
-                else rows.sumOf { it[i] * it[j] } + if (i == j && i != 0) 0.03 else 0.0
+                else rows.sumOf { it[i] * it[j] } + if (i == j && i != 0) 0.006 * rows.size else 0.0
             } }
             for (col in 0..2) {
                 val pivot = (col..2).maxBy { abs(a[it][col]) }
