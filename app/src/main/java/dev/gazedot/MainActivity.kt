@@ -19,6 +19,39 @@ class MainActivity : ComponentActivity() {
     private lateinit var stopButton: Button
     private var calibration: CalibrationView? = null
     private var tutorial: PostCalibrationTutorialView? = null
+    private var clickEvaluationActive = false
+    private var clickEvaluationStartedAt: Long? = null
+    private var clickEvaluationResult: TextView? = null
+    private var clickEvaluationTarget: Button? = null
+    private var clickEvaluationCaseLabel: TextView? = null
+    private var clickEvaluationTimerLabel: TextView? = null
+    private var clickEvaluationSummaryView: TextView? = null
+    private var clickEvaluationCaseIndex = -1
+    private val clickEvaluationResults = mutableListOf<String>()
+    private data class ClickEvaluationCase(val name: String, val small: Boolean, val gravity: Int)
+    private val clickEvaluationCases = listOf(
+        ClickEvaluationCase("Large · center", false, Gravity.CENTER),
+        ClickEvaluationCase("Small · center", true, Gravity.CENTER),
+        ClickEvaluationCase("Large · top left", false, Gravity.TOP or Gravity.START),
+        ClickEvaluationCase("Large · top right", false, Gravity.TOP or Gravity.END),
+        ClickEvaluationCase("Large · bottom left", false, Gravity.BOTTOM or Gravity.START),
+        ClickEvaluationCase("Large · bottom right", false, Gravity.BOTTOM or Gravity.END),
+        ClickEvaluationCase("Small · top left", true, Gravity.TOP or Gravity.START),
+        ClickEvaluationCase("Small · top right", true, Gravity.TOP or Gravity.END),
+        ClickEvaluationCase("Small · bottom left", true, Gravity.BOTTOM or Gravity.START),
+        ClickEvaluationCase("Small · bottom right", true, Gravity.BOTTOM or Gravity.END),
+    )
+    private val clickEvaluationTicker = object : Runnable {
+        override fun run() {
+            val started = clickEvaluationStartedAt
+            if (clickEvaluationActive && started != null) {
+                val elapsed = SystemClock.elapsedRealtime() - started
+                clickEvaluationTimerLabel?.text = "경과 시간: ${formatElapsed(elapsed)}"
+                if (elapsed >= CLICK_EVALUATION_TIMEOUT_MS) finishClickEvaluationCase(success = false)
+                else handler.postDelayed(this, 50)
+            }
+        }
+    }
     private val handler = Handler(Looper.getMainLooper())
     private val homeTargets = mutableListOf<View>()
     private val homeDwell = TutorialDwell()
@@ -55,7 +88,13 @@ class MainActivity : ComponentActivity() {
         showHome()
         onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (calibration != null) {
+                if (clickEvaluationActive || clickEvaluationTarget != null) {
+                    clickEvaluationActive = false
+                    clickEvaluationStartedAt = null
+                    clickEvaluationTarget = null
+                    handler.removeCallbacks(clickEvaluationTicker)
+                    showHome()
+                } else if (calibration != null) {
                     calibration?.close()
                     calibration = null
                     TrackerState.cancelCalibration()
@@ -125,6 +164,11 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun showHome() {
+        clickEvaluationActive = false
+        clickEvaluationStartedAt = null
+        clickEvaluationResult = null
+        clickEvaluationTarget = null
+        handler.removeCallbacks(clickEvaluationTicker)
         tutorial?.close()
         tutorial = null
         TrackerState.cancelActions?.invoke()
@@ -253,6 +297,11 @@ class MainActivity : ComponentActivity() {
         }
         addStep("3", "시선 테스트", "회색 점이 시선을 잘 따라오는지 확인해 주세요.\n잘 맞지 않는다면 다시 보정해 주세요.", 26)
 
+        val clickEvaluationButton = pill("클릭 평가 · 시간 측정") { showClickEvaluation() }
+        content.addView(clickEvaluationButton, LinearLayout.LayoutParams(dp(230), dp(46)).apply {
+            topMargin = dp(12)
+        })
+
         stopButton = pill("추적 중지") {
             TrackerState.status = "추적 중지됨"
             stopService(Intent(this, TrackingService::class.java))
@@ -317,6 +366,178 @@ class MainActivity : ComponentActivity() {
             target.performClick()
         }
     }
+
+    private fun showClickEvaluation() {
+        homeDwell.reset()
+        homeTargets.clear()
+        homeTarget = null
+        selectedHomeTarget = null
+        clickEvaluationActive = false
+        clickEvaluationStartedAt = null
+        handler.removeCallbacks(clickEvaluationTicker)
+        val density = resources.displayMetrics.density
+        fun dp(n: Int) = (n * density).toInt()
+        val ink = Color.rgb(17, 18, 70)
+        val blue = Color.rgb(6, 108, 236)
+        clickEvaluationCaseIndex = -1
+        clickEvaluationResults.clear()
+        val root = FrameLayout(this).apply {
+            setBackgroundColor(Color.WHITE)
+        }
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(dp(20), dp(28), dp(20), dp(12))
+        }
+        header.addView(TextView(this).apply {
+            text = "클릭 평가"
+            textSize = 28f
+            setTextColor(ink)
+            gravity = Gravity.CENTER
+        }, LinearLayout.LayoutParams(-1, -2))
+        clickEvaluationCaseLabel = TextView(this).apply {
+            text = "큰 중앙 목표부터 시작합니다."
+            textSize = 16f
+            setTextColor(ink)
+            gravity = Gravity.CENTER
+        }
+        header.addView(clickEvaluationCaseLabel, LinearLayout.LayoutParams(-1, dp(44)))
+        clickEvaluationTimerLabel = TextView(this).apply {
+            text = "시작을 누르면 이 케이스의 시간을 잽니다."
+            textSize = 20f
+            setTextColor(ink)
+            gravity = Gravity.CENTER
+        }
+        header.addView(clickEvaluationTimerLabel, LinearLayout.LayoutParams(-1, dp(40)))
+        root.addView(header, FrameLayout.LayoutParams(-1, -2, Gravity.TOP))
+
+        val target = Button(this).apply {
+            text = "선택"
+            isAllCaps = false
+            textSize = 20f
+            setTextColor(Color.WHITE)
+            background = android.graphics.drawable.GradientDrawable().apply {
+                cornerRadius = dp(20).toFloat()
+                setColor(blue)
+            }
+            setOnClickListener {
+                if (clickEvaluationActive) finishClickEvaluationCase(success = true)
+            }
+        }
+        clickEvaluationTarget = target
+        homeTargets += target
+        root.addView(target, FrameLayout.LayoutParams(dp(240), dp(112), Gravity.CENTER))
+
+        val summary = TextView(this).apply {
+            textSize = 15f
+            setTextColor(ink)
+            visibility = View.GONE
+            setPadding(dp(24), dp(8), dp(24), dp(8))
+        }
+        clickEvaluationSummaryView = summary
+        root.addView(ScrollView(this).apply { addView(summary) }, FrameLayout.LayoutParams(-1, -1).apply {
+            topMargin = dp(130); bottomMargin = dp(140)
+        })
+
+        val controls = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER }
+        controls.addView(Button(this).apply {
+            text = "시작 / 다음 케이스 측정"
+            isAllCaps = false
+            setOnClickListener {
+                if (clickEvaluationActive) return@setOnClickListener
+                homeDwell.reset()
+                homeTarget = null
+                selectedHomeTarget = null
+                if (clickEvaluationCaseIndex < 0) {
+                    clickEvaluationCaseIndex = 0
+                    clickEvaluationResults.clear()
+                    displayClickEvaluationCase()
+                }
+                startClickEvaluationCase()
+            }
+        }, LinearLayout.LayoutParams(-1, dp(56)))
+        controls.addView(Button(this).apply {
+            text = "홈으로"
+            isAllCaps = false
+            setOnClickListener {
+                clickEvaluationActive = false
+                clickEvaluationStartedAt = null
+                clickEvaluationTarget = null
+                handler.removeCallbacks(clickEvaluationTicker)
+                showHome()
+            }
+        }, LinearLayout.LayoutParams(-1, dp(52)).apply { topMargin = dp(8) })
+        root.addView(controls, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM).apply {
+            leftMargin = dp(24); rightMargin = dp(24); bottomMargin = dp(24)
+        })
+        setContentView(root)
+    }
+
+    private fun displayClickEvaluationCase() {
+        if (clickEvaluationCaseIndex !in clickEvaluationCases.indices) return
+        val case = clickEvaluationCases[clickEvaluationCaseIndex]
+        val target = clickEvaluationTarget ?: return
+        val density = resources.displayMetrics.density
+        fun dp(n: Int) = (n * density).toInt()
+        val params = target.layoutParams as? FrameLayout.LayoutParams ?: return
+        params.width = dp(if (case.small) 136 else 240)
+        params.height = dp(if (case.small) 64 else 112)
+        params.gravity = case.gravity
+        params.leftMargin = dp(if (case.small) 16 else 24)
+        params.rightMargin = params.leftMargin
+        params.topMargin = dp(150)
+        params.bottomMargin = dp(170)
+        target.layoutParams = params
+        clickEvaluationCaseLabel?.text = "${clickEvaluationCaseIndex + 1}/${clickEvaluationCases.size} · ${case.name}"
+        target.visibility = View.VISIBLE
+    }
+
+    private fun startClickEvaluationCase() {
+        if (clickEvaluationCaseIndex !in clickEvaluationCases.indices || clickEvaluationActive) return
+        clickEvaluationTimerLabel?.text = "경과 시간: 0.00초"
+        homeDwell.reset()
+        homeTarget = null
+        selectedHomeTarget = null
+        clickEvaluationActive = true
+        clickEvaluationStartedAt = SystemClock.elapsedRealtime()
+        handler.removeCallbacks(clickEvaluationTicker)
+        handler.post(clickEvaluationTicker)
+    }
+
+    private fun finishClickEvaluationCase(success: Boolean) {
+        if (!clickEvaluationActive) return
+        val started = clickEvaluationStartedAt ?: return
+        val elapsed = SystemClock.elapsedRealtime() - started
+        clickEvaluationResults += "${clickEvaluationCaseIndex + 1}. ${clickEvaluationCases[clickEvaluationCaseIndex].name}: " +
+            if (success) "success, ${formatElapsed(elapsed)}" else "timeout, —"
+        clickEvaluationActive = false
+        clickEvaluationStartedAt = null
+        handler.removeCallbacks(clickEvaluationTicker)
+        homeDwell.reset()
+        homeTarget = null
+        selectedHomeTarget = null
+        if (clickEvaluationCaseIndex + 1 < clickEvaluationCases.size) {
+            clickEvaluationCaseIndex++
+            displayClickEvaluationCase()
+            clickEvaluationTimerLabel?.text = if (success) {
+                "선택 완료 · ${formatElapsed(elapsed)} — 시작을 눌러 다음 케이스 측정"
+            } else {
+                "시간 초과 · ${formatElapsed(elapsed)} — 시작을 눌러 다음 케이스 측정"
+            }
+        } else {
+            clickEvaluationCaseLabel?.text = "모든 케이스 완료"
+            clickEvaluationTimerLabel?.text = "결과 요약"
+            clickEvaluationTarget?.visibility = View.GONE
+            clickEvaluationSummaryView?.apply {
+                text = clickEvaluationResults.joinToString("\n")
+                visibility = View.VISIBLE
+            }
+        }
+    }
+
+    private fun formatElapsed(ms: Long) = "%.2f초".format(ms / 1_000.0)
+
+    companion object { private const val CLICK_EVALUATION_TIMEOUT_MS = 15_000L }
 
     private fun startTracking() {
         if (TrackerState.running) { status.text = TrackerState.status; return }
