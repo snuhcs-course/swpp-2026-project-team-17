@@ -11,12 +11,14 @@ internal object WritingPhrases {
 }
 
 internal data class EditorSnapshot(
-    val packageName: String, val windowId: Int, val viewId: String, val screenIdentity: String,
+    val packageName: String, val windowId: Int, val nodeKey: Int,
     val text: String, val start: Int, val end: Int,
 ) {
     val validSelection get() = start in 0..text.length && end in 0..text.length
+    // Empty text has exactly one insertion position, even when the editor omits selection metadata.
+    fun withEmptySelectionFallback() = if (text.isEmpty()) copy(start = 0, end = 0) else this
     fun sameTarget(other: EditorSnapshot) = packageName == other.packageName && windowId == other.windowId &&
-        viewId == other.viewId && screenIdentity == other.screenIdentity
+        nodeKey == other.nodeKey
     fun unchanged(other: EditorSnapshot) = sameTarget(other) && text == other.text && start == other.start && end == other.end
     fun plan(addition: String): InsertionPlan? {
         if (!validSelection || addition.isEmpty()) return null

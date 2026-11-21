@@ -8,59 +8,38 @@ import android.os.SystemClock
 import android.text.InputType
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
-import java.security.MessageDigest
 
-/** Explicit app adapters. Unknown IDs/screens fail closed; verify each shipped app version on device. */
+/** Bind the user-selected editable node, without app-specific field IDs or room titles. */
 internal object MessagingEditors {
-    private val editors = mapOf(
-        "com.kakao.talk" to setOf("message_edit_text"),
-        "com.samsung.android.messaging" to setOf("message_edit_text", "embedded_text_editor", "message_text"),
-        "com.google.android.apps.messaging" to setOf("compose_message_text"),
+    private val packages = setOf(
+        "com.kakao.talk", "com.samsung.android.messaging", "com.google.android.apps.messaging",
     )
-    private val headers = setOf("chat_room_title", "chatroom_title", "chat_title", "title", "toolbar_title",
-        "conversation_title", "conversation_title_text", "recipient_name", "recipient_text", "recipients")
-    private val headerContainers = setOf("toolbar", "action_bar", "chat_room_toolbar", "toolbar_container",
-        "conversation_toolbar", "top_bar", "title_bar", "chat_room_header")
-    private val specificHeaders = setOf("chat_room_title", "chatroom_title", "chat_title", "conversation_title", "conversation_title_text")
-    fun supportsPackage(packageName: String) = packageName in editors
+    fun supportsPackage(packageName: String) = packageName in packages
 
-    fun supports(packageName: String, id: String, password: Boolean, inputType: Int): Boolean {
-        if (password || id !in editors[packageName].orEmpty().map { "$packageName:id/$it" }) return false
+    fun supports(packageName: String, password: Boolean, inputType: Int): Boolean {
+        if (!supportsPackage(packageName) || password) return false
         val variation = inputType and InputType.TYPE_MASK_VARIATION
-        return variation !in setOf(InputType.TYPE_TEXT_VARIATION_PASSWORD, InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD,
-            InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD) &&
-            !(inputType and InputType.TYPE_MASK_CLASS == InputType.TYPE_CLASS_NUMBER && variation == InputType.TYPE_NUMBER_VARIATION_PASSWORD)
+        val inputClass = inputType and InputType.TYPE_MASK_CLASS
+        return !(inputClass == InputType.TYPE_CLASS_TEXT && variation in setOf(
+            InputType.TYPE_TEXT_VARIATION_PASSWORD, InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD,
+            InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD)) &&
+            !(inputClass == InputType.TYPE_CLASS_NUMBER && variation == InputType.TYPE_NUMBER_VARIATION_PASSWORD)
     }
-    @Suppress("DEPRECATION")
-    fun snapshot(root: AccessibilityNodeInfo, editor: AccessibilityNodeInfo): EditorSnapshot? {
-        val pkg = editor.packageName?.toString() ?: return null
-        val id = editor.viewIdResourceName ?: return null
-        if (!editor.isEditable || !editor.isEnabled || !editor.isVisibleToUser || !editor.isFocused ||
-            !supports(pkg, id, editor.isPassword, editor.inputType)) return null
-        val markers = mutableListOf<String>()
-        var visits = 0
-        fun visit(node: AccessibilityNodeInfo, depth: Int, inHeader: Boolean) {
-            if (++visits > 350 || depth > 20) return
-            val viewId = node.viewIdResourceName.orEmpty()
-            val localId = viewId.substringAfterLast('/')
-            val knownHeader = inHeader || (viewId.startsWith("$pkg:id/") && localId in headerContainers)
-            if (node.isVisibleToUser && !node.isEditable && viewId.startsWith("$pkg:id/") &&
-                localId in headers && (knownHeader || localId in specificHeaders)) {
-                node.text?.toString()?.takeIf { it.isNotBlank() }?.let { markers += "$viewId:$it" }
-            }
-            for (index in 0 until node.childCount) {
-                val child = node.getChild(index) ?: continue
-                try { visit(child, depth + 1, knownHeader) } finally { child.recycle() }
-            }
-        }
-        // Only the known header metadata is read. Never read message bubble text/history.
-        visit(root, 0, false)
-        if (markers.isEmpty()) return null
-        val digest = MessageDigest.getInstance("SHA-256").digest(markers.sorted().joinToString("\u0000").toByteArray())
-            .joinToString("") { "%02x".format(it) }
-        val result = EditorSnapshot(pkg, editor.windowId, id, digest, editor.text?.toString().orEmpty(),
-            editor.textSelectionStart, editor.textSelectionEnd)
-        return result.takeIf { it.validSelection }
+
+    fun snapshot(editor: AccessibilityNodeInfo, onFailure: (String) -> Unit = {}): EditorSnapshot? {
+        fun reject(message: String): EditorSnapshot? { onFailure(message); return null }
+        val pkg = editor.packageName?.toString()
+            ?: return reject("입력칸의 앱 정보를 읽지 못했어요.")
+        if (!editor.isEditable || !editor.isEnabled || !editor.isVisibleToUser)
+            return reject("현재 입력칸을 사용할 수 없어요.")
+        if (!editor.isFocused) return reject("메시지 입력칸을 먼저 눌러 주세요.")
+        if (!supports(pkg, editor.isPassword, editor.inputType))
+            return reject("이 입력칸에서는 작성할 수 없어요.")
+        // The key is for snapshot comparisons only. current() also compares the actual nodes.
+        // Some editors expose their placeholder through text when empty.
+        val text = if (editor.isShowingHintText) "" else editor.text?.toString().orEmpty()
+        return EditorSnapshot(pkg, editor.windowId, editor.hashCode(), text,
+            editor.textSelectionStart, editor.textSelectionEnd).withEmptySelectionFallback()
     }
 }
 
@@ -88,7 +67,7 @@ internal class WritingTarget private constructor(
             try {
                 val focus = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: return null
                 try { if (focus != editor) return null } finally { focus.recycle() }
-                return MessagingEditors.snapshot(root, editor)
+                return MessagingEditors.snapshot(editor)
             } finally { root.recycle() }
         } finally { windows.forEach { it.recycle() } }
     }
@@ -141,12 +120,22 @@ internal class WritingTarget private constructor(
     fun close() { closed = true; main.removeCallbacksAndMessages(null); editor.recycle() }
 
     companion object {
-        fun capture(service: AccessibilityService): WritingTarget? {
-            val root = service.rootInActiveWindow ?: return null
+        fun capture(service: AccessibilityService, onFailure: (String) -> Unit = {}): WritingTarget? {
+            val root = service.rootInActiveWindow ?: run {
+                onFailure("현재 앱 화면을 읽지 못했어요."); return null
+            }
             try {
-                val editor = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: return null
-                val snapshot = MessagingEditors.snapshot(root, editor)
+                val editor = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: run {
+                    onFailure("메시지 입력칸을 먼저 눌러 주세요."); return null
+                }
+                val snapshot = try { MessagingEditors.snapshot(editor, onFailure) }
+                    catch (error: RuntimeException) { editor.recycle(); throw error }
                 if (snapshot == null) { editor.recycle(); return null }
+                if (!snapshot.validSelection) {
+                    editor.recycle()
+                    onFailure("글자 사이를 눌러 커서를 지정해 주세요.")
+                    return null
+                }
                 return WritingTarget(service, editor, snapshot)
             } finally { root.recycle() }
         }

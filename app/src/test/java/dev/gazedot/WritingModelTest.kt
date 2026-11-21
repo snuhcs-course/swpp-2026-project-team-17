@@ -5,7 +5,7 @@ import org.junit.Test
 
 class WritingModelTest {
     private fun editor(text: String = "기존 내용", start: Int = 2, end: Int = 2) =
-        EditorSnapshot("com.kakao.talk", 7, "message", "room-a", text, start, end)
+        EditorSnapshot("com.kakao.talk", 7, 101, text, start, end)
 
     @Test fun selectionIsPreservedAndAdditionGoesAfterItsEndInEitherDirection() {
         for ((start, end) in listOf(0 to 2, 2 to 0)) {
@@ -17,10 +17,10 @@ class WritingModelTest {
             assertFalse(plan.confirmed(before.copy(text = plan.text)))
         }
     }
-    @Test fun inputIdentityIncludesRoomWindowFieldContentsAndCaret() {
+    @Test fun inputIdentityIncludesAppWindowSelectedNodeContentsAndCaret() {
         val before = editor()
         listOf(before.copy(packageName = "another.app"), before.copy(windowId = 8),
-            before.copy(screenIdentity = "room-b"), before.copy(viewId = "search"),
+            before.copy(nodeKey = 102),
             before.copy(text = "changed"), before.copy(start = 1), before.copy(end = 4))
             .forEach { assertFalse(before.unchanged(it)) }
         assertNull(editor(start = -1).plan("추가"))

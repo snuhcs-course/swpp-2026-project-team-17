@@ -176,7 +176,7 @@ internal class WritingController(private val service: ControlAccessibilityServic
             removePrompt(); dwell.screenChanged()
         }
         // Discovery depends on the app, while binding/writing still requires a verified editor.
-        // A missing editor, header or input focus must not silently hide the entire feature.
+        // A missing editor or input focus must not silently hide the entire feature.
         promptPackage = packageName
         promptSnapshot = snapshot
         if (prompt != null) return
@@ -201,10 +201,12 @@ internal class WritingController(private val service: ControlAccessibilityServic
         if (packageName == null || packageName != promptPackage || !MessagingEditors.supportsPackage(packageName)) {
             removePrompt(); return
         }
-        val captured = runCatching { WritingTarget.capture(service) }.getOrNull() ?: run {
-            Toast.makeText(service,
-                "대화방의 메시지 입력칸을 누른 뒤 다시 선택해 주세요. 이미 눌렀다면 현재 화면의 입력칸을 인식하지 못한 상태입니다.",
-                Toast.LENGTH_LONG).show()
+        var captureFailure = "입력칸 연결 중 오류가 발생했어요."
+        val captured = runCatching {
+            WritingTarget.capture(service) { captureFailure = it }
+        }.getOrNull() ?: run {
+            // Android text toasts have limited space. Report just the failed condition.
+            Toast.makeText(service, captureFailure, Toast.LENGTH_LONG).show()
             return
         }
         if (captured.expected.packageName != packageName ||
