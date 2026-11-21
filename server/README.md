@@ -1,21 +1,23 @@
 # NoTouch 예측 중계 서버
 
-FastAPI 중계 서버와 Android 클라이언트 연결 코드는 구현되어 있습니다. **AI 제공자·모델은 미정이며 실제 API 키는 입력하지 않았습니다.** 기본 설정으로 유료 API를 호출하지 않습니다. 테스트는 전부 가짜 제공자 응답을 사용합니다.
+FastAPI 중계 서버와 Android 클라이언트 연결 코드는 구현되어 있습니다. **OpenAI Responses API + `gpt-6-luna` + 추론 `none`으로 연결합니다.** 실제 API 키는 서버 로컬 `.env`에서 입력합니다. 공유 예제는 온라인 예측을 비활성화하며, 단위 테스트는 전부 가짜 제공자 응답을 사용합니다.
 
 ## 나중에 채울 설정
 
-`server/.env.example`을 `server/.env`로 복사합니다. 이 작업 공간에는 빈 `server/.env`도 만들어 두었습니다. `.env`는 Git에서 제외하며, 각 위치에 미정·미입력 주석이 있습니다.
+`server/.env.example`을 `server/.env`로 복사합니다. 이 작업 공간에는 Luna 연결 값이 들어 있는 로컬 `server/.env`를 만들어 두었습니다. `.env`는 Git에서 제외하며, 실제 API 키를 넣을 위치에 주석이 있습니다. 키를 채팅이나 예제 파일에 붙이지 않습니다.
 
 | 변수 | 용도 |
 |---|---|
-| `AI_PREDICTION_ENABLED` | 기본 `false`. 나머지 설정이 모두 준비된 뒤 사용 여부 결정 |
-| `AI_PROVIDER` | 아직 미정. 현재 구현된 어댑터는 `openai`; 다른 제공자는 어댑터 추가 필요 |
-| `AI_MODEL` | 아직 미정. 사용할 API 모델 ID를 나중에 입력. 기본 모델 없음 |
+| `AI_PREDICTION_ENABLED` | 공유 예제는 `false`. 실제 연결할 로컬 `.env`에서 `true`로 설정 |
+| `AI_PROVIDER` | `openai` |
+| `AI_MODEL` | `gpt-6-luna` |
 | `AI_API_KEY` | 아직 미입력. 서버에서만 사용하며 APK·문서·예제에 실제 키를 넣지 않음 |
-| `AI_API_BASE_URL` | 제공자의 HTTPS API 기본 주소. OpenAI 어댑터는 뒤에 `/responses`를 붙임 |
-| `AI_REASONING_EFFORT` | 모델이 지원하는 경우에만 입력. 미정이므로 기본 비움 |
+| `AI_API_BASE_URL` | `https://api.openai.com/v1` — 서버가 뒤에 `/responses`를 붙임 |
+| `AI_REASONING_EFFORT` | `none` — 추가 추론 없이 짧은 예측 생성 |
 
 프로세스 환경변수는 `.env`보다 우선합니다. 설정 변경 후 서버를 재시작해야 합니다. 필수 값이 비어 있거나 지원하지 않는 제공자이면 `/v1/config`는 비활성 상태를 반환하고 예측 요청은 503으로 종료합니다.
+
+모델의 Responses API·구조화 출력·`none` 지원은 [OpenAI 공식 모델 문서](https://developers.openai.com/api/docs/models/gpt-6-luna)에서 확인할 수 있습니다. API 호출은 사용량에 따라 과금됩니다.
 
 Android에서는 저장소 루트의 `online-prediction.properties.example`을 `online-prediction.properties`로 복사해 `PREDICTION_SERVER_URL`에 유효한 인증서가 있는 HTTPS 중계 서버 주소만 입력한 뒤 다시 빌드합니다. 이 파일도 Git에서 제외합니다. 모델·제공자 키는 Android 설정에 넣지 않습니다. 빈 주소, 동의 거부, 서버 설정 미완료 상태에서는 온라인 예측 없이 작성합니다.
 
@@ -46,4 +48,4 @@ server/.venv/bin/python -m unittest discover -s server -p 'test_server.py' -v
 - 모델·제공자·보관 안내가 바뀌면 정책 ID도 바뀝니다. 기존 동의의 요청은 412로 거부하며 새 제공자에 초안을 보내지 않습니다. 앱에서 안내를 다시 확인해야 합니다.
 - 제공자 키는 서버에서만 사용합니다. HTTPS 제공자 연결의 리다이렉트를 따르지 않으며 요청을 재시도하지 않습니다. 입력·후보·예외 본문·요청 헤더는 로그에 남기지 않고 상태·처리 시간·토큰 사용량만 기록합니다. Uvicorn도 위 명령처럼 접근 로그를 끕니다.
 - OpenAI 요청은 `store:false`이며 이전 응답 ID나 대화 저장소를 사용하지 않습니다. API 데이터는 기본적으로 학습에 쓰이지 않지만 악용 방지 로그는 기본 최대 30일 보관될 수 있고 정책상 예외가 있습니다. [공식 데이터 정책](https://developers.openai.com/api/docs/guides/your-data)
-- 한국어 미완성 자모·단어 후보의 유용성, 실제 응답 시간, 비용은 모델과 키를 정한 뒤 별도로 측정해야 합니다. 서버 단위 테스트는 이 성능을 입증하지 않습니다.
+- 한국어 미완성 자모·단어 후보의 유용성, 실제 응답 시간, 비용은 Luna API에 연결한 뒤 별도로 측정해야 합니다. 서버 단위 테스트는 이 성능을 입증하지 않습니다.

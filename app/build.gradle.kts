@@ -4,7 +4,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
-// TODO: AI provider/model/API key are unset in server/.env. Only a proxy URL belongs in the APK.
+// OpenAI provider/model/key settings stay in server/.env. Only a proxy URL belongs in the APK.
 val predictionProperties = Properties().apply {
     val config = rootProject.file("online-prediction.properties")
     if (config.isFile) config.inputStream().use { load(it) }

@@ -1,5 +1,6 @@
-# TODO: AI provider/model and API key are still unset in server/.env.
+# OpenAI GPT-6 Luna is configured in server/.env; its API key stays on the server.
 # Copy this file to online-prediction.properties and later enter the HTTPS proxy URL.
 # Do not put an AI provider key, model or secret query parameter in this Android configuration.
 # Empty means no online prediction requests. Rebuild the app after changing the URL.
+# This is your NoTouch proxy URL, not https://api.openai.com/v1.
 PREDICTION_SERVER_URL=

@@ -43,6 +43,7 @@ internal class WritingController(private val service: ControlAccessibilityServic
     private var openedAt = 0L
     private var lastProbe = 0L
     private var promptSnapshot: EditorSnapshot? = null
+    private var promptPackage: String? = null
     private var exitBounds: Rect? = null
     private var clickedBounds: Rect? = null
     private var candidateGaze = false
@@ -165,27 +166,49 @@ internal class WritingController(private val service: ControlAccessibilityServic
         if (now - lastProbe < 300) return
         lastProbe = now
         if (TrackerState.collecting || TrackerState.helpVisible || TrackerState.recoveryOpening) { removePrompt(); return }
+        val packageName = foregroundPackage()
+        if (packageName == null || !MessagingEditors.supportsPackage(packageName)) { removePrompt(); return }
         val found = runCatching { WritingTarget.capture(service) }.getOrNull()
         val snapshot = found?.expected
         found?.close()
-        if (snapshot == null) { removePrompt(); return }
-        if (promptSnapshot?.sameTarget(snapshot) == false) { removePrompt(); dwell.screenChanged() }
+        if (promptPackage != packageName ||
+            (snapshot != null && promptSnapshot?.sameTarget(snapshot) == false)) {
+            removePrompt(); dwell.screenChanged()
+        }
+        // Discovery depends on the app, while binding/writing still requires a verified editor.
+        // A missing editor, header or input focus must not silently hide the entire feature.
+        promptPackage = packageName
         promptSnapshot = snapshot
         if (prompt != null) return
-        val entry = RecoveryUi.button(service, "NoTouch로 작성") { open() }
+        val entry = RecoveryUi.button(service, "AI 텍스팅 · NoTouch로 작성") { open() }
         entry.foreground = WritingFeedback(service.resources.displayMetrics.density)
         if (runCatching { manager.addView(entry, params(false)) }.isSuccess) {
             prompt = entry; dwell.screenChanged()
         }
     }
+    @Suppress("DEPRECATION")
+    private fun foregroundPackage(): String? {
+        val active = service.rootInActiveWindow ?: return null
+        return try { active.packageName?.toString() } finally { active.recycle() }
+    }
     private fun removePrompt() {
         prompt?.let { if (it.isAttachedToWindow) runCatching { manager.removeView(it) } }
-        prompt = null; promptSnapshot = null
+        prompt = null; promptSnapshot = null; promptPackage = null
         if (root == null && exitBounds == null) TrackerState.writingOwnsInput = false
     }
     private fun open() {
-        val captured = runCatching { WritingTarget.capture(service) }.getOrNull() ?: run { removePrompt(); return }
-        if (promptSnapshot?.unchanged(captured.expected) != true) {
+        val packageName = foregroundPackage()
+        if (packageName == null || packageName != promptPackage || !MessagingEditors.supportsPackage(packageName)) {
+            removePrompt(); return
+        }
+        val captured = runCatching { WritingTarget.capture(service) }.getOrNull() ?: run {
+            Toast.makeText(service,
+                "대화방의 메시지 입력칸을 누른 뒤 다시 선택해 주세요. 이미 눌렀다면 현재 화면의 입력칸을 인식하지 못한 상태입니다.",
+                Toast.LENGTH_LONG).show()
+            return
+        }
+        if (captured.expected.packageName != packageName ||
+            (promptSnapshot != null && promptSnapshot?.unchanged(captured.expected) != true)) {
             captured.close(); removePrompt(); Toast.makeText(service, "입력칸이 바뀌었어요. 다시 선택해 주세요.", Toast.LENGTH_SHORT).show(); return
         }
         removePrompt(); target = captured

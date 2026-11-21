@@ -12,6 +12,7 @@ import android.graphics.Path
 import android.graphics.PathMeasure
 import android.graphics.Rect
 import android.graphics.RectF
+import android.graphics.drawable.GradientDrawable
 import android.os.SystemClock
 import android.util.TypedValue
 import android.view.Gravity
@@ -50,6 +51,7 @@ internal class PostCalibrationTutorialView(
     private var scrollPanel: ScrollView? = null
     private var horizontalPanel: HorizontalScrollView? = null
     private var scrollStatus: TextView? = null
+    private val scrollBadges = mutableMapOf<ScrollDirection, TextView>()
     private var animation: ValueAnimator? = null
     private val advance = Runnable {
         if (!closed && step == Step.CALIBRATED && TrackerState.running) showStep(Step.BUTTON)
@@ -161,6 +163,7 @@ internal class PostCalibrationTutorialView(
                 if (isHorizontal) horizontal.scrollTo(it.animatedValue as Int, 0)
                 else panel.scrollTo(0, it.animatedValue as Int)
                 practice.moved(horizontal.scrollX - beforeX, panel.scrollY - beforeY)
+                updateScrollBadges()
             }
             addListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animator: Animator) {
@@ -183,9 +186,43 @@ internal class PostCalibrationTutorialView(
 
     private fun updateScrollStatus() {
         scrollStatus?.text = "스크롤 모드 ${if (scrolling.enabled) "켜짐 · 파란 커서" else "꺼짐 · 빨간 커서"}\n" +
-            "↑ ${if (practice.up) "✓" else "○"}  ↓ ${if (practice.down) "✓" else "○"}  " +
-            "← ${if (practice.left) "✓" else "○"}  → ${if (practice.right) "✓" else "○"}" +
-            if (practice.up && practice.down) "\n윙크로 모드를 끄면 완료됩니다." else "\n위·아래로 한 번씩 스크롤해 보세요."
+            if (practice.up && practice.down) "윙크로 모드를 끄면 완료됩니다." else "위·아래로 한 번씩 스크롤해 보세요."
+        updateScrollBadges()
+    }
+
+    private fun scrollBadge(direction: ScrollDirection): TextView = label("", 700).apply {
+        tag = 18
+        textSize = 18f
+        accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+        background = GradientDrawable().apply { cornerRadius = 12 * resources.displayMetrics.density }
+        // Display-only: looking at the completion indicator must not trigger an action.
+        isClickable = false
+        scrollBadges[direction] = this
+    }
+
+    private fun updateScrollBadges() {
+        for ((direction, badge) in scrollBadges) {
+            val (name, complete) = when (direction) {
+                ScrollDirection.UP -> "위쪽" to practice.up
+                ScrollDirection.DOWN -> "아래쪽" to practice.down
+                ScrollDirection.LEFT -> "왼쪽" to practice.left
+                ScrollDirection.RIGHT -> "오른쪽" to practice.right
+            }
+            val arrow = when (direction) {
+                ScrollDirection.UP -> "↑"
+                ScrollDirection.DOWN -> "↓"
+                ScrollDirection.LEFT -> "←"
+                ScrollDirection.RIGHT -> "→"
+            }
+            val separator = if (direction.dx != 0) "\n" else " "
+            val message = "${if (complete) "✓" else arrow} $name${separator}scrolling ${if (complete) "완료!" else "대기"}"
+            if (badge.text.toString() == message) continue
+            badge.text = message
+            badge.setTextColor(if (complete) Color.WHITE else Color.rgb(98, 107, 128))
+            (badge.background as GradientDrawable).setColor(
+                if (complete) Color.rgb(22, 131, 71) else Color.rgb(232, 235, 241)
+            )
+        }
     }
 
     private fun label(value: String, weight: Int = 700, alignment: Int = Gravity.CENTER) = TextView(context).apply {
@@ -206,6 +243,7 @@ internal class PostCalibrationTutorialView(
         TrackerState.localDwellProgress = 0f
         TrackerState.localScrollMode = false
         target = null; scrollPanel = null; horizontalPanel = null; scrollStatus = null
+        scrollBadges.clear()
         column.removeAllViews()
         fun text(value: String, size: Int, weight: Int = 700): TextView {
             return label(value, weight).apply {
@@ -231,11 +269,9 @@ internal class PostCalibrationTutorialView(
             Step.SCROLL -> {
                 practice = ScrollPractice()
                 text("이제 시선으로 화면을 스크롤해 볼까요?", 23)
-                text("왼쪽/오른쪽 눈을 깜빡이면 스크롤 모드가 켜집니다. 화면의 윗부분을 바라보면 위로, 아랫부분을 바라보면 아래로 스크롤할 수 있어요.", 18)
-                text("모드가 켜지면 커서 중앙이 파란색으로 바뀝니다. 왼쪽/오른쪽 1/3을 바라보면 가로로도 스크롤해요.", 16, 500)
-                text("스크롤 모드를 끄고 싶다면 다시 한번 왼쪽/오른쪽 눈을 깜빡여 주세요.", 18)
-                text("주의 : Don't flirt while using the app", 16, 800)
-                text("위·아래·좌·우 1/3: 해당 방향 · 중앙: 정지", 14, 500)
+                text("한쪽 눈을 깜빡여 스크롤 모드를 켜세요.\n원하는 방향을 바라보면 스크롤돼요.", 18, 500)
+                scrollStatus = text("", 15, 500)
+                column.addView(scrollBadge(ScrollDirection.UP), LinearLayout.LayoutParams(-1, -2))
                 val frame = FrameLayout(context).apply { tag = "scroll-demo"; setBackgroundColor(Color.rgb(245, 247, 251)) }
                 val panel = ScrollView(context).apply { isFillViewport = true }
                 val horizontal = HorizontalScrollView(context).apply { isFillViewport = true }
@@ -253,6 +289,16 @@ internal class PostCalibrationTutorialView(
                 horizontal.addView(panel, LayoutParams((displayWidth * 1.8).toInt(), -1))
                 frame.addView(horizontal, LayoutParams(-1, -1))
                 column.addView(frame, LinearLayout.LayoutParams(-1, 190))
+                column.addView(scrollBadge(ScrollDirection.DOWN), LinearLayout.LayoutParams(-1, -2))
+                val horizontalBadges = LinearLayout(context).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    tag = "scroll-badges"
+                    addView(scrollBadge(ScrollDirection.LEFT), LinearLayout.LayoutParams(0, -2, 1f))
+                    addView(scrollBadge(ScrollDirection.RIGHT), LinearLayout.LayoutParams(0, -2, 1f))
+                }
+                column.addView(horizontalBadges, LinearLayout.LayoutParams(-1, -2))
+                text("위·아래·왼쪽·오른쪽 1/3: 해당 방향\n중앙: 정지", 14, 500)
+                text("연습 후 한쪽 눈을 다시 깜빡여\n스크롤 모드를 끄세요.", 18, 500)
                 scrollPanel = panel
                 horizontalPanel = horizontal
                 panel.post {
@@ -261,7 +307,6 @@ internal class PostCalibrationTutorialView(
                         horizontal.scrollTo((panel.width - horizontal.width).coerceAtLeast(0) / 2, 0)
                     }
                 }
-                scrollStatus = text("", 15, 500)
                 updateScrollStatus()
             }
             Step.FINISHED -> {
@@ -289,12 +334,12 @@ internal class PostCalibrationTutorialView(
         if (width == 0 || height == 0) return
         val availableWidth = width - paddingLeft - paddingRight
         val availableHeight = height - paddingTop - paddingBottom
-        val scale = minOf(availableWidth / 390f, availableHeight / if (step == Step.SCROLL) 1000f else 870f)
+        val scale = minOf(availableWidth / 390f, availableHeight / 870f)
         fun px(value: Int) = (value * scale).toInt()
         logo.setTextSize(TypedValue.COMPLEX_UNIT_PX, 24 * scale)
         (logo.layoutParams as LayoutParams).apply { leftMargin = px(24); topMargin = px(24) }
             .also { logo.layoutParams = it }
-        val sideSpace = if (step == Step.CALIBRATED || step == Step.FINISHED) 48 else 80
+        val sideSpace = if (step == Step.SCROLL) 40 else if (step == Step.CALIBRATED || step == Step.FINISHED) 48 else 80
         column.layoutParams = LayoutParams(availableWidth - px(sideSpace), -2, Gravity.CENTER)
         column.translationY = if (step == Step.CALIBRATED) -availableHeight * .04f else 0f
         for (i in 0 until column.childCount) {
@@ -310,7 +355,18 @@ internal class PostCalibrationTutorialView(
             if (child is TextView) child.setTextSize(TypedValue.COMPLEX_UNIT_PX, (child.tag as Int) * scale)
             if (child is GazeButton) { params.width = px(BUTTON_WIDTH); params.height = px(BUTTON_HEIGHT) }
             if (child.tag == "scroll-demo") params.height = px(190)
+            if (child.tag == "scroll-badges") {
+                val row = child as LinearLayout
+                (row.getChildAt(0).layoutParams as LinearLayout.LayoutParams).apply {
+                    marginEnd = px(10)
+                }.also { row.getChildAt(0).layoutParams = it }
+            }
             child.layoutParams = params
+        }
+        for (badge in scrollBadges.values) {
+            badge.setTextSize(TypedValue.COMPLEX_UNIT_PX, 18 * scale)
+            badge.setPadding(px(8), px(12), px(8), px(12))
+            (badge.background as GradientDrawable).cornerRadius = 12 * scale
         }
     }
 

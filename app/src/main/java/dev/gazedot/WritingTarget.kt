@@ -22,6 +22,8 @@ internal object MessagingEditors {
     private val headerContainers = setOf("toolbar", "action_bar", "chat_room_toolbar", "toolbar_container",
         "conversation_toolbar", "top_bar", "title_bar", "chat_room_header")
     private val specificHeaders = setOf("chat_room_title", "chatroom_title", "chat_title", "conversation_title", "conversation_title_text")
+    fun supportsPackage(packageName: String) = packageName in editors
+
     fun supports(packageName: String, id: String, password: Boolean, inputType: Int): Boolean {
         if (password || id !in editors[packageName].orEmpty().map { "$packageName:id/$it" }) return false
         val variation = inputType and InputType.TYPE_MASK_VARIATION
