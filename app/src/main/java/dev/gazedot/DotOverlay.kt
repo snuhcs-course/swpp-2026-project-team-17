@@ -91,7 +91,7 @@ class DotOverlay(context: Context) {
         dot.position = position; dot.progress=progress.coerceIn(0f,1f)
         dot.scrollMode=scrollMode; dot.invalidate()
         if (label.isBlank() || card != null) {
-            if (statusAttached) { manager.removeView(status); statusAttached = false }
+            if (statusAttached) { if (status.isAttachedToWindow) runCatching { manager.removeView(status) }; statusAttached = false }
             setDotOpacity(.7f)
         } else {
             status.text = label
@@ -156,10 +156,10 @@ class DotOverlay(context: Context) {
         card = panel
     }
 
-    fun hideHelp() { card?.let { if (it.isAttachedToWindow) manager.removeView(it) }; card = null }
+    fun hideHelp() { card?.let { if (it.isAttachedToWindow) runCatching { manager.removeView(it) } }; card = null }
     fun close() {
         hideHelp()
-        if (statusAttached) { manager.removeView(status); statusAttached = false }
-        if (dot.isAttachedToWindow) manager.removeView(dot)
+        if (statusAttached) { if (status.isAttachedToWindow) runCatching { manager.removeView(status) }; statusAttached = false }
+        if (dot.isAttachedToWindow) runCatching { manager.removeView(dot) }
     }
 }

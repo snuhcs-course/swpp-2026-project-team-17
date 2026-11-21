@@ -3,6 +3,39 @@ package dev.gazedot
 /** Accessed on the main thread. Camera worker posts immutable results here. */
 object TrackerState {
     var running = false
+    private var accessibilityInterrupted = false
+    private var resumeAfterAccessibility = false
+
+    fun accessibilityDisconnected() {
+        if (!accessibilityInterrupted) resumeAfterAccessibility = running && controls
+        accessibilityInterrupted = true
+        if (running && (fault == null || fault?.setting == RecoverySetting.ACCESSIBILITY)) {
+            fault = TrackingFault("접근성 조작이 중단되었어요",
+                "NoTouch 눈 조작을 다시 켜면 이전 추적 상태로 돌아갑니다.", RecoverySetting.ACCESSIBILITY)
+        }
+        controls = false
+        cancelActions?.invoke()
+        clearCoordinates()
+        contextChanged?.invoke()
+        notifyListeners()
+    }
+
+    fun accessibilityConnected() {
+        val resume = accessibilityInterrupted && resumeAfterAccessibility && running
+        accessibilityInterrupted = false
+        resumeAfterAccessibility = false
+        if (fault?.setting == RecoverySetting.ACCESSIBILITY) fault = null
+        cancelActions?.invoke()
+        clearCoordinates()
+        if (resume && fault == null) controls = true
+        contextChanged?.invoke()
+        notifyListeners()
+    }
+
+    fun pauseControls() {
+        resumeAfterAccessibility = false
+        controls = false
+    }
     var model: GazeModel? = null
     var controls = false
         set(value) {
@@ -80,6 +113,8 @@ object TrackerState {
     }
 
     fun trackingStopped() {
+        accessibilityInterrupted = false
+        resumeAfterAccessibility = false
         running = false
         controls = false
         cancelCalibration()

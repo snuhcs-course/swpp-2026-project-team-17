@@ -15,9 +15,10 @@ class ControlAccessibilityService : AccessibilityService() {
     private var writing: WritingController? = null
     override fun onServiceConnected() {
         instance=this
+        writing?.close()
         writing = WritingController(this)
-        if (TrackerState.fault?.setting == RecoverySetting.ACCESSIBILITY) TrackerState.fault = null
-        TrackerState.notifyListeners()
+        busy = false
+        TrackerState.accessibilityConnected()
     }
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         writing?.onEvent(event)
@@ -59,17 +60,15 @@ class ControlAccessibilityService : AccessibilityService() {
         return try { visit(root, 0); key } finally { root.recycle() }
     }
     private fun reportInterrupted() {
-        if (TrackerState.running) TrackerState.fault = TrackingFault("접근성 조작이 중단되었어요", "접근성 설정에서 NoTouch 눈 조작을 확인한 뒤 조작 재개를 선택해 주세요.", RecoverySetting.ACCESSIBILITY)
-        TrackerState.controls=false
-        TrackerState.cancelActions?.invoke()
-        TrackerState.contextChanged?.invoke()
-        TrackerState.notifyListeners()
+        TrackerState.accessibilityDisconnected()
     }
     override fun onInterrupt() { writing?.hide(); reportInterrupted() }
     override fun onDestroy() {
         writing?.close(); writing = null
-        if(instance===this) instance=null
-        reportInterrupted()
+        if (instance === this) {
+            instance = null
+            reportInterrupted()
+        }
         handler.removeCallbacksAndMessages(null); super.onDestroy()
     }
     private fun allowed()=TrackerState.externalActionsAllowed()

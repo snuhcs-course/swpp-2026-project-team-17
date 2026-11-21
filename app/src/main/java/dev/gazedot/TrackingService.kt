@@ -33,6 +33,8 @@ class TrackingService : LifecycleService() {
     private var cameraProvider: ProcessCameraProvider? = null
     private var analysis: ImageAnalysis? = null
     private var overlay: DotOverlay? = null
+    private var overlayOwner: ControlAccessibilityService? = null
+    private var previousInteractionAllowed = false
     private var lastFrame = 0L
     private var lastResult = 0L
     private var initialRotation = Surface.ROTATION_0
@@ -68,6 +70,7 @@ class TrackingService : LifecycleService() {
                 fail("카메라 권한이 필요해요", RecoverySetting.CAMERA); return
             }
             val now = SystemClock.uptimeMillis()
+            refreshOverlayOwner()
             if (TrackerState.recoveryOpening && now - recoveryOpenedAt > 5_000) {
                 TrackerState.recoveryOpening = false
                 TrackerState.cancelActions?.invoke()
@@ -129,11 +132,17 @@ class TrackingService : LifecycleService() {
             }
             TrackerState.contextChanged = {
                 if (!closing) {
+                    refreshOverlayOwner()
+                    // Returning from help/settings starts a new full observation interval.
+                    if (TrackerState.interactionAllowed && !previousInteractionAllowed) lossHelp.reset()
+                    previousInteractionAllowed = TrackerState.interactionAllowed
                     updateHelp(SystemClock.uptimeMillis()); renderOverlay(SystemClock.uptimeMillis())
                     updateNotification()
                 }
             }
             overlay = DotOverlay(this)
+            overlayOwner = ControlAccessibilityService.instance
+            previousInteractionAllowed = TrackerState.interactionAllowed
             initialRotation = rotation(); initialSize = sizeKey()
             displayManager.registerDisplayListener(displayListener, main)
             ContextCompat.registerReceiver(this, screenReceiver, IntentFilter(Intent.ACTION_SCREEN_OFF), ContextCompat.RECEIVER_NOT_EXPORTED)
@@ -357,12 +366,24 @@ class TrackingService : LifecycleService() {
     }
 
     private fun pauseControls() {
-        TrackerState.controls = false
+        TrackerState.pauseControls()
         clearHelp(resetEpisode = true)
         resetTracking()
         TrackerState.actionStatus = "조작 일시정지 · 홈이나 알림에서 조작 재개를 선택해 주세요"
         TrackerState.notifyListeners()
         updateNotification()
+    }
+
+    private fun refreshOverlayOwner() {
+        val owner = ControlAccessibilityService.instance
+        if (owner === overlayOwner) return
+        // Accessibility windows belong to a service connection; an old token cannot be reused.
+        overlayOwner = owner
+        val old = overlay
+        overlay = null
+        clearHelp(resetEpisode = true)
+        runCatching { old?.close() }
+        overlay = runCatching { DotOverlay(this) }.getOrNull()
     }
 
     private fun renderOverlay(now: Long) {
