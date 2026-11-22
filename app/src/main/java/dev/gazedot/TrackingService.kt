@@ -141,6 +141,7 @@ class TrackingService : LifecycleService() {
                 }
             }
             overlay = DotOverlay(this)
+            TrackerState.raiseGazeOverlay = { if (!closing) runCatching { overlay?.raiseDot() }; Unit }
             overlayOwner = ControlAccessibilityService.instance
             previousInteractionAllowed = TrackerState.interactionAllowed
             initialRotation = rotation(); initialSize = sizeKey()
@@ -433,6 +434,7 @@ class TrackingService : LifecycleService() {
     override fun onDestroy() {
         closing = true
         TrackerState.contextChanged = null
+        TrackerState.raiseGazeOverlay = null
         clearHelp(resetEpisode = true)
         main.removeCallbacksAndMessages(null)
         displayManager.unregisterDisplayListener(displayListener)

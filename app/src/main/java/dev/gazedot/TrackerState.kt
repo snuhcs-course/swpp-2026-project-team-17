@@ -63,6 +63,7 @@ object TrackerState {
     var fault: TrackingFault? = null
     var signalPending = false
     var contextChanged: (() -> Unit)? = null
+    var raiseGazeOverlay: (() -> Unit)? = null
     private val observers = linkedSetOf<() -> Unit>()
     fun observe(observer: () -> Unit) { observers += observer }
     fun unobserve(observer: () -> Unit) { observers -= observer }

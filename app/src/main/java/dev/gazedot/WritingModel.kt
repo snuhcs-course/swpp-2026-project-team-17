@@ -25,6 +25,15 @@ internal data class EditorSnapshot(
         val at = maxOf(start, end)
         return InsertionPlan(this, text.take(at) + addition + text.drop(at), at + addition.length)
     }
+
+    fun candidatePlan(candidate: WritingCandidate): InsertionPlan? {
+        if (!validSelection || start != text.length || end != text.length ||
+            candidate.start !in 0..text.length || candidate.end != text.length ||
+            text.substring(candidate.start, candidate.end) != candidate.expected ||
+            candidate.replacement.isEmpty()) return null
+        val updated = text.take(candidate.start) + candidate.replacement
+        return InsertionPlan(this, updated, updated.length)
+    }
 }
 
 internal data class InsertionPlan(val before: EditorSnapshot, val text: String, val caret: Int) {

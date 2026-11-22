@@ -33,10 +33,18 @@ class ControlAccessibilityService : AccessibilityService() {
     @Suppress("DEPRECATION")
     fun dwellTargetKey(point: Pair<Double, Double>): String? {
         if (!allowed()) return null
-        val root = rootInActiveWindow ?: return null
         val bounds = DisplaySpace.bounds(this)
         val x = (point.first * bounds.width()).toInt()
         val y = (point.second * bounds.height()).toInt()
+        // The keyboard is a separate accessibility window, not a child of the message app.
+        val visibleWindows = windows
+        val keyboardRoot = try {
+            visibleWindows.firstOrNull { window ->
+                window.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_INPUT_METHOD &&
+                    android.graphics.Rect().let { window.getBoundsInScreen(it); it.contains(x, y) }
+            }?.root
+        } finally { visibleWindows.forEach { it.recycle() } }
+        val root = keyboardRoot ?: rootInActiveWindow ?: return null
         var bestArea = Long.MAX_VALUE
         var key: String? = null
         var visits = 0

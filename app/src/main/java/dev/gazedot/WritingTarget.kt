@@ -76,6 +76,34 @@ internal class WritingTarget private constructor(
     fun insert(addition: String, result: (WriteResult) -> Unit) {
         if (pending || !unchanged()) { result(WriteResult.REJECTED); return }
         val plan = expected.plan(addition) ?: run { result(WriteResult.REJECTED); return }
+        applyPlan(plan, result)
+    }
+
+    fun applyCandidate(candidate: WritingCandidate, result: (WriteResult) -> Unit) {
+        if (pending || !unchanged()) { result(WriteResult.REJECTED); return }
+        val plan = expected.candidatePlan(candidate) ?: run { result(WriteResult.REJECTED); return }
+        applyPlan(plan, result)
+    }
+
+    /** Include the compact composer container, not only the text's inner bounds. */
+    fun protectedBounds(keyboardTop: Int): android.graphics.Rect {
+        val bounds = android.graphics.Rect().also { editor.getBoundsInScreen(it) }
+        val padding = RecoveryUi.dp(service, 64)
+        var ancestor = editor.parent
+        repeat(4) {
+            val node = ancestor ?: return bounds
+            val rect = android.graphics.Rect().also { node.getBoundsInScreen(it) }
+            val next = node.parent
+            node.recycle()
+            if (rect.contains(bounds) && rect.top >= bounds.top - padding &&
+                rect.bottom <= keyboardTop && rect.height() <= bounds.height() + padding) bounds.set(rect)
+            ancestor = next
+        }
+        ancestor?.recycle()
+        return bounds
+    }
+
+    private fun applyPlan(plan: InsertionPlan, result: (WriteResult) -> Unit) {
         pending = true
         val at = maxOf(expected.start, expected.end)
         if (expected.start != at || expected.end != at) {
@@ -85,7 +113,7 @@ internal class WritingTarget private constructor(
                 pending = false; invalid = true; result(WriteResult.REJECTED); return
             }
         }
-        // Persist the draft as uncertain before calling this method; a crash may follow IPC success.
+        // Never automatically retry an unconfirmed IPC; the real editor remains visible for inspection.
         runCatching {
             editor.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, Bundle().apply {
                 putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, plan.text)

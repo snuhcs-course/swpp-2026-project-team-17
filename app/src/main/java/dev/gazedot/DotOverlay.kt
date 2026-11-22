@@ -111,6 +111,15 @@ class DotOverlay(context: Context) {
         }
     }
 
+    fun raiseDot() {
+        // A newly added writing window otherwise covers this older window.
+        // The dot remains non-touchable, so keyboard and panel touches pass through.
+        if (!dot.isAttachedToWindow) return
+        val params = dot.layoutParams as WindowManager.LayoutParams
+        manager.removeViewImmediate(dot)
+        manager.addView(dot, params)
+    }
+
     private fun panelParams(touchable: Boolean) = WindowManager.LayoutParams(
         (displayBounds.width() - RecoveryUi.dp(overlayContext, 24)).coerceAtLeast(1),
         WindowManager.LayoutParams.WRAP_CONTENT, overlayType,
