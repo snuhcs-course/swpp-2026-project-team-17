@@ -10,6 +10,7 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 
 class ControlAccessibilityService : AccessibilityService() {
+    private val applicationWindow = ApplicationWindowTracker()
     private var busy=false
     private val handler=Handler(Looper.getMainLooper())
     private var writing: WritingController? = null
@@ -18,17 +19,34 @@ class ControlAccessibilityService : AccessibilityService() {
         writing?.close()
         writing = WritingController(this)
         busy = false
+        applicationWindow.changed(focusedApplicationWindow())
         TrackerState.accessibilityConnected()
     }
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         writing?.onEvent(event)
         if (event?.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            TrackerState.cancelActions?.invoke()
+            // Scrolling can emit WINDOW_STATE_CHANGED without leaving the app/window.
+            // Cancel stale clicks in that case, but keep the user's wink-selected mode.
+            if (applicationWindow.changed(focusedApplicationWindow())) TrackerState.cancelActions?.invoke()
+            else TrackerState.cancelPendingClick?.invoke()
         } else if (event?.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED ||
             event?.eventType == AccessibilityEvent.TYPE_VIEW_SCROLLED) {
             TrackerState.cancelPendingClick?.invoke()
         }
     }
+    @Suppress("DEPRECATION")
+    private fun focusedApplicationWindow(): ApplicationWindowKey? {
+        val visibleWindows = windows
+        return try {
+            val window = visibleWindows.firstOrNull {
+                it.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION && it.isFocused
+            } ?: return null
+            val root = window.root ?: return null
+            try { root.packageName?.toString()?.let { ApplicationWindowKey(it, window.id) } }
+            finally { root.recycle() }
+        } finally { visibleWindows.forEach { it.recycle() } }
+    }
+
     /** Local identity only: labels/text are neither read nor sent to the cloud. */
     @Suppress("DEPRECATION")
     fun dwellTargetKey(point: Pair<Double, Double>): String? {
