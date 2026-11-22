@@ -1,4 +1,12 @@
-# NoTouch — main (MediaPipe-only v30)
+# NoTouch — natural calibration comparison (v32)
+
+This branch is based on main/v30. Calibration now opens the five screen targets directly; there is no face-alignment/iris-registration activity. A non-blocking eyelid baseline is gathered automatically from 20 distinct low-blink frames, without a center/pose/iris-size requirement. It only normalizes open-eye/gesture classification. The five-point screen mapping, pose-consistency checks, tracking freshness and interaction logic remain unchanged.
+
+Choose a comfortable starting posture with both eyes visible. Keep that posture during screen calibration; this change does not add head-motion invariance. The texting/API integration is on feature/texting, not in this gaze comparison APK.
+
+## Base implementation (v30 history)
+
+### NoTouch — main (MediaPipe-only v30)
 
 Main now integrates `mediapipe-gaze-accuracy` at `4b3c525` with the former main history (`fd387cc`). The active Android application tree is the tested v30 implementation.
 

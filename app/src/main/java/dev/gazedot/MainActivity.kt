@@ -58,10 +58,6 @@ class MainActivity : ComponentActivity() {
             handler.postDelayed(this, 50)
         }
     }
-    private val faceSetup = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if(result.resultCode == android.app.Activity.RESULT_OK && TrackerState.running) startScreenCalibration()
-        else { TrackerState.status="얼굴 기준 측정 취소 · 기존 보정 유지"; showHome() }
-    }
     private fun showCalibrationTutorial() {
         if(!TrackerState.running) { showHome(); return }
         val bounds=DisplaySpace.bounds(this)
@@ -429,7 +425,7 @@ class MainActivity : ComponentActivity() {
     private fun startCalibration() {
         if(!TrackerState.running || TrackerState.fault!=null) { status.text="먼저 카메라를 시작하세요";return }
         tutorial?.close();tutorial=null
-        faceSetup.launch(Intent(this,FaceSetupActivity::class.java))
+        startScreenCalibration()
     }
     private fun startScreenCalibration() {
         if (!TrackerState.running || TrackerState.fault != null) {
@@ -456,7 +452,7 @@ class MainActivity : ComponentActivity() {
         private var poseReference: HeadPose? = null
         private var lastSampleAt = 0L
         private var closed = false
-        private var hint = "머리는 고정하고 파란 점을 바라보세요"
+        private var hint = "편한 자세에서 파란 점을 바라보세요 · 보정 중에는 자세를 유지하세요"
         private val tick = object : Runnable {
             override fun run() {
                 if (closed || calibration !== this@CalibrationView) return

@@ -39,9 +39,10 @@ class DeveloperSettingsActivity : ComponentActivity() {
             status.text=getSharedPreferences("personal",MODE_PRIVATE).getString("last_frame_error","기록된 오류 없음")
         }
         root.addView(TextView(this).apply {text="시선 모델: MediaPipe 얼굴·홍채 특징 + 양안 회귀. iTracker 없이 폰 안에서 실행합니다."})
-        button("홍채 기준 측정 결과") {
-            val prefs=getSharedPreferences("personal",MODE_PRIVATE)
-            status.text=prefs.getString("eye_profile_report","홍채 측정 전")
+        button("눈 뜸 자동 기준 상태") {
+            val profile=TrackerState.eyeProfile
+            status.text=if(profile==null) "기본 눈 판정 사용 중 · 눈이 자연스럽게 열린 표본을 자동 수집합니다. 얼굴 위치 맞추기는 필요하지 않습니다."
+                else "눈 뜸 기준 자동 적용 · 왼쪽 %.3f / 오른쪽 %.3f".format(profile.leftOpen,profile.rightOpen)
         }
         val personal=getSharedPreferences("personal",MODE_PRIVATE)
         root.addView(Switch(this).apply {
