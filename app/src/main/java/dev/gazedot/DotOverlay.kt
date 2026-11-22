@@ -56,7 +56,23 @@ class DotOverlay(context: Context) {
         setBackgroundColor(Color.rgb(245, 245, 255))
     }
     private var card: ScrollView? = null
-    private var statusAttached = false
+    private val statusBanner = OverlayStatusBanner(
+        setContent = { message, visible ->
+            status.text = message
+            status.visibility = if (visible) View.VISIBLE else View.GONE
+        },
+        addWindow = { manager.addView(status, panelParams(touchable = false)) },
+        removeWindow = {
+            // A registered window can still be awaiting its first attachment/layout.
+            // Do not gate removal on isAttachedToWindow.
+            try {
+                manager.removeViewImmediate(status)
+            } catch (error: IllegalArgumentException) {
+                // Android may already have removed it after an accessibility disconnect.
+                if (status.parent != null) throw error
+            }
+        },
+    )
     init {
         try {
             manager.addView(dot, createParams(overlayType))
@@ -91,15 +107,11 @@ class DotOverlay(context: Context) {
         dot.position = position; dot.progress=progress.coerceIn(0f,1f)
         dot.scrollMode=scrollMode; dot.invalidate()
         if (label.isBlank() || card != null) {
-            if (statusAttached) { if (status.isAttachedToWindow) runCatching { manager.removeView(status) }; statusAttached = false }
+            statusBanner.clear()
             setDotOpacity(.7f)
         } else {
-            status.text = label
-            if (!statusAttached) {
-                if (overlayType == WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY) setDotOpacity(.3f)
-                statusAttached = runCatching { manager.addView(status, panelParams(touchable = false)); true }.getOrDefault(false)
-                if (!statusAttached) setDotOpacity(.7f)
-            }
+            if (overlayType == WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY) setDotOpacity(.3f)
+            if (!statusBanner.show(label)) setDotOpacity(.7f)
         }
     }
 
@@ -168,7 +180,7 @@ class DotOverlay(context: Context) {
     fun hideHelp() { card?.let { if (it.isAttachedToWindow) runCatching { manager.removeView(it) } }; card = null }
     fun close() {
         hideHelp()
-        if (statusAttached) { if (status.isAttachedToWindow) runCatching { manager.removeView(status) }; statusAttached = false }
+        statusBanner.clear()
         if (dot.isAttachedToWindow) runCatching { manager.removeView(dot) }
     }
 }
