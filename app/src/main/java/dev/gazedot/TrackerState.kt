@@ -3,26 +3,66 @@ package dev.gazedot
 /** Accessed on the main thread. Camera worker posts immutable results here. */
 object TrackerState {
     var running = false
-    var model: GazePredictor? = null
-    var modelLabel = "기본 홍채 포인터 · 보정 없이 시작"
+    var model: GazeModel? = null
+    @Volatile var eyeProfile: EyeProfile? = null
+    var faceFrame: FaceFrame? = null
+    @Volatile var faceSetupActive = false
+    var inferenceStatus = "MediaPipe 준비 전"
     var controls = false
+        set(value) {
+            if (field == value) return
+            field = value
+            cancelActions?.invoke()
+            contextChanged?.invoke()
+            notifyListeners()
+        }
     var collecting = false
+    var precisionTraining = false
     var interactionAllowed = false
+        set(value) {
+            if (field == value) return
+            field = value
+            cancelActions?.invoke()
+            contextChanged?.invoke()
+        }
     var localDwellProgress = 0f
+    var localBarDirection:ScrollDirection?=null
+    var localBarProgress=0f
     var localScrollMode = false
     private var settingsScreens = 0
+    var helpVisible = false
+    var recoveryOpening = false
+    var fault: TrackingFault? = null
+    var signalPending = false
+    var contextChanged: (() -> Unit)? = null
+    private val observers = linkedSetOf<() -> Unit>()
+    fun observe(observer: () -> Unit) { observers += observer }
+    fun unobserve(observer: () -> Unit) { observers -= observer }
+    fun notifyListeners() { listener?.invoke(); observers.toList().forEach { it() } }
+    fun currentStatus(now: Long) = trackingStatus(running, controls, collecting, model != null,
+        sample, eyeState, now, fault, signalPending)
+    fun externalActionsAllowed() = running && controls && interactionAllowed && !collecting && !precisionTraining &&
+        !helpVisible && !recoveryOpening && fault == null && !signalPending
+    fun recognitionHelpEligible(accessibilityReady: Boolean) = running && controls && interactionAllowed &&
+        !collecting && !precisionTraining && !speaking && !recoveryOpening && model != null && fault == null &&
+        !signalPending && accessibilityReady
     fun settingsStarted() {
         settingsScreens++
         interactionAllowed = false
         cancelActions?.invoke()
+        contextChanged?.invoke()
     }
-    fun settingsStopped() { settingsScreens=(settingsScreens-1).coerceAtLeast(0); interactionAllowed=settingsScreens==0 }
+    fun settingsStopped() {
+        cancelActions?.invoke()
+        settingsScreens=(settingsScreens-1).coerceAtLeast(0)
+        interactionAllowed=settingsScreens==0
+        contextChanged?.invoke()
+    }
     var speaking = false
     var microphoneReady = false
     var actionStatus = "조작 꺼짐"
     var frameAt = 0L
     var eyeState = EyeState.LOST
-    var configKey = ""
     var cancelActions: (() -> Unit)? = null
     var cancelPendingClick: (() -> Unit)? = null
     var features: EyeFeatures? = null
@@ -32,7 +72,7 @@ object TrackerState {
     private var nextCalibration = 0L
     private var calibration: Long? = null
 
-    fun hasFreshFeatures(now: Long) = features != null && now - frameAt in 0..250
+    fun hasFreshFeatures(now: Long) = features != null && now - frameAt in 0..500
 
     fun clearCoordinates() {
         localDwellProgress = 0f
@@ -40,6 +80,7 @@ object TrackerState {
         frameAt = 0L
         eyeState = EyeState.LOST
         features = null
+        faceFrame = null
         sample = null
         gaze = null
     }
@@ -50,9 +91,12 @@ object TrackerState {
         cancelCalibration()
         collecting = false
         clearCoordinates()
+        helpVisible = false
+        recoveryOpening = false
+        signalPending = false
     }
 
-    /** Keep the selected model and all saved values until an explicit session succeeds. */
+    /** Keep the previous in-memory calibration until a new session succeeds. */
     fun beginCalibration(): Long {
         cancelCalibration()
         val session = ++nextCalibration
@@ -60,14 +104,14 @@ object TrackerState {
         collecting = true
         cancelActions?.invoke()
         clearCoordinates()
+        contextChanged?.invoke()
         return session
     }
 
-    fun finishCalibration(session: Long, result: GazePredictor?, save: () -> Unit): Boolean {
+    fun finishCalibration(session: Long, result: GazeModel?): Boolean {
         if (calibration != session) return false
         try {
             if (result == null) return false
-            save()
             model = result
             return true
         } finally {
@@ -81,6 +125,7 @@ object TrackerState {
         collecting = false
         cancelActions?.invoke()
         clearCoordinates()
+        contextChanged?.invoke()
     }
     var status = "시작 전 · 기기를 거치대에 고정해 주세요"
     var listener: (() -> Unit)? = null
@@ -91,15 +136,15 @@ object TrackerState {
             gaze = null
         }
         status = message
-        listener?.invoke()
+        notifyListeners()
     }
 
     fun publishSample(result: GazeSample, message: String) {
         sample = result
         frameAt = result.timestampMs
         features = result.features
-        gaze = result.toScreenGaze()
+        gaze = result.toScreenGaze()?.takeIf { eyeState == EyeState.OPEN }
         status = message
-        listener?.invoke()
+        notifyListeners()
     }
 }

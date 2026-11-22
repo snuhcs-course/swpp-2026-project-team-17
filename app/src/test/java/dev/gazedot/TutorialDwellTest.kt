@@ -27,7 +27,7 @@ class TutorialDwellTest {
         val dwell = TutorialDwell()
         dwell.update(true, 0, 0)
         dwell.update(true, 100, 100)
-        assertFalse(dwell.update(true, 200, 400))
+        assertFalse(dwell.update(true, 200, 650))
         assertEquals(0f, dwell.progress, 0f)
     }
 
@@ -52,17 +52,17 @@ class TutorialDwellTest {
     @Test fun missingFramesExpireWithoutSelectingAndCannotBridgeAGap() {
         val dwell = TutorialDwell()
         for (time in 0L..800L step 100) dwell.update(true, time, time)
-        dwell.expire(1_051)
+        dwell.expire(1_301)
         assertEquals(0f, dwell.progress, 0f)
-        assertFalse(dwell.update(true, 1_100, 1_100))
+        assertFalse(dwell.update(true, 1_400, 1_400))
         assertEquals(0f, dwell.progress, 0f)
-        assertFalse(dwell.update(true, 1_500, 1_500))
+        assertFalse(dwell.update(true, 2_000, 2_000))
         assertEquals(0f, dwell.progress, 0f)
     }
 
     @Test fun rejectsStaleFutureAndRepeatedSamples() {
         val dwell = TutorialDwell()
-        assertFalse(dwell.update(true, 0, 300))
+        assertFalse(dwell.update(true, 0, 501))
         assertFalse(dwell.update(true, 400, 300))
         dwell.update(true, 500, 500)
         dwell.update(true, 600, 600)

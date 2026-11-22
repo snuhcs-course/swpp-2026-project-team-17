@@ -1,0 +1,272 @@
+C:\Users\gyulimkim\Documents\New project\notouch-gaze-recovery\app\src\main\java\dev\gazedot\DeveloperSettingsActivity.kt:74: Warning: This argument is a new instance so stopService will not remove anything [ImplicitSamInstance]
+        button("추적 중지") { stopService(Intent(this, TrackingService::class.java)); status.text = "추적 중지됨" }
+                                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:\Users\gyulimkim\Documents\New project\notouch-gaze-recovery\app\src\main\java\dev\gazedot\MainActivity.kt:267: Warning: This argument is a new instance so stopService will not remove anything [ImplicitSamInstance]
+            stopService(Intent(this, TrackingService::class.java))
+                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   Explanation for issues of type "ImplicitSamInstance":
+   Kotlin's support for SAM (single abstract method) interfaces lets you pass
+   a lambda to the interface. This will create a new instance on the fly even
+   though there is no explicit constructor call. If you pass one of these
+   lambdas or method references into a method which (for example) stores or
+   compares the object identity, unexpected results may happen.
+
+   In particular, passing a lambda variable in as a listener, and then later
+   attempting to remove the listener will not work because a different
+   instance is passed in.
+
+   https://kotlinlang.org/docs/fun-interfaces.html#sam-conversions
+
+C:\Users\gyulimkim\Documents\New project\notouch-gaze-recovery\app\build.gradle.kts:11: Warning: Not targeting the latest versions of Android; compatibility modes apply. Consider testing and updating this version. Consult the android.os.Build.VERSION_CODES javadoc for details. [OldTargetApi]
+        targetSdk = 35
+        ~~~~~~~~~~~~~~
+
+   Explanation for issues of type "OldTargetApi":
+   When your application or sdk runs on a version of Android that is more
+   recent than your targetSdkVersion specifies that it has been tested with,
+   various compatibility modes kick in. This ensures that your application
+   continues to work, but it may look out of place. For example, if the
+   targetSdkVersion is less than 14, your app may get an option button in the
+   UI.
+
+   To fix this issue, set the targetSdkVersion to the highest available value.
+   Then test your app to make sure everything works correctly. You may want to
+   consult the compatibility notes to see what changes apply to each version
+   you are adding support for:
+   https://developer.android.com/reference/android/os/Build.VERSION_CODES.html
+   as well as follow this guide:
+   https://developer.android.com/distribute/best-practices/develop/target-sdk.
+   html
+
+   https://developer.android.com/distribute/best-practices/develop/target-sdk.html
+
+C:\Users\gyulimkim\Documents\New project\notouch-gaze-recovery\app\src\main\res\xml\accessibility_service.xml:8: Warning: Attribute isAccessibilityTool is only used in API level 31 and higher (current min is 26) [UnusedAttribute]
+    android:isAccessibilityTool="true"
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   Explanation for issues of type "UnusedAttribute":
+   This check finds attributes set in XML files that were introduced in a
+   version newer than the oldest version targeted by your application (with
+   the minSdkVersion attribute).
+
+   This is not an error; the application will simply ignore the attribute.
+   However, if the attribute is important to the appearance or functionality
+   of your application, you should consider finding an alternative way to
+   achieve the same result with only available attributes, and then you can
+   optionally create a copy of the layout in a layout-vNN folder which will be
+   used on API NN or higher where you can take advantage of the newer
+   attribute.
+
+   Note: This check does not only apply to attributes. For example, some tags
+   can be unused too, such as the new <tag> element in layouts introduced in
+   API 21.
+
+C:\Users\gyulimkim\Documents\New project\notouch-gaze-recovery\app\build.gradle.kts:24: Warning: A newer version of androidx.activity:activity-ktx than 1.10.1 is available: 1.13.0 [GradleDependency]
+    implementation("androidx.activity:activity-ktx:1.10.1")
+                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:\Users\gyulimkim\Documents\New project\notouch-gaze-recovery\app\build.gradle.kts:25: Warning: A newer version of androidx.lifecycle:lifecycle-service than 2.8.7 is available: 2.11.0 [GradleDependency]
+    implementation("androidx.lifecycle:lifecycle-service:2.8.7")
+                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:\Users\gyulimkim\Documents\New project\notouch-gaze-recovery\app\build.gradle.kts:26: Warning: A newer version of androidx.camera:camera-camera2 than 1.4.2 is available: 1.6.2 [GradleDependency]
+    implementation("androidx.camera:camera-camera2:1.4.2")
+                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:\Users\gyulimkim\Documents\New project\notouch-gaze-recovery\app\build.gradle.kts:27: Warning: A newer version of androidx.camera:camera-lifecycle than 1.4.2 is available: 1.6.2 [GradleDependency]
+    implementation("androidx.camera:camera-lifecycle:1.4.2")
+                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:\Users\gyulimkim\Documents\New project\notouch-gaze-recovery\app\build.gradle.kts:28: Warning: A newer version of com.google.mediapipe:tasks-vision than 0.10.26 is available: 1.2.3 [GradleDependency]
+    implementation("com.google.mediapipe:tasks-vision:0.10.26")
+                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   Explanation for issues of type "GradleDependency":
+   This detector looks for usages of libraries where the version you are using
+   is not the current stable release. Using older versions is fine, and there
+   are cases where you deliberately want to stick with an older version.
+   However, you may simply not be aware that a more recent version is
+   available, and that is what this lint check helps find.
+
+C:\Users\gyulimkim\Documents\New project\notouch-gaze-recovery\app\src\main\java\dev\gazedot\VoiceInput.kt:84: Warning: Don't use a constant here; expected one of: SpeechRecognizer.ERROR_AUDIO, SpeechRecognizer.ERROR_CANNOT_CHECK_SUPPORT, SpeechRecognizer.ERROR_CANNOT_LISTEN_TO_DOWNLOAD_EVENTS, SpeechRecognizer.ERROR_CLIENT, SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS, SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED, SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE, SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT, SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_RECOGNIZER_BUSY, SpeechRecognizer.ERROR_SERVER, SpeechRecognizer.ERROR_SERVER_DISCONNECTED, SpeechRecognizer.ERROR_SPEECH_TIMEOUT, SpeechRecognizer.ERROR_TOO_MANY_REQUESTS [SwitchIntDef]
+            12,13 -> "한국어 음성 모델을 사용할 수 없습니다. 기기의 음성 인식 언어 설정을 확인하세요"
+            ~~
+C:\Users\gyulimkim\Documents\New project\notouch-gaze-recovery\app\src\main\java\dev\gazedot\VoiceInput.kt:84: Warning: Don't use a constant here; expected one of: SpeechRecognizer.ERROR_AUDIO, SpeechRecognizer.ERROR_CANNOT_CHECK_SUPPORT, SpeechRecognizer.ERROR_CANNOT_LISTEN_TO_DOWNLOAD_EVENTS, SpeechRecognizer.ERROR_CLIENT, SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS, SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED, SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE, SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT, SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_RECOGNIZER_BUSY, SpeechRecognizer.ERROR_SERVER, SpeechRecognizer.ERROR_SERVER_DISCONNECTED, SpeechRecognizer.ERROR_SPEECH_TIMEOUT, SpeechRecognizer.ERROR_TOO_MANY_REQUESTS [SwitchIntDef]
+            12,13 -> "한국어 음성 모델을 사용할 수 없습니다. 기기의 음성 인식 언어 설정을 확인하세요"
+               ~~
+
+   Explanation for issues of type "SwitchIntDef":
+   This check warns if a switch statement does not explicitly include all the
+   values declared by the typedef @IntDef declaration.
+
+C:\Users\gyulimkim\Documents\New project\notouch-gaze-recovery\app\src\main\AndroidManifest.xml:17: Warning: The attribute android:allowBackup is deprecated from Android 12 and higher and may be removed in future versions. Consider adding the attribute android:dataExtractionRules specifying an @xml resource which configures cloud backups and device transfers on Android 12 and higher. [DataExtractionRules]
+        android:allowBackup="false" android:supportsRtl="true">
+                             ~~~~~
+
+   Explanation for issues of type "DataExtractionRules":
+   Before Android 12, the attributes android:allowBackup and
+   android:fullBackupContent were used to configure all forms of backup,
+   including cloud backups, device-to-device transfers and adb backup.
+
+   In Android 12 and higher, these attributes have been deprecated and will
+   only apply to cloud backups. You should instead use the attribute
+   android:dataExtractionRules, specifying an @xml resource that configures
+   which files to back up, for cloud backups and for device-to-device
+   transfers, separately. If your minSdkVersion supports older versions,
+   you'll still want to specify an android:fullBackupContent resource if the
+   default behavior is not right for your app.
+
+   https://developer.android.com/about/versions/12/backup-restore#xml-changes
+   https://goo.gle/DataExtractionRules
+
+C:\Users\gyulimkim\Documents\New project\notouch-gaze-recovery\app\src\main\java\dev\gazedot\VoiceInput.kt:36: Warning: Unnecessary; SDK_INT is always >= 31 [ObsoleteSdkInt]
+            recognizer=if(onDevice && Build.VERSION.SDK_INT>=31) SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+                                      ~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   Explanation for issues of type "ObsoleteSdkInt":
+   This check flags version checks that are not necessary, because the
+   minSdkVersion (or surrounding known API level) is already at least as high
+   as the version checked for.
+
+   Similarly, it also looks for resources in -vNN folders, such as values-v14
+   where the version qualifier is less than or equal to the minSdkVersion,
+   where the contents should be merged into the best folder.
+
+C:\Users\gyulimkim\Documents\New project\notouch-gaze-recovery\app\src\main\java\dev\gazedot\AccuracyActivity.kt:111: Warning: Use the KTX extension function SharedPreferences.edit instead? [UseKtx]
+            getSharedPreferences("personal",MODE_PRIVATE).edit().putString("accuracy_report",report).apply()
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:\Users\gyulimkim\Documents\New project\notouch-gaze-recovery\app\src\main\java\dev\gazedot\ControlAccessibilityService.kt:66: Warning: Use the KTX extension function SharedPreferences.edit instead? [UseKtx]
+                    getSharedPreferences("personal",0).edit().putString("ranker",rankerState).apply()
+                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:\Users\gyulimkim\Documents\New project\notouch-gaze-recovery\app\src\main\java\dev\gazedot\DeveloperSettingsActivity.kt:34: Warning: Use the KTX extension function SharedPreferences.edit instead? [UseKtx]
+                personal.edit().putBoolean("enabled",enabled).apply()
+                ~~~~~~~~~~~~~~~
+C:\Users\gyulimkim\Documents\New project\notouch-gaze-recovery\app\src\main\java\dev\gazedot\DeveloperSettingsActivity.kt:51: Warning: Use the KTX extension function SharedPreferences.edit instead? [UseKtx]
+            ControlAccessibilityService.instance?.closeSelection(); personal.edit().remove("ranker").apply()
+                                                                    ~~~~~~~~~~~~~~~
+C:\Users\gyulimkim\Documents\New project\notouch-gaze-recovery\app\src\main\java\dev\gazedot\MainActivity.kt:358: Warning: Use the KTX extension function String.toUri instead? [UseKtx]
+            overlayPermission.launch(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+                                                                                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:\Users\gyulimkim\Documents\New project\notouch-gaze-recovery\app\src\main\java\dev\gazedot\TextEntryActivity.kt:214: Warning: Use the KTX extension property View.isVisible instead? [UseKtx]
+            if (view.isClickable && view.isEnabled && view.visibility == View.VISIBLE) focusables.add(view)
+                                                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   Explanation for issues of type "UseKtx":
+   The Android KTX libraries decorates the Android platform SDK as well as
+   various libraries with more convenient extension functions available from
+   Kotlin, allowing you to use default parameters, named parameters, and
+   more.
+
+   Available options:
+
+   **remove-defaults** (default is true):
+   Whether to skip arguments that match the defaults provided by the extension.
+
+   Extensions often provide default values for some of the parameters. For example:
+   ```kotlin
+   fun Path.readLines(charset: Charset = Charsets.UTF_8): List<String> { return Files.readAllLines(this, charset) }
+   ```
+   This lint check will by default automatically omit parameters that match the default, so if your code was calling ```kotlin
+   Files.readAllLines(file, Charset.UTF_8)
+   ```
+   lint would replace this with
+   ```kotlin
+   file.readLines()
+   ```
+   rather than
+   ```kotlin
+   file.readLines(Charset.UTF_8
+   ```
+   You can turn this behavior off using this option.
+
+   To configure this option, use a `lint.xml` file with an <option> like this:
+
+   ```xml
+   <lint>
+       <issue id="UseKtx">
+           <option name="remove-defaults" value="true" />
+       </issue>
+   </lint>
+   ```
+
+   **require-present** (default is true):
+   Whether to only offer extensions already available.
+
+   This option lets you only have lint suggest extension replacements if those extensions are already available on the class path (in other words, you're already depending on the library containing the extension method.)
+
+   To configure this option, use a `lint.xml` file with an <option> like this:
+
+   ```xml
+   <lint>
+       <issue id="UseKtx">
+           <option name="require-present" value="true" />
+       </issue>
+   </lint>
+   ```
+
+C:\Users\gyulimkim\Documents\New project\notouch-gaze-recovery\app\src\main\java\dev\gazedot\DeveloperSettingsActivity.kt:48: Warning: Do not concatenate text displayed with setText. Use resource string with placeholders. [SetTextI18n]
+            status.text="명시적으로 확인한 선택 ${model.confirmations}회 · 폰 안에 저장됨"
+                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:\Users\gyulimkim\Documents\New project\notouch-gaze-recovery\app\src\main\java\dev\gazedot\DeveloperSettingsActivity.kt:55: Warning: Do not concatenate text displayed with setText. Use resource string with placeholders. [SetTextI18n]
+            text = "9점 보정 후 사용하세요.\n1초 응시: 클릭 · 윙크: 스크롤 모드 · 양눈 두 번 깜빡임: 받아쓰기"
+                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:\Users\gyulimkim\Documents\New project\notouch-gaze-recovery\app\src\main\java\dev\gazedot\LearnedSelectionPanel.kt:41: Warning: Do not concatenate text displayed with setText. Use resource string with placeholders. [SetTextI18n]
+            text="어느 버튼인가요? · 학습 ${ranker.confirmations}회\n먼저 후보 밖을 본 뒤, 원하는 항목을 1초 보세요. 터치도 가능."
+                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:\Users\gyulimkim\Documents\New project\notouch-gaze-recovery\app\src\main\java\dev\gazedot\LearnedSelectionPanel.kt:47: Warning: Do not concatenate text displayed with setText. Use resource string with placeholders. [SetTextI18n]
+                text="${position+1}. ${choice.label}"; isAllCaps=false; textSize=18f
+                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:\Users\gyulimkim\Documents\New project\notouch-gaze-recovery\app\src\main\java\dev\gazedot\LearnedSelectionPanel.kt:47: Warning: Do not concatenate text displayed with setText. Use resource string with placeholders. [SetTextI18n]
+                text="${position+1}. ${choice.label}"; isAllCaps=false; textSize=18f
+                        ~~~~~~~~~~
+C:\Users\gyulimkim\Documents\New project\notouch-gaze-recovery\app\src\main\java\dev\gazedot\MainActivity.kt:39: Warning: String literal in setText can not be translated. Use Android resources instead. [SetTextI18n]
+        else status.text = "접근성 > 설치된 앱 > NoTouch 눈 조작에서 사용 설정을 켜 주세요."
+                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:\Users\gyulimkim\Documents\New project\notouch-gaze-recovery\app\src\main\java\dev\gazedot\MainActivity.kt:161: Warning: String literal in setText can not be translated. Use Android resources instead. [SetTextI18n]
+            text = "NoTouch"; textSize = sp(30f); setTextColor(ink); gravity = Gravity.CENTER
+                    ~~~~~~~
+C:\Users\gyulimkim\Documents\New project\notouch-gaze-recovery\app\src\main\java\dev\gazedot\MainActivity.kt:374: Warning: Do not concatenate text displayed with setText. Use resource string with placeholders. [SetTextI18n]
+        } catch (e: Exception) { status.text = "시작 실패: ${e.message}" }
+                                               ~~~~~~~~~~~~~~~~~~~~~
+C:\Users\gyulimkim\Documents\New project\notouch-gaze-recovery\app\src\main\java\dev\gazedot\PostCalibrationTutorialView.kt:184: Warning: Do not concatenate text displayed with setText. Use resource string with placeholders. [SetTextI18n]
+        scrollStatus?.text = "스크롤 모드 ${if (scrolling.enabled) "켜짐 · 파란 커서" else "꺼짐 · 빨간 커서"}\n" +
+                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:\Users\gyulimkim\Documents\New project\notouch-gaze-recovery\app\src\main\java\dev\gazedot\PostCalibrationTutorialView.kt:184: Warning: Do not concatenate text displayed with setText. Use resource string with placeholders. [SetTextI18n]
+        scrollStatus?.text = "스크롤 모드 ${if (scrolling.enabled) "켜짐 · 파란 커서" else "꺼짐 · 빨간 커서"}\n" +
+                             ^
+C:\Users\gyulimkim\Documents\New project\notouch-gaze-recovery\app\src\main\java\dev\gazedot\PostCalibrationTutorialView.kt:184: Warning: Do not concatenate text displayed with setText. Use resource string with placeholders. [SetTextI18n]
+        scrollStatus?.text = "스크롤 모드 ${if (scrolling.enabled) "켜짐 · 파란 커서" else "꺼짐 · 빨간 커서"}\n" +
+                             ^
+C:\Users\gyulimkim\Documents\New project\notouch-gaze-recovery\app\src\main\java\dev\gazedot\PostCalibrationTutorialView.kt:184: Warning: Do not concatenate text displayed with setText. Use resource string with placeholders. [SetTextI18n]
+        scrollStatus?.text = "스크롤 모드 ${if (scrolling.enabled) "켜짐 · 파란 커서" else "꺼짐 · 빨간 커서"}\n" +
+                             ^
+C:\Users\gyulimkim\Documents\New project\notouch-gaze-recovery\app\src\main\java\dev\gazedot\PostCalibrationTutorialView.kt:185: Warning: Do not concatenate text displayed with setText. Use resource string with placeholders. [SetTextI18n]
+            "↑ ${if (practice.up) "✓" else "○"}  ↓ ${if (practice.down) "✓" else "○"}  " +
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:\Users\gyulimkim\Documents\New project\notouch-gaze-recovery\app\src\main\java\dev\gazedot\PostCalibrationTutorialView.kt:186: Warning: Do not concatenate text displayed with setText. Use resource string with placeholders. [SetTextI18n]
+            "← ${if (practice.left) "✓" else "○"}  → ${if (practice.right) "✓" else "○"}" +
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:\Users\gyulimkim\Documents\New project\notouch-gaze-recovery\app\src\main\java\dev\gazedot\PracticeActivity.kt:13: Warning: Do not concatenate text displayed with setText. Use resource string with placeholders. [SetTextI18n]
+        val title=TextView(this).apply { text="눈 조작 연습\n1초 응시: 클릭 · 윙크: 스크롤 모드"; textSize=23f }; root.addView(title)
+                                              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:\Users\gyulimkim\Documents\New project\notouch-gaze-recovery\app\src\main\java\dev\gazedot\PracticeActivity.kt:15: Warning: Do not concatenate text displayed with setText. Use resource string with placeholders. [SetTextI18n]
+        root.addView(Button(this).apply { text="클릭 횟수: 0"; setOnClickListener { text="클릭 횟수: ${++count}" } })
+                                                                                     ~~~~~~~~~~~~~~~~~~~
+C:\Users\gyulimkim\Documents\New project\notouch-gaze-recovery\app\src\main\java\dev\gazedot\PracticeActivity.kt:17: Warning: Do not concatenate text displayed with setText. Use resource string with placeholders. [SetTextI18n]
+        repeat(24) { n -> root.addView(TextView(this).apply { text="스크롤 연습 ${n+1}\n윙크로 모드를 켠 뒤 위/아래 1/3을 바라보세요"; textSize=18f; setPadding(0,35,0,35) }) }
+                                                                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:\Users\gyulimkim\Documents\New project\notouch-gaze-recovery\app\src\main\java\dev\gazedot\PracticeActivity.kt:17: Warning: Do not concatenate text displayed with setText. Use resource string with placeholders. [SetTextI18n]
+        repeat(24) { n -> root.addView(TextView(this).apply { text="스크롤 연습 ${n+1}\n윙크로 모드를 켠 뒤 위/아래 1/3을 바라보세요"; textSize=18f; setPadding(0,35,0,35) }) }
+                                                                             ~~~
+
+   Explanation for issues of type "SetTextI18n":
+   When calling TextView#setText
+   * Never call Number#toString() to format numbers; it will not handle
+   fraction separators and locale-specific digits properly. Consider using
+   String#format with proper format specifications (%d or %f) instead.
+   * Do not pass a string literal (e.g. "Hello") to display text. Hardcoded
+   text can not be properly translated to other languages. Consider using
+   Android resource strings instead.
+   * Do not build messages by concatenating text chunks. Such messages can not
+   be properly translated.
+
+   https://developer.android.com/guide/topics/resources/localization.html
+
+0 errors, 37 warnings

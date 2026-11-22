@@ -12,9 +12,10 @@ sealed class EyeAction {
 }
 
 /** Dwell uses result receipt time; blink and scroll timing retains camera timestamps. */
-class InteractionEngine {
+class InteractionEngine(useBars:Boolean=false) {
     private val dwell = TutorialDwell()
-    private val scroll = ScrollController()
+    private val scroll = ScrollController(useBars)
+    val bars get()=scroll.bars
     val scrollMode get() = scroll.enabled
     val progress get() = dwell.progress
     val pending get() = anchor != null
@@ -50,7 +51,7 @@ class InteractionEngine {
         targetKey: String? = null,
         receivedAt: Long = now,
     ): List<EyeAction> {
-        if (eye == EyeState.LOST || previousFrame?.let { now - it > 250 || now <= it } == true) {
+        if (eye == EyeState.LOST || previousFrame?.let { now - it > 500 || now <= it } == true) {
             val cancelled = pending
             reset(preserveSelection = true); previousFrame = now
             return if (cancelled) listOf(EyeAction.Cancel) else emptyList()

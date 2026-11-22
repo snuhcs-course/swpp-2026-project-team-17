@@ -8,7 +8,7 @@ data class ScreenGaze(
     val quality: TrackingQuality = TrackingQuality.TRACKING,
 ) {
     val valid get() = quality == TrackingQuality.TRACKING && x.isFinite() && y.isFinite()
-    fun fresh(now: Long) = valid && now - uptimeMillis in 0..TutorialDwell.MAX_SAMPLE_GAP_MS
+    fun fresh(now: Long) = valid && now - uptimeMillis in 0..500
 }
 
 fun GazeSample.toScreenGaze(): ScreenGaze? = point?.let {

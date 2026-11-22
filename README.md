@@ -1,124 +1,110 @@
-# NoTouch — 홈 화면·로컬 시선 추적 통합
+# NoTouch — main (MediaPipe-only v30)
 
-## 통합 사용 흐름
+Main now integrates `mediapipe-gaze-accuracy` at `4b3c525` with the former main history (`fd387cc`). The active Android application tree is the tested v30 implementation.
 
-1. 홈의 **카메라 시작**으로 전면 카메라와 오버레이를 시작합니다. 카메라·다른 앱 위 표시 권한이 필요하며, 마이크 권한이나 GPT 서버 설정 없이 로컬 추적을 사용할 수 있습니다.
-2. 유효한 저장 모델은 자동으로 재사용합니다. 기존 선택 순서는 거리·머리 학습 모델 → 가져온 학습 모델 → 저장된 개인 보정 → 기본 홍채 포인터입니다. 매번 보정할 필요는 없습니다.
-3. **보정 시작**을 명시적으로 누르면 기존 9점 보정을 진행합니다. 네 번째 목표 뒤에는 2초간 눈을 깜빡일 수 있는 휴식이 있습니다. 보정 중에도 카메라의 눈 특징을 수집하지만 일반 클릭·스크롤·받아쓰기는 차단하고 대기 중인 동작을 취소합니다.
-4. 보정이 성공적으로 저장된 경우에만 기존 모델을 교체합니다. 실패·뒤로 가기·화면 이탈·회전·추적 종료 시 기존 모델과 저장값을 보존하고 수집 상태를 정리합니다. 명시적 개인 보정 성공 시 가져온 모델·거리 학습 모델을 대체하는 codex의 기존 저장 동작을 유지합니다.
-5. 성공 후 완료 화면을 3초 표시하고 튜토리얼로 이동합니다. **여기를 바라보세요** 버튼 안에 유효한 카메라 시선을 연속 1초 유지하면 선택됩니다. 접근성 서비스는 필요하지 않습니다. 눈 감김·불확실·검출 소실·유효 범위 이탈·오래된 표본은 진행을 초기화하며, 유효 결과 수신이 250ms 넘게 끊기면 진행이 만료됩니다. 응시 시간은 첫 유효 결과를 받은 시각부터 계산하며 프레임 자체의 나이도 별도로 검사합니다. 클릭 연습 중 양눈을 빠르게 두 번 깜빡이면 보정으로 돌아갑니다. 이후 윙크 스크롤 연습에서 실제 위·아래 이동을 각각 해보고 윙크로 모드를 끄면 완료 화면이 표시됩니다.
-6. 홈의 **설정 · 개발자 기능**에서 기존 모델 가져오기, 60점 데이터 수집, 학습·평가, CSV/평가 내보내기, GPT 설정, 접근성 설정과 클릭·스크롤·받아쓰기 연습을 사용할 수 있습니다. 홈의 보정 시작·추적 중지·설정 진입은 접근성 권한 없이 1초 응시로 선택합니다. 일반 접근성 조작은 홈·보정·튜토리얼·설정 화면에서 차단되고 연습 화면이나 다른 앱에서 작동합니다. 알림에서 조작만 일시정지했다면 이 설정 화면의 **시작 / 일시정지한 조작 재개**로 재개합니다.
+- Front-camera capture → MediaPipe face/iris landmarks → separate left/right personal mappings → averaged screen position and stabilization.
+- Face/iris setup followed by **five-point calibration** with quality checks. No iTracker inference, weights or OpenCV dependency in this APK.
+- Existing dwell interaction, edge scroll bars, tutorial navigation, selection assistance and voice dictation are retained from v30.
+- The **texting composer is not included**. `feature/texting` and `feature/retargeting` are separate branches and are not implicitly integrated by this merge.
+- Calibration is session-local. Actual phone accuracy remains unverified for v30; automated checks do not establish accuracy.
+- See [v30 behavior, comparison procedure and verification](docs/mediapipe-comparison-v30.md).
 
-카메라 → MediaPipe 랜드마크 → 눈·머리 특징 → 기존 선택 모델 → 기존 안정화·품질 판정을 한 번 거친 최종 로컬 좌표를 포인터와 튜토리얼에 함께 전달합니다. `ScreenGaze`는 `GazeSample`의 원래 시간과 품질을 유지합니다. 좌표는 시스템 표시줄·컷아웃을 포함한 전체 디스플레이 기준이며 실제 뷰 위치와 맞춰 사용합니다. 화면 밖 좌표도 전달 시에는 보존하고 그릴 때만 제한하지만, 스크롤은 모드가 켜진 상태의 화면 안 위·아래·좌·우 1/3에서만 실행합니다. GPT 좌표는 라이브 포인터에 적용하지 않으며, 번들 MobileGaze/`PretrainedGaze` 추론도 활성화하지 않습니다. GazeCapture 실험은 포함하지 않습니다.
+Open the repository root in Android Studio. Configure the Android SDK locally, then build with:
 
-빌드·자동 테스트에 API 자격 증명은 필요하지 않습니다. 실제 GPT 검증에는 별도로 구성한 서버 URL과 NoTouch 접속 토큰이 필요하며, OpenAI 키는 서버에만 둡니다. 이번 통합의 검증 결과와 실기기 확인 제한은 [VALIDATION.md](VALIDATION.md)를 참고하세요.
+```powershell
+.\gradlew.bat :app:testDebugUnitTest :app:assembleDebug :app:lintDebug -PtargetAbi=arm64-v8a
+```
 
-## GPT-5.4 실험 모드 (v0.4)
+The existing `server/`, `training/` and earlier project documents are retained for history and separate experiments; their presence does not mean the v30 gaze pipeline invokes them. The Android tree matches v30; obsolete main-only depth/imported-model application modules are superseded by that implementation and remain available in Git history.
 
-기존 로컬 기능에 두 API 분석 단계를 추가했습니다. 두 단계 모두 모델 ID는 **`gpt-5.4`**입니다. API 키·실제 폰으로 호출과 정확도를 확인해야 하며, LLM이 정밀 시선 센서처럼 작동한다고 검증한 버전은 아닙니다. 외장 IR 카메라 입력이나 홍채 무늬 등록을 구현한 버전도 아닙니다.
+## Historical prototype notes (not the current v30 specification)
 
-1. 카메라 시작 후 **설정 · 개발자 기능** → **GPT-5.4 눈/머리 · 화면 보정 실험 설정**을 엽니다.
-2. [서버 설정](server/README.md)을 완료하고 서버 HTTPS 주소와 별도의 NoTouch 접속 토큰을 입력해 1번/2번 기능을 선택합니다. OpenAI 키는 서버 환경변수에만 보관합니다. 접속 토큰은 앱 메모리에만 유지합니다. ChatGPT 구독과 API 이용은 별개입니다.
-3. 전송 안내를 확인하고 **설정 적용**을 누릅니다. **현재 프레임 1회 분석**으로 시작하거나 10초 이상 간격 자동 분석을 켭니다. 두 단계를 모두 실행하면 샘플당 최대 두 번 호출합니다. 요청 흐름은 중첩하지 않습니다.
-4. 1번은 얼굴·눈 JPEG와 수치 특징, 기존 로컬 시선 추정값(있는 경우)을 보내 시선/머리·홍채 각도에 대한 모델 추정을 받습니다. 모호하면 보류할 수 있습니다. 각도는 측정값이 아닙니다.
-5. 2번은 접근성 서비스에서 얻은 현재 앱 이름·버튼 이름/영역, 시선 좌표를 보내 후보 ID를 받습니다. 화면 이미지는 전송하지 않습니다. 비밀번호 노드와 입력칸 내용은 제외합니다. 읽을 수 있는 후보가 없는 화면에서는 추천하지 않습니다.
-6. 파란 원은 추천 후보입니다. 같은 대상을 1초 동안 바라보면 추천 위치를 선택합니다. 스크롤 판단은 추천 버튼 좌표가 아닌 시선 좌표를 사용합니다.
-7. 설정 화면에서 소요 시간, 모델 판단 이유, 호출 수/누적 토큰을 확인합니다. GPT 끄기·추적 종료·알림 일시정지는 API 모드를 끄고 접속 토큰을 제거합니다.
+The text below documents an earlier prototype, including its nine-point workflow and feature limitations. Use the v30 reference above for current behavior.
 
-원본 시선용 사진은 기본 전면 카메라의 회전 보정된 비미러 영상입니다. 클라우드 추정은 촬영부터 8초 이내이며 눈·머리 특징이 유사할 때만 적용합니다. 후보는 같은 화면 구조이고 시선 근처인 경우에만 사용합니다. 이 임계치는 실험용 보호 규칙이며 정확도 보증이 아닙니다. API 응답 대기·실패·보류 중에도 선택한 로컬 모델 또는 기본 홍채 포인터를 사용합니다. GPT의 시선 샘플은 포인터 좌표를 대체하지 않습니다.
+# GazeDot — 안드로이드 시선 추정 시제품
 
-프로세스당 API 호출 상한은 20회이며 오류 발생 시 자동 분석을 멈춥니다. 상한은 결제 금액 제한이 아니므로 OpenAI 프로젝트 사용 한도도 설정하세요. 서버는 해시로 접속 토큰을 인증하고 Redis의 원자적 카운터로 전체 분당 12회·UTC 하루 200회로 제한합니다. 서버 설정이나 Redis 장애 시 호출을 차단합니다. 현재는 팀 실험용 공용 접속 토큰이며 사용자 계정·개인별 요금제는 없습니다.
+전면 카메라에서 눈·홍채 위치를 검출하고 **사용자별 9점 보정**을 거쳐 화면의 추정 시선 위치에 빨간 점을 표시합니다. 홈 화면이나 다른 앱으로 이동한 뒤에도 카메라 포그라운드 서비스와 터치가 통과하는 오버레이가 동작합니다.
 
-카메라 제품·무선 연결·각도 보정 설계: [하드웨어 검토](docs/ir-camera-research.md). 기존 기능 전체: [기능 목록](docs/features.md).
+## 현재 상태
 
-전면 카메라로 눈·홍채 랜드마크를 추적하고 다른 앱 위에 빨간 점을 표시합니다. 개발 단계에서 목표를 보고 터치하여 수집한 데이터를 PC에서 학습한 뒤 모델을 폰에 가져올 수 있습니다. 클릭, 스크롤, 한국어 음성 입력을 추가했습니다.
+Android Studio에서 저장소 루트 폴더를 열 수 있습니다. APK는 로컬에서 빌드하며 빌드 산출물은 저장소에 포함하지 않습니다.
 
-**실제 사용자 데이터로 학습된 시선 모델은 아직 포함하지 않습니다.** 학습 전 조작 테스트에는 선택 기능인 9점 개인 보정을 사용합니다. 모델과 개인 보정은 저장되므로 매번 보정할 필요는 없지만, 자세·거리·조명이 달라져도 정확하다는 의미는 아닙니다. 기존 버전에서 보고된 좌우 정확도 문제의 개선 여부는 실기기 측정이 필요합니다.
+첫 실기기 사용에서 좌우 시선 이동이 잘 반영되지 않는 문제가 보고되었습니다. 보정값 저장·재사용, 머리 각도·거리 변화 보완은 아직 구현하지 않았습니다. 현재 버전은 매번 시작할 때 9점 보정이 필요한 실험용 시제품입니다.
 
-## 설치·첫 실행
+## 문자 입력 모듈 분리
 
-1. `app/build/outputs/apk/debug/app-debug.apk`를 폰으로 옮겨 설치합니다. 동일 서명의 기존 NoTouch에 업데이트 설치할 수 있습니다. Android 8.0/API 26 이상, 전면 카메라가 필요합니다.
-2. **카메라 시작**을 누르고 ‘다른 앱 위에 표시’, 카메라, 알림 권한을 허용합니다. 받아쓰기를 쓰려면 마이크도 허용합니다.
-3. 저장 모델을 재사용하거나 홈의 **보정 시작**으로 9점 개인 보정을 진행합니다. 학습 모델 JSON은 **설정 · 개발자 기능**에서 불러옵니다. 개인 보정을 새로 완료하면 불러온 학습 모델 대신 개인 보정을 사용합니다.
-4. **설정 · 개발자 기능** → **접근성 서비스 설정 열기** → **NoTouch 눈 조작**을 활성화한 뒤 앱으로 돌아옵니다. 보정과 튜토리얼에는 이 권한이 필요하지 않습니다.
-5. 카메라 시작 시 일반 눈 조작이 준비됩니다. **설정 · 개발자 기능**의 **클릭·스크롤·받아쓰기 연습 화면**으로 이동합니다. 설정 화면에서는 눈 조작을 멈추며, 연습 화면이나 다른 앱에서 작동합니다.
-6. 알림의 **조작 일시정지**는 조작만 끕니다. **중지**는 카메라·마이크 서비스와 오버레이를 종료합니다.
+이 브랜치에서는 texting 작성 화면·저장 문장·한글 자판·온라인 자동완성을 제거했습니다. 해당 기능은 `feature/texting`에서 관리합니다. 기존 음성 받아쓰기와 클릭·스크롤·버튼 선택 보조는 유지합니다.
 
-마이크 권한을 뒤늦게 허용했다면 추적을 중지했다가 다시 시작하세요. 회전·화면 크기 변경·화면 꺼짐 시 추적을 종료합니다. 모델은 기종·화면 크기·방향이 일치할 때만 불러옵니다. 서비스가 종료되어도 저장한 모델과 수집 데이터는 유지됩니다.
+## 설치와 사용
 
-## 눈 조작
+1. `app/build/outputs/apk/debug/app-debug.apk`를 안드로이드 기기로 옮겨 설치합니다. Android 8.0/API 26 이상, 전면 카메라가 필요합니다. USB 연결 시 `adb install -r app/build/outputs/apk/debug/app-debug.apk`를 사용할 수 있습니다.
+2. GazeDot에서 **권한 허용 및 카메라 시작**을 누릅니다. ‘다른 앱 위에 표시’, 카메라, 알림 권한을 허용합니다. 오버레이 설정 화면에서 앱으로 돌아옵니다.
+3. 기기를 고정하고 얼굴을 정면에 둡니다. **눈 검출됨** 상태가 되면 **9점 시선 보정**을 누릅니다.
+4. 머리는 움직이지 않고 파란 점을 눈으로 따라갑니다. 점마다 약 2.5초 이상, 유효 표본 22개를 모읍니다. 보정은 약 25~40초가 걸릴 수 있습니다.
+5. 보정 후 빨간 점을 확인하고 **홈 화면에서 빨간 점 확인**을 누릅니다. 설정 앱 등 일부 화면에서는 안드로이드 보안 정책에 의해 오버레이가 숨겨질 수 있습니다.
+6. 앱의 **추적 중지** 또는 알림의 **중지**를 누르면 카메라와 오버레이가 종료됩니다.
 
-| 동작 | 방법 | 처리 |
-|---|---|---|
-| 클릭 | 같은 버튼 또는 위치를 연속 1초 응시 | 포인터의 진행률이 차면 한 번 클릭. 다시 선택하려면 시선을 벗겼다가 돌아오기 |
-| 응시 취소 | 다른 대상을 보거나 눈 검출·유효 입력이 끊기기 | 진행률 초기화. 오래된 좌표는 클릭에 사용하지 않음 |
-| 스크롤 모드 켜기/끄기 | 왼쪽 또는 오른쪽 눈을 한 번 윙크하고 다시 뜨기 | 모드 켜짐/꺼짐 전환. 켜지면 커서 중앙이 파란색, 꺼지면 빨간색. 켜진 동안 응시 클릭 차단 |
-| 아래로 스크롤 | 모드를 켠 뒤 화면 아래쪽 1/3을 350ms 이상 응시 | 화면 높이 15%를 650ms 동안 위로 스와이프. 최소 1.1초 간격으로 반복 |
-| 위로 스크롤 | 모드를 켠 뒤 화면 위쪽 1/3을 350ms 이상 응시 | 같은 속도로 아래로 스와이프 |
-| 좌·우 스크롤 | 모드를 켠 뒤 화면 좌측 또는 우측 1/3을 350ms 이상 응시 | 화면 너비 15%만큼 반대 방향으로 스와이프. 가로 이동을 지원하는 화면에서 사용 |
-| 음성 입력 | 입력칸을 선택한 후 빠르게 두 번 깜빡임 | 한국어 한 문장을 받아적고 해당 입력칸에 삽입 |
+앱을 처음 실행했을 때 카메라 권한을 거부했다면 다시 허용해야 합니다. 영구 거부한 경우 시스템 앱 설정에서 허용합니다. 화면 꺼짐, 회전, 화면 크기 변경 시 서비스를 종료하며 앱에서 다시 시작·보정합니다. 시스템에 의해 앱 프로세스가 종료된 경우에도 자동으로 카메라를 켜지 않습니다.
 
-짧은 깜빡임은 닫힘 70~350ms, 두 깜빡임 사이 열림 70~450ms로 판정합니다. 긴 눈 감기는 클릭하지 않으며 응시 진행을 초기화합니다. 스크롤 모드에서는 응시 클릭이 차단되고 받아쓰기 중에는 조작하지 않습니다. 얼굴 검출 실패를 눈 감기로 취급하지 않습니다.
+## background process인가?
 
-받아쓰기는 선택한 입력칸의 내용·커서·포커스가 유지될 때만 삽입하며 전송/Enter는 누르지 않습니다. 비밀번호 입력칸과 접근성 텍스트 편집을 지원하지 않는 앱에는 입력하지 않습니다. 기본값은 Android의 기기 내 음성 인식입니다. 기기 내 한국어 모델을 사용할 수 없는 경우 설정을 확인해야 합니다. 선택 옵션인 **시스템 음성 인식 허용**은 기기의 인식 제공자가 음성을 서버에 전송할 수 있습니다.
+일상적인 의미로는 앱 화면을 떠난 뒤에도 동작하는 백그라운드 기능이지만, Android 구현은 **camera 유형 Foreground Service**입니다. 앱 화면이 보일 때 사용자가 시작하고, 지속 알림을 표시하면서 카메라를 유지합니다. 빨간 점은 `TYPE_APPLICATION_OVERLAY` 창입니다. 접근성 서비스나 화면 캡처 권한은 사용하지 않습니다. 다른 앱을 클릭하는 기능은 포함하지 않습니다.
 
-스크롤은 화면 안의 위·아래·좌·우 1/3을 기준으로 하며 모드를 먼저 켜야 합니다. 중앙 사각 영역에서는 멈추고, 모서리처럼 두 영역이 겹치면 중앙에서 더 멀리 벗어난 축으로 한 방향만 이동합니다(같으면 상하 우선). 윙크는 한쪽 눈만 닫고 다른 눈은 열린 상태를 100~800ms 유지한 뒤 양눈을 다시 뜨는 것으로 판정합니다. 실제 인식은 기기와 눈 검출 품질에 따라 확인이 필요합니다. 빠른 깜빡임도 카메라 처리 속도와 눈 검출 품질에 영향을 받습니다. 시선 자판·자동완성은 향후 기능입니다.
+## 실제 구현과 한계
 
-스크롤 속도는 `EyeGestures.kt`의 `ScrollSettings`에서 조절합니다. `DISTANCE_FRACTION`은 한 번 이동할 해당 축의 화면 크기 비율, `DURATION_MS`는 이동 시간, `INTERVAL_MS`는 반복 간격입니다. 튜토리얼과 실제 접근성 스와이프가 같은 값을 사용합니다. 현재 평균 이동량은 초당 약 해당 축 화면 크기의 13.6%이며, 앱별 관성 스크롤에 따라 체감 속도는 달라질 수 있습니다.
+- CameraX ImageAnalysis: 전면 카메라, RGBA 프레임, 센서 회전 보정, 최신 프레임만 처리, 추론 최대 약 15fps.
+- MediaPipe Face Landmarker: CPU에서 얼굴·눈·홍채 랜드마크 478개 검출.
+- 양쪽 눈의 모서리 축을 기준으로 홍채의 상대 수평/수직 변위를 계산. 눈이 감기거나 랜드마크가 없으면 점을 숨김.
+- 9개 목표의 표본 중앙값으로 정규화된 ridge 선형 회귀를 학습해 화면 좌표로 변환.
+- 보정 시 시선 변화가 너무 작거나 적합 오차가 크면 실패 처리. 얼굴 위치·거리 변화가 큰 경우 점을 숨김. 미세한 고개 회전까지 완전히 보정하는 모델은 아님.
+- 화면 좌표에 지수 평활화 적용. 800ms 넘게 결과가 없으면 점을 숨김.
+- 전체 화면 오버레이는 터치를 받지 않고 창 불투명도를 0.7로 설정해 Android의 터치 통과 조건을 고려함.
 
-## 개발용 데이터 → 학습 → 폰 추론
+**홍채 검출 모델 자체가 화면 시선 좌표를 출력하는 것은 아닙니다.** 이 앱은 개인 보정 기반의 초기 시선 추정 실험입니다. 작은 버튼을 정확하게 선택할 수 있다는 보장이 없으며 기기, 조명, 안경, 눈 형태, 머리 위치에 영향을 받습니다. 보정 데이터의 적합 오차는 실제 사용 정확도가 아닙니다. 별도의 목표점 검증이 필요합니다.
 
-일반 사용자가 실행할 때마다 학습하는 방식이 아닙니다. 개발자가 데이터를 수집하고 PC에서 학습한 모델을 폰에 넣는 구조입니다. 자세한 명령과 평가 방법은 [training/README.md](training/README.md)를 참고하세요.
+카메라를 사용하는 다른 앱과 동시에 전면 카메라를 공유하지 못할 수 있습니다. 제조사의 배터리 관리, 카메라 정책, 분할 화면·폴더블 화면 전환에 따라 실기기 확인이 필요합니다.
 
-1. 기기와 머리를 고정하고 카메라를 시작합니다. 학습 모델은 없어도 됩니다.
-2. **설정 · 개발자 기능**에서 참가자 코드(P01 등)를 입력하고 **목표 60개 보고 터치하여 데이터 수집**을 실행합니다.
-3. 각 파란 목표를 1초 이상 보고 그 목표를 누릅니다. 터치 전 50~450ms의 눈·얼굴 특징 중앙값을 수집합니다. 부족한 표본과 큰 움직임은 거절합니다. 터치 자체가 시선의 정답임을 보장하지 않으므로 목표를 실제로 봐야 합니다.
-4. 다른 세션도 수집한 뒤 **수집 CSV 내보내기**로 PC에 옮깁니다. 1행은 한 목표/터치입니다. 원본 눈 영상은 저장하지 않습니다.
-5. PC의 `training/train.py`에서 평가용 세션 또는 참가자를 명시해 분리하고 학습합니다. 평균·표준편차도 학습 세션에서만 계산합니다.
-6. 생성한 `gaze-model.json`을 폰으로 옮겨 불러옵니다. `.report.json`은 평가 결과이며 모델 파일이 아닙니다.
+## 개인정보·네트워크
 
-현재 모델은 두 눈 각각의 홍채 상대좌표, 얼굴 위치, 눈 사이 간격, 머리 방향의 기하학적 특징 10개를 사용하는 **2차 ridge 회귀**입니다. 폰에서 동일한 연산을 수행하므로 추론 서버/API 비용이 없습니다. 실제 거리(cm), 정밀 3D 눈 회전각, 개인 홍채 무늬 등록·추적은 구현하지 않았습니다. 여러 사람의 무보정 사용 가능 여부는 학습에 포함하지 않은 참가자로 검증해야 합니다.
+이 브랜치에는 문자 초안 전송 및 온라인 자동완성 연결이 없습니다. 기존 시스템 받아쓰기의 데이터 처리는 해당 음성 인식 제공자 정책을 따릅니다. 이전 설치에 남은 작성 설정의 백업 제외 규칙은 유지합니다.
 
-## 구현 구조
+## 빌드
 
-- `MainActivity.kt`, `PostCalibrationTutorialView.kt`: 홈·9점 보정·중간 휴식·보정 완료·카메라 응시 튜토리얼.
-- `DeveloperSettingsActivity.kt`: 기존 모델·수집·학습·내보내기·GPT·연습 진입점.
-- `TrackingService.kt`: CameraX 전면 카메라, MediaPipe Face Landmarker, 빨간 점, 상호작용 연결. 화면을 떠나도 유지되는 camera/microphone 유형 Foreground Service.
-- `LandmarkFeatures.kt`: 478개 랜드마크에서 눈 열림·홍채 상대좌표·자세 특징 추출. 원본 영상은 처리 후 해제.
-- `InteractionEngine.kt`, `EyeGestures.kt`: 1초 응시 클릭·윙크 스크롤 모드·받아쓰기용 양눈 두 번 깜빡임 상태 처리. 검출 소실, 오래된 프레임, 중복 확정 방지.
-- `ControlAccessibilityService.kt`: 접근성 제스처로 터치/스와이프, 선택된 입력칸 텍스트 삽입.
-- `VoiceInput.kt`: 한 문장 음성 인식, 시간 초과, 취소된 이전 인식 결과 무시.
-- `CaptureActivity.kt`: 개발용 60개 목표·터치 수집, CSV 내보내기용 로컬 파일.
-- `ModelStore.kt`, `GazeMath.kt`: 모델 검사·저장·추론, 개인 보정.
-- `PracticeActivity.kt`: 클릭 카운터·입력칸·스크롤 연습 화면.
-
-전면 카메라는 1280×720을 요청하며 기기에 따라 실제 해상도가 달라질 수 있습니다. 프레임 처리 시작 간격은 최소 33ms이나 실제 FPS는 성능에 따라 낮습니다. 250ms 이상 지연된 프레임은 조작에서 제외합니다. 영상 신호가 800ms 이상 없으면 점을 숨기고 받아쓰기를 취소합니다.
-
-## 데이터·권한
-
-기본 로컬 모드는 카메라 영상을 업로드하거나 파일로 저장하지 않습니다. GPT 모드를 명시적으로 켜면 위 설명의 얼굴 사진·수치 특징·UI 후보를 NoTouch 서버를 거쳐 OpenAI로 전송합니다. `store:false`로 Responses 저장을 요청하지 않지만 이것이 제공자의 모든 보존 정책을 비활성화한다는 뜻은 아닙니다. 로컬 저장 항목은 모델, 개인 보정값, 개발 수집 모드의 수치 특징·목표/터치 좌표·참가자 코드입니다. CSV는 직접 내보내며 자동 전송하지 않습니다. 수집 데이터는 `datasets/` 아래에 보관하면 Git에서 제외됩니다. 화면 텍스트와 API 키는 로그에 저장하지 않습니다.
-
-v0.4은 GPT API용 INTERNET 권한이 있습니다. 사용자가 허용한 시스템 음성 인식은 별도 제공자 앱의 네트워크 정책을 따릅니다. 앱 삭제 시 내부 수집 데이터·보정·모델은 삭제되지만 외부로 내보낸 CSV/JSON은 따로 지워야 합니다.
-
-## 빌드·검증
-
-Android Studio에서 저장소 루트를 엽니다. SDK 35, JDK 17 또는 21이 필요합니다. `local.properties`의 `sdk.dir`를 자신의 SDK 경로로 설정하세요.
+Android Studio에서 이 폴더를 열고 SDK 35를 설치합니다. JDK 17 또는 21을 사용합니다. `local.properties`의 `sdk.dir`는 각 PC의 SDK 경로를 사용합니다(버전 관리 제외).
 
 ```powershell
 .\gradlew.bat :app:assembleDebug :app:testDebugUnitTest :app:lintDebug
-python -m pip install -r training/requirements.txt
-python -m unittest discover -s training -v
 ```
 
-Gradle 8.13 / AGP 8.9.2 / Kotlin 2.1.20 / CameraX 1.4.2 / MediaPipe Tasks Vision 0.10.26을 사용합니다. 첫 빌드에는 라이브러리 다운로드가 필요합니다.
+Gradle 8.13 / AGP 8.9.2 / Kotlin 2.1.20 / CameraX 1.4.2 / MediaPipe Tasks Vision 0.10.26을 고정해 사용합니다. 첫 빌드에는 라이브러리 다운로드를 위한 인터넷이 필요합니다. 기기 내 시선 추정은 오프라인으로 실행됩니다.
 
-자동 테스트는 응시 클릭·받아쓰기용 깜빡임·스크롤의 상태 전환, 학습/평가 분리, 잘못된 모델 거절, Python 학습 모델과 Android 추론값 일치를 검사합니다. 테스트용 합성 데이터는 정확도 근거로 사용하지 않으며 APK에 학습 모델로 넣지 않습니다. 실제 S23의 클릭·스크롤·음성 입력과 눈 추정 성능은 별도 실기기 확인이 필요합니다. 작은 버튼, 안경 반사, 고개 이동, 제조사 카메라/배터리 정책은 현재 한계입니다.
+## 실기기 확인 항목
 
-## 참고
+- 보정 후 보정에 쓰지 않은 화면 위치를 바라보며 오차·반응 지연을 측정.
+- 머리를 고정한 상태에서 눈만 좌우·상하로 이동했을 때 점이 따라오는지 확인.
+- 홈/브라우저로 전환하고 2분 동안 점·알림·터치 통과 확인.
+- 눈 감기/얼굴 가리기 시 점 숨김, 복귀 시 추적 재개 확인.
+- 회전/화면 끄기/중지 버튼 후 카메라 표시와 점이 사라지는지 확인.
+- 오버레이/카메라 권한 거부 및 취소, 다른 카메라 앱 실행 시 확인.
 
-- [MediaPipe Face Landmarker](https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker)
-- [Android 접근성 제스처 API](https://developer.android.com/reference/android/accessibilityservice/AccessibilityService)
-- [Android SpeechRecognizer API](https://developer.android.com/reference/android/speech/SpeechRecognizer)
-- [Android Foreground Service 유형](https://developer.android.com/develop/background-work/services/fgs/service-types)
+## 파일 안내
 
-번들 모델은 Google MediaPipe Face Landmarker float16 v1입니다. [다운로드 출처](https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task). SHA-256: `64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff`. MediaPipe 라이선스와 모델 카드는 배포 전에 확인하세요.
+- `MainActivity.kt`: 권한, 상태 화면, 9점 보정 UI.
+- `TrackingService.kt`: 카메라 포그라운드 서비스, 추론, 생명주기·종료.
+- `LandmarkFeatures.kt`: 홍채의 눈 내부 상대좌표 추출.
+- `GazeMath.kt`: 보정 회귀, 품질·얼굴 위치 검사.
+- `DotOverlay.kt`: 다른 앱 위의 빨간 점.
+- `GazeMathTest.kt`: 미관측 좌표 예측, 무효 보정·얼굴 이동·이상값 검사.
+
+## 모델 출처
+
+Google MediaPipe Face Landmarker float16 v1:
+https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task
+
+SHA-256: `64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff`
+
+MediaPipe는 Apache-2.0 라이선스이며 배포 모델의 모델 카드와 관련 고지를 함께 확인하세요:
+https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker
+
+Android camera foreground service 문서:
+https://developer.android.com/develop/background-work/services/fgs/service-types#camera

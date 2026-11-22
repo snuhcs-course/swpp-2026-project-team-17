@@ -17,6 +17,31 @@ class MainActivity : ComponentActivity() {
     private lateinit var cameraButton: Button
     private lateinit var calibrationButton: Button
     private lateinit var stopButton: Button
+    private lateinit var resumeButton: Button
+    private var recoveryAction: String? = null
+    private var recoveryDeadline = 0L
+    private val recoveryRequest = object : Runnable {
+        override fun run() {
+            when (recoveryAction) {
+                RECOVERY_START -> {
+                    if (TrackerState.running) {
+                        if (SystemClock.uptimeMillis() < recoveryDeadline) { handler.postDelayed(this, 100); return }
+                        recoveryAction = null
+                        status.text = "추적 종료를 기다리고 있어요. 잠시 후 카메라 시작을 다시 선택해 주세요."
+                        return
+                    }
+                    recoveryAction = null
+                    startTracking()
+                }
+                RECOVERY_CALIBRATE -> {
+                    if (TrackerState.running && !TrackerState.hasFreshFeatures(SystemClock.uptimeMillis()) &&
+                        SystemClock.uptimeMillis() < recoveryDeadline) { handler.postDelayed(this, 100); return }
+                    recoveryAction = null
+                    startCalibration()
+                }
+            }
+        }
+    }
     private var calibration: CalibrationView? = null
     private var tutorial: PostCalibrationTutorialView? = null
     private val handler = Handler(Looper.getMainLooper())
@@ -33,13 +58,28 @@ class MainActivity : ComponentActivity() {
             handler.postDelayed(this, 50)
         }
     }
+    private val faceSetup = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if(result.resultCode == android.app.Activity.RESULT_OK && TrackerState.running) startScreenCalibration()
+        else { TrackerState.status="얼굴 기준 측정 취소 · 기존 보정 유지"; showHome() }
+    }
+    private fun showCalibrationTutorial() {
+        if(!TrackerState.running) { showHome(); return }
+        val bounds=DisplaySpace.bounds(this)
+        tutorial=PostCalibrationTutorialView(this,bounds.width(),bounds.height(),
+            onRecalibrate={startCalibration()},onFinished={window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); showHome()})
+        setContentView(tutorial)
+    }
+    private val accessibilitySettings = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        if (ControlAccessibilityService.instance != null) startTracking()
+        else status.text = "접근성 > 설치된 앱 > NoTouch 눈 조작에서 사용 설정을 켜 주세요."
+    }
     private val overlayPermission = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         if (Settings.canDrawOverlays(this)) startTracking()
-        else status.text = "다른 앱 위에 표시 권한을 허용한 뒤 다시 시작하세요."
+        else reportPermissionFault("다른 앱 위에 표시 권한이 필요해요", RecoverySetting.OVERLAY)
     }
     private val permissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) startTracking()
-        else { status.text = "시선 추적에는 카메라 권한이 필요합니다. 권한을 허용한 뒤 다시 시작하세요." }
+        else reportPermissionFault("카메라 권한이 필요해요", RecoverySetting.CAMERA)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,7 +88,11 @@ class MainActivity : ComponentActivity() {
         else @Suppress("DEPRECATION") run {
             window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
         }
-        if (TrackerState.model == null) TrackerState.model = ModelStore.load(this)
+        recoveryAction = if (savedInstanceState == null) intent.getStringExtra(EXTRA_RECOVERY_ACTION) else null
+        if (recoveryAction == RECOVERY_START && TrackerState.running) {
+            TrackerState.cancelActions?.invoke()
+            stopService(Intent(this, TrackingService::class.java))
+        }
         showHome()
         onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -57,7 +101,7 @@ class MainActivity : ComponentActivity() {
                     calibration = null
                     TrackerState.cancelCalibration()
                     TrackerState.status = "보정 취소됨"
-                    showHome()
+                    if (intent.hasExtra(EXTRA_RECOVERY_ACTION)) finish() else showHome()
                 } else if (tutorial != null) {
                     showHome()
                 } else {
@@ -78,7 +122,7 @@ class MainActivity : ComponentActivity() {
         TrackerState.listener = {
             if (tutorial != null) {
                 if (!TrackerState.running) showHome()
-                else tutorial?.onFrame(TrackerState.sample, TrackerState.eyeState)
+                else tutorial?.onFrame(if (TrackerState.controls && !TrackerState.helpVisible && TrackerState.fault == null) TrackerState.sample else null, TrackerState.eyeState)
             } else if (calibration != null && !TrackerState.running) {
                 calibration?.close()
                 calibration = null
@@ -86,20 +130,26 @@ class MainActivity : ComponentActivity() {
                 showHome()
             } else if (calibration != null) calibration?.onFrame(TrackerState.sample)
             else if (::status.isInitialized) {
-                status.text = TrackerState.status
+                status.text = homeStatus()
                 updateHomeButtons()
                 onHomeGaze(TrackerState.gaze)
             }
         }
         if (calibration == null && tutorial == null) {
-            status.text = TrackerState.status
+            status.text = homeStatus()
             updateHomeButtons()
         }
         handler.removeCallbacks(homeFreshness)
         handler.post(homeFreshness)
+        if (recoveryAction != null) {
+            recoveryDeadline = SystemClock.uptimeMillis() + 1_500
+            handler.post(recoveryRequest)
+        }
     }
     override fun onPause() {
         handler.removeCallbacks(homeFreshness)
+        handler.removeCallbacks(recoveryRequest)
+        recoveryAction = null
         homeDwell.reset()
         TrackerState.localDwellProgress = 0f
         TrackerState.listener = null
@@ -109,7 +159,7 @@ class MainActivity : ComponentActivity() {
             calibration?.close()
             calibration = null
             TrackerState.cancelCalibration()
-            TrackerState.status = "보정이 중단되었습니다. 다시 9점 보정을 시작하세요."
+            TrackerState.status = "보정이 중단되었습니다. 다시 5점 보정을 시작하세요."
             showHome()
         }
     }
@@ -136,7 +186,7 @@ class MainActivity : ComponentActivity() {
         val screenHeightDp = resources.displayMetrics.heightPixels / density
         val scale = minOf(screenWidthDp / 390f, screenHeightDp / 780f).coerceIn(0.55f, 1f)
         fun dp(n: Int) = (n * density * scale).toInt()
-        fun sp(n: Float) = n * scale
+        fun sp(n: Float) = n
         val ink = Color.rgb(17, 18, 70)
         val blue = Color.rgb(6, 108, 236)
         val pale = Color.rgb(230, 230, 253)
@@ -151,19 +201,26 @@ class MainActivity : ComponentActivity() {
             gravity = Gravity.CENTER_HORIZONTAL
             setPadding(dp(24), 0, dp(24), dp(16))
         }
-        root.addView(content, FrameLayout.LayoutParams(-1, -2))
+        val scroll = ScrollView(this).apply { isFillViewport = true; addView(content) }
+        root.addView(scroll, FrameLayout.LayoutParams(-1, -1))
+        root.setOnApplyWindowInsetsListener { _, insets ->
+            @Suppress("DEPRECATION")
+            root.setPadding(insets.systemWindowInsetLeft, insets.systemWindowInsetTop,
+                insets.systemWindowInsetRight, insets.systemWindowInsetBottom)
+            insets
+        }
 
         val logo = TextView(this).apply {
             text = "NoTouch"; textSize = sp(30f); setTextColor(ink); gravity = Gravity.CENTER
             style(this, 800)
         }
-        content.addView(logo, LinearLayout.LayoutParams(-1, dp(46)).apply { topMargin = dp(104) })
+        content.addView(logo, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(40) })
         status = TextView(this).apply {
-            text = if (TrackerState.status.startsWith("시작 전")) "" else TrackerState.status
-            textSize = sp(12f); setTextColor(ink); gravity = Gravity.CENTER
-            maxLines = 2; style(this, 500)
+            text = homeStatus()
+            textSize = sp(18f); setTextColor(ink); gravity = Gravity.CENTER
+            style(this, 500)
         }
-        content.addView(status, LinearLayout.LayoutParams(-1, dp(28)))
+        content.addView(status, LinearLayout.LayoutParams(-1, -2))
 
         fun pill(label: String, action: () -> Unit) = Button(this).apply {
             text = label; isAllCaps = false; textSize = sp(16f); setTextColor(Color.WHITE)
@@ -171,12 +228,17 @@ class MainActivity : ComponentActivity() {
                 cornerRadius = dp(28).toFloat(); setColor(blue)
             }
             stateListAnimator = null
-            minHeight = 0; minimumHeight = 0; minWidth = 0
-            setPadding(dp(16), 0, dp(16), 0)
+            minHeight = RecoveryUi.dp(this@MainActivity, 56); minWidth = 0
+            setPadding(dp(16), RecoveryUi.dp(this@MainActivity, 12), dp(16), RecoveryUi.dp(this@MainActivity, 12))
             style(this, 700)
             setOnClickListener { action() }
             homeTargets += this
         }
+        content.addView(pill("도움 · 인식 문제 해결하기") {
+            homeDwell.reset()
+            TrackerState.cancelActions?.invoke()
+            startActivity(Intent(this, RecoveryActivity::class.java))
+        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
         fun addStep(
             number: String,
             heading: String,
@@ -197,7 +259,7 @@ class MainActivity : ComponentActivity() {
                 gravity = Gravity.CENTER
                 style(this, 900)
             }
-            row.addView(numeral, LinearLayout.LayoutParams(dp(54), dp(64)))
+            row.addView(numeral, LinearLayout.LayoutParams(dp(54), -2))
 
             val title = TextView(this).apply {
                 text = heading
@@ -206,11 +268,11 @@ class MainActivity : ComponentActivity() {
                 gravity = Gravity.CENTER_VERTICAL
                 style(this, 800)
             }
-            row.addView(title)
+            row.addView(title, LinearLayout.LayoutParams(0, -2, 1f))
 
             content.addView(
                 row,
-                LinearLayout.LayoutParams(-1, dp(64)).apply {
+                LinearLayout.LayoutParams(-1, -2).apply {
                     topMargin = dp(top)
                 }
             )
@@ -228,7 +290,7 @@ class MainActivity : ComponentActivity() {
                 val button = pill(actionLabel, action)
                 content.addView(
                     button,
-                    LinearLayout.LayoutParams(dp(186), dp(46)).apply {
+                    LinearLayout.LayoutParams(-1, -2).apply {
                         topMargin = dp(10)
                     }
                 )
@@ -240,32 +302,35 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-        addStep("1", "카메라 시작", "카메라 및 오버레이 권한을 허용해 주세요.", 2, "카메라 시작") { startTracking() }
+        addStep(
+            "1", "카메라 시작",
+            "먼저 접근성 설정에서 'NoTouch 눈 조작'을 켜고, 카메라 및 다른 앱 위 표시 권한을 허용해 주세요.",
+            2, "카메라 시작"
+        ) { startTracking() }
         addStep("2", "시선 보정", "기기를 움직이지 말고 얼굴을 카메라에서 약\n30~50cm 떨어진 위치에 맞춰 주세요.", 26, "보정 시작") {
             startCalibration()
         }
-        addStep("3", "시선 테스트", "회색 점이 시선을 잘 따라오는지 확인해 주세요.\n잘 맞지 않는다면 다시 보정해 주세요.", 26)
+        addStep("3", "시선 테스트", "추가 보정 후 새 목표에서 오차를 확인합니다.", 26, "정밀 보정") {
+            if (TrackerState.model == null) status.text = "먼저 5점 보정을 완료해 주세요"
+            else startActivity(Intent(this, AccuracyActivity::class.java))
+        }
 
         stopButton = pill("추적 중지") {
             TrackerState.status = "추적 중지됨"
             stopService(Intent(this, TrackingService::class.java))
-            status.text = TrackerState.status
+            status.text = homeStatus()
             updateHomeButtons()
         }
-        root.addView(stopButton, FrameLayout.LayoutParams(dp(186), dp(46), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply {
-            bottomMargin = dp(72)
-        })
-        root.addView(TextView(this).apply {
-            text = "설정 · 개발자 기능"
-            textSize = sp(14f)
-            setTextColor(blue)
-            gravity = Gravity.CENTER
-            style(this, 500)
-            setOnClickListener { startActivity(Intent(this@MainActivity, DeveloperSettingsActivity::class.java)) }
-            isFocusable = true
-            homeTargets += this
-        }, FrameLayout.LayoutParams(dp(186), dp(48), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply {
-            bottomMargin = dp(16)
+        fun addHomeAction(button: View) {
+            content.addView(button, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(16) })
+        }
+        resumeButton = pill("조작 재개") {
+            if (TrackerState.running) startService(Intent(this, TrackingService::class.java).setAction(TrackingService.ACTION_RESUME))
+        }
+        addHomeAction(resumeButton)
+        addHomeAction(stopButton)
+        addHomeAction(pill("설정 · 개발자 기능") {
+            startActivity(Intent(this@MainActivity, DeveloperSettingsActivity::class.java))
         })
         setContentView(root)
         updateHomeButtons()
@@ -275,7 +340,9 @@ class MainActivity : ComponentActivity() {
     private fun updateHomeButtons() {
         if (!::cameraButton.isInitialized || !::calibrationButton.isInitialized || !::stopButton.isInitialized) return
         cameraButton.isEnabled = !TrackerState.running
-        calibrationButton.isEnabled = TrackerState.running && TrackerState.hasFreshFeatures(SystemClock.uptimeMillis())
+        calibrationButton.text = if (TrackerState.model == null) "보정 시작" else "다시 보정하기"
+        calibrationButton.isEnabled = TrackerState.running && TrackerState.fault == null && TrackerState.hasFreshFeatures(SystemClock.uptimeMillis())
+        resumeButton.visibility = if (TrackerState.running && !TrackerState.controls) View.VISIBLE else View.GONE
         stopButton.isEnabled = TrackerState.running
         val disabled = Color.rgb(153, 158, 165)
         listOf(cameraButton, calibrationButton, stopButton).forEach { button ->
@@ -286,7 +353,8 @@ class MainActivity : ComponentActivity() {
 
     private fun onHomeGaze(gaze: ScreenGaze?) {
         val now = SystemClock.uptimeMillis()
-        val valid = TrackerState.running && gaze?.fresh(now) == true
+        val valid = TrackerState.running && TrackerState.controls && TrackerState.fault == null &&
+            !TrackerState.helpVisible && !TrackerState.collecting && !TrackerState.speaking && gaze?.fresh(now) == true
         val bounds = DisplaySpace.bounds(this)
         val target = if (!valid) null else homeTargets.firstOrNull { view ->
             val visible = Rect()
@@ -311,8 +379,30 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun homeStatus(): String {
+        val current = TrackerState.currentStatus(SystemClock.uptimeMillis())
+        val calibrationMessage = TrackerState.status.takeIf { it.startsWith("보정 실패") || it.startsWith("보정 취소") || it.startsWith("보정이 중단") || it.startsWith("눈 표본이 부족") }
+        return calibrationMessage ?: listOf(current.message, current.advice, if(TrackerState.running) TrackerState.inferenceStatus else "").filter { it.isNotBlank() }.joinToString("\n")
+    }
+
+    private fun reportPermissionFault(message: String, setting: RecoverySetting) {
+        TrackerState.fault = TrackingFault(message, "도움에서 관련 설정을 열거나 카메라 시작을 다시 선택해 주세요.", setting)
+        status.text = homeStatus()
+    }
+
     private fun startTracking() {
-        if (TrackerState.running) { status.text = TrackerState.status; return }
+        if (TrackerState.running) { status.text = homeStatus(); return }
+        if (ControlAccessibilityService.instance == null) {
+            android.app.AlertDialog.Builder(this)
+                .setTitle("NoTouch 눈 조작 켜기")
+                .setMessage("다음 화면에서 접근성 > 설치된 앱 > NoTouch 눈 조작을 열고 사용 설정을 켜 주세요. 완료 후 NoTouch로 돌아오면 나머지 권한 안내가 이어집니다.")
+                .setNegativeButton("취소", null)
+                .setPositiveButton("접근성 설정 열기") { _, _ ->
+                    accessibilitySettings.launch(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                }
+                .show()
+            return
+        }
         if (!Settings.canDrawOverlays(this)) {
             overlayPermission.launch(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
             return
@@ -330,12 +420,20 @@ class MainActivity : ComponentActivity() {
         try {
             startForegroundService(Intent(this, TrackingService::class.java))
             status.text = "시작 중…"
-        } catch (e: Exception) { status.text = "시작 실패: ${e.message}" }
+        } catch (e: Exception) {
+            TrackerState.fault = TrackingFault("추적을 시작하지 못했어요", "권한을 확인하고 카메라를 다시 시작해 주세요.")
+            status.text = homeStatus()
+        }
     }
 
     private fun startCalibration() {
-        if (!TrackerState.running || !TrackerState.hasFreshFeatures(SystemClock.uptimeMillis())) {
-            if (::status.isInitialized) status.text = "카메라를 먼저 시작하고 눈 검출을 기다려 주세요."
+        if(!TrackerState.running || TrackerState.fault!=null) { status.text="먼저 카메라를 시작하세요";return }
+        tutorial?.close();tutorial=null
+        faceSetup.launch(Intent(this,FaceSetupActivity::class.java))
+    }
+    private fun startScreenCalibration() {
+        if (!TrackerState.running || TrackerState.fault != null) {
+            if (::status.isInitialized) status.text = "보정을 시작할 수 없어요. 카메라를 시작하고 눈이 검출되면 다시 선택해 주세요."
             return
         }
         tutorial?.close()
@@ -349,14 +447,13 @@ class MainActivity : ComponentActivity() {
 
     private inner class CalibrationView(private val session: Long) : View(this@MainActivity) {
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-        private val targets = listOf(.5 to .5, .15 to .15, .5 to .15, .85 to .15,
-            .85 to .5, .85 to .85, .5 to .85, .15 to .85, .15 to .5)
+        private val targets = listOf(.5 to .5, .18 to .18, .82 to .18, .82 to .82, .18 to .82)
         private var index = 0
         private var since = SystemClock.uptimeMillis()
-        private val blinkBreakDurationMs = 2_000L
-        private var blinkBreakUntil = 0L
+        private var targetStartedAt = since
         private val samples = mutableListOf<EyeFeatures>()
-        private val anchors = mutableListOf<Anchor>()
+        private val fixations = mutableListOf<CalibrationFixation>()
+        private var poseReference: HeadPose? = null
         private var lastSampleAt = 0L
         private var closed = false
         private var hint = "머리는 고정하고 파란 점을 바라보세요"
@@ -364,7 +461,7 @@ class MainActivity : ComponentActivity() {
             override fun run() {
                 if (closed || calibration !== this@CalibrationView) return
                 val now = SystemClock.uptimeMillis()
-                if (!isTakingBlinkBreak(now) && now - since > 9000) {
+                if (now - targetStartedAt > 15000) {
                     finish(null, "눈 표본이 부족합니다. 조명·거리·안경 반사를 확인하고 다시 보정하세요.")
                     return
                 }
@@ -376,30 +473,40 @@ class MainActivity : ComponentActivity() {
             closed = true
             removeCallbacks(tick)
             samples.clear()
-            anchors.clear()
-            blinkBreakUntil = 0L
+            fixations.clear()
         }
         override fun onDetachedFromWindow() { close(); super.onDetachedFromWindow() }
-        private fun isTakingBlinkBreak(now: Long): Boolean {
-            if (blinkBreakUntil == 0L) return false
-            if (now < blinkBreakUntil) return true
-            blinkBreakUntil = 0L
-            // Start point five's settling and timeout clocks after the break, even without eye detection.
-            since = now
-            hint = "${index + 1} / 9 · 파란 점을 계속 바라보세요"
-            return false
-        }
         fun onFrame(sample: GazeSample?) {
             if (closed || index >= targets.size || width == 0 || height == 0) return
             val now = SystemClock.uptimeMillis()
-            if (isTakingBlinkBreak(now)) return
+            if (sample != null && sample.timestampMs <= lastSampleAt && now-sample.timestampMs in 0..750) return
             val elapsed = now - since
             // Keep collecting open-eye features even when the old model rejects this pose.
-            val f = sample?.calibrationFeatures(now, lastSampleAt)
-            if (f == null) { hint = "눈 검출 대기 · 눈을 뜨고 얼굴을 카메라로 향해 주세요"; return }
+            val f = sample?.calibrationFeatures(now, lastSampleAt, 750)
+            if (f == null) {
+                if (samples.isNotEmpty()) { samples.clear(); poseReference=null; since=now }
+                hint = "${TrackerState.eyeState} · ${TrackerState.inferenceStatus}"
+                invalidate(); return
+            }
+            if(f.source != GazeSource.LANDMARK) { samples.clear(); hint="MediaPipe 눈 특징 대기"; return }
+            if (lastSampleAt>0 && sample.timestampMs-lastSampleAt>1200) {
+                samples.clear(); poseReference=null; since=now
+            }
             lastSampleAt = sample.timestampMs
-            hint = "${index + 1} / 9 · 파란 점을 계속 바라보세요"
-            if (elapsed < 1000) return
+            val head = f.head
+            if (head == null) {
+                samples.clear(); since = now
+                hint = "머리 자세 검출 대기 · 얼굴 전체가 보이게 해 주세요"
+                invalidate(); return
+            }
+            if (poseReference == null) poseReference = head
+            if (!CalibrationPose.stable(head, poseReference!!)) {
+                samples.clear(); since = now; poseReference = head
+                hint = "현재 자세에서 잠시 멈추고 점을 바라보세요"
+                invalidate(); return
+            }
+            hint = "${index + 1} / 5 · 파란 점을 계속 바라보세요"
+            if (sample.timestampMs < since + 1000) return
             samples += f
             if (samples.size >= 22 && elapsed >= 2500) {
                 val eye = medianFeatures(samples)
@@ -414,52 +521,43 @@ class MainActivity : ComponentActivity() {
                 val bounds = DisplaySpace.bounds(this@MainActivity)
                 val point = DisplayCoordinates(bounds.width(), bounds.height())
                     .normalize(location[0] + width * xy.first, location[1] + height * xy.second)
-                anchors += Anchor(eye, point.first, point.second)
-                index++; samples.clear(); since = SystemClock.uptimeMillis()
-                if (index == 4) blinkBreakUntil = since + blinkBreakDurationMs
+                fixations += CalibrationFixation(samples.toList(), point.first, point.second)
+                index++; samples.clear(); poseReference=null; since = SystemClock.uptimeMillis(); targetStartedAt=since
+                // Five-point screen mapping; no head-motion training or mid-session break.
                 if (index == targets.size) {
-                    val model = GazeModel.fit(anchors)
-                    finish(model, if (model == null) "보정 실패 · 시선 변화가 불충분하거나 오차가 큽니다. 기기를 고정하고 다시 시도하세요."
-                        else "보정 완료 · 빨간 점과 실제 시선이 맞는지 확인하세요. 홈으로 나가도 동작합니다.")
+                    val audit = CalibrationAudit.fit(fixations)
+                    getSharedPreferences("personal",MODE_PRIVATE).edit().putString("calibration_audit_v30",audit.report).apply()
+                    val rows=fixations.flatMap { group -> group.samples.map { f -> listOf(group.x,group.y,f.x,f.y,f.faceX,f.faceY,f.scale) } }
+                    runCatching { java.io.File(filesDir,"last-calibration-audit-v30.json").writeText(org.json.JSONObject()
+                        .put("version",30).put("source","mediapipe-binocular").put("report",audit.report).put("rows",org.json.JSONArray(rows)).toString()) }
+                    finish(audit.model, if (audit.model == null) "보정 실패 · ${audit.report}"
+                        else "보정 완료 · 품질 검사 통과. 실제 오차는 시선 원인 진단에서 확인하세요.")
                 }
             }
             invalidate()
         }
         private fun finish(model: GazeModel?, message: String) {
             val saved = runCatching {
-                TrackerState.finishCalibration(session, model) {
-                    ModelStore.saveCalibration(this@MainActivity, anchors)
-                }
+                TrackerState.finishCalibration(session, model)
             }
-            TrackerState.status = saved.exceptionOrNull()?.let { "보정 저장 실패: ${it.message}" } ?: message
-            // Match the exact normalization dimensions used for the calibration anchors above.
-            val bounds = DisplaySpace.bounds(this@MainActivity)
+            TrackerState.status = saved.exceptionOrNull()?.let { "보정 적용 실패: ${it.message}" } ?: message
             close()
             calibration = null
             if (saved.getOrDefault(false) && TrackerState.running) {
-                tutorial = PostCalibrationTutorialView(this@MainActivity, bounds.width(), bounds.height(),
-                    onRecalibrate = { startCalibration() },
-                    onFinished = { window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) })
-                setContentView(tutorial)
-            } else showHome()
+                if (intent.hasExtra(EXTRA_RECOVERY_ACTION)) finish() else showCalibrationTutorial()
+            } else if (intent.hasExtra(EXTRA_RECOVERY_ACTION)) finish() else {
+                showHome()
+                android.app.AlertDialog.Builder(this@MainActivity)
+                    .setTitle("새 보정이 적용되지 않았습니다")
+                    .setMessage(message + if(TrackerState.model!=null) "\n이전 보정은 유지됩니다." else "\n적용된 보정이 없습니다.")
+                    .setPositiveButton("확인",null).show()
+            }
         }
         override fun onDraw(canvas: Canvas) {
             val target = targets.getOrNull(index) ?: return
             val d = resources.displayMetrics.density
             paint.color = Color.WHITE; paint.textSize = 15 * d; paint.textAlign = Paint.Align.CENTER
-            if (blinkBreakUntil != 0L) {
-                val secondsLeft = ((blinkBreakUntil - SystemClock.uptimeMillis() + 999) / 1000).coerceAtLeast(1)
-                canvas.drawText("시선 보정 4/9 완료 · 잠시 쉬어가기", width / 2f, 55 * d, paint)
-                paint.textSize = 20 * d
-                canvas.drawText("눈을 편하게 깜빡여 주세요", width / 2f, height / 2f, paint)
-                paint.textSize = 14 * d
-                canvas.drawText("${secondsLeft}초 후 나머지 5개를 이어서 진행합니다", width / 2f, height / 2f + 32 * d, paint)
-                paint.textSize = 12 * d
-                canvas.drawText("머리와 기기는 그대로 유지해 주세요", width / 2f, height - 70 * d, paint)
-                canvas.drawText("중단하려면 뒤로 가기", width / 2f, height - 45 * d, paint)
-                return
-            }
-            canvas.drawText("시선 보정 ${index + 1}/9", width / 2f, 55 * d, paint)
+            canvas.drawText("MediaPipe 화면 맞춤 ${index + 1}/5", width / 2f, 55 * d, paint)
             paint.textSize = 12 * d
             canvas.drawText(hint, width / 2f, height - 70 * d, paint)
             canvas.drawText("중단하려면 뒤로 가기", width / 2f, height - 45 * d, paint)
@@ -473,4 +571,10 @@ class MainActivity : ComponentActivity() {
             paint.style = Paint.Style.FILL
         }
     }
+    companion object {
+        const val EXTRA_RECOVERY_ACTION = "dev.gazedot.RECOVERY_ACTION"
+        const val RECOVERY_START = "start"
+        const val RECOVERY_CALIBRATE = "calibrate"
+    }
+
 }

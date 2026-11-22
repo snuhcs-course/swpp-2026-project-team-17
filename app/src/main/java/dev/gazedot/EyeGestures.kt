@@ -14,13 +14,15 @@ class EyeGestureDetector {
     private var closedAt = 0L
     private var firstBlinkOpenedAt: Long? = null
     private var uncertainAt: Long? = null
+    private var lastSparseAt: Long? = null
 
     fun reset() {
-        previousAt = null; ready = false; closure = null; firstBlinkOpenedAt = null; uncertainAt = null
+        previousAt = null; ready = false; closure = null; firstBlinkOpenedAt = null; uncertainAt = null; lastSparseAt = null
     }
 
     fun update(at: Long, eye: EyeState): EyeGesture? {
-        if (previousAt?.let { at <= it || at - it > 250 } == true) reset()
+        if (previousAt?.let { at <= it || at - it > 500 } == true) reset()
+        if (previousAt?.let { at-it>250 } == true) lastSparseAt=at
         previousAt = at
         if (eye == EyeState.LOST) {
             ready = false; closure = null; firstBlinkOpenedAt = null
@@ -43,7 +45,7 @@ class EyeGestureDetector {
                 firstBlinkOpenedAt = null
                 return if (duration in WINK_MIN_MS..WINK_MAX_MS) EyeGesture.WINK else null
             }
-            if (duration !in 70..350) { firstBlinkOpenedAt = null; return null }
+            if (lastSparseAt?.let{at-it<1000}==true || duration !in 70..350) { firstBlinkOpenedAt = null; return null }
             val prior = firstBlinkOpenedAt
             if (prior != null && closedAt - prior in 70..450) {
                 firstBlinkOpenedAt = null
@@ -106,7 +108,8 @@ object ScrollSettings {
 data class ScrollStep(val modeChanged: Boolean? = null, val direction: ScrollDirection? = null,
     val doubleBlink: Boolean = false, val wink: Boolean = false)
 
-class ScrollController {
+class ScrollController(private val useBars:Boolean=false) {
+    val bars=EdgeScrollBar()
     var enabled = false
         private set
     private val gestures = EyeGestureDetector()
@@ -116,22 +119,27 @@ class ScrollController {
     private var lastScrollAt: Long? = null
 
     fun reset() {
-        enabled = false; previousAt = null; lastScrollAt = null; cancelPending()
+        bars.reset(); enabled = false; previousAt = null; lastScrollAt = null; cancelPending()
     }
 
     fun cancelPending() {
-        gestures.reset(); direction = null
+        bars.reset(); gestures.reset(); direction = null
     }
 
     fun update(at: Long, receivedAt: Long, eye: EyeState, point: Pair<Double, Double>?): ScrollStep {
-        if (receivedAt - at !in 0..250 || eye == EyeState.LOST ||
-            previousAt?.let { at <= it || at - it > 250 } == true) {
+        if (receivedAt - at !in 0..500 || eye == EyeState.LOST ||
+            previousAt?.let { at <= it || at - it > 500 } == true) {
             val wasEnabled = enabled
             reset(); previousAt = at
             return ScrollStep(modeChanged = if (wasEnabled) false else null)
         }
         previousAt = at
         val gesture = gestures.update(at, eye)
+        if(useBars) {
+            val movement=bars.update(at,receivedAt,eye,point)
+            enabled=bars.ownsInput
+            return ScrollStep(direction=movement,doubleBlink=gesture==EyeGesture.DOUBLE_BLINK)
+        }
         if (gesture == EyeGesture.WINK) {
             enabled = !enabled; direction = null
             return ScrollStep(modeChanged = enabled, wink = true)

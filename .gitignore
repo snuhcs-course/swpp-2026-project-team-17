@@ -18,3 +18,11 @@ node_modules/
 !.env.example
 .device-token.txt
 .token-hash.txt
+# Keep local AI credentials out of version control; share empty examples only.
+.env
+.env.*
+online-prediction.properties
+server/.venv/
+*.pyc
+# Upstream research-only assets are fetched locally, never published in Git.
+app/src/main/assets/itracker/

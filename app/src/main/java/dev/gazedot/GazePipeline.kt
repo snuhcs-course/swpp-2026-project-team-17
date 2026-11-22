@@ -2,8 +2,6 @@ package dev.gazedot
 
 enum class TrackingQuality { TRACKING, CLOSED, UNCERTAIN, LOST, OUT_OF_RANGE, STALE }
 
-/** Camera and UI-independent output. Points are normalized, deliberately NOT clamped:
- * coordinates outside the screen drive scrolling. Call only from the UI thread. */
 data class GazeSample(
     val timestampMs: Long,
     val quality: TrackingQuality,
@@ -14,80 +12,81 @@ data class GazeSample(
     val actions: List<EyeAction>,
     val scrollMode: Boolean = false,
 ) {
-    /** A previous model rejecting a new pose must not prevent explicit recalibration. */
-    fun calibrationFeatures(nowMs: Long, after: Long): EyeFeatures? = features?.takeIf {
-        timestampMs > after && nowMs - timestampMs in 0..250 &&
+    fun calibrationFeatures(nowMs: Long, after: Long, maxAgeMs: Long = 250): EyeFeatures? = features?.takeIf {
+        timestampMs > after && nowMs - timestampMs in 0..maxAgeMs &&
             quality in listOf(TrackingQuality.TRACKING, TrackingQuality.OUT_OF_RANGE)
     }
 }
 
-class GazePipeline {
+/** Calibrated prediction, robust fixation filtering and freshness-gated interaction. */
+class GazePipeline(private val trackingMaxAgeMs: Long = 500, private val actionMaxAgeMs: Long = 500, useBars:Boolean=false) {
+    private val interaction = InteractionEngine(useBars)
+    val bars get()=interaction.bars
     private val stabilizer = GazeStabilizer()
-    private val interaction = InteractionEngine()
-    private var model: GazePredictor? = null
+    private var smoothed: Pair<Double, Double>? = null
     private var lastTimestamp: Long? = null
+    private var model: GazeModel? = null
+    private var closureAt: Long? = null
+    private var reopenedAt: Long? = null
     val pending get() = interaction.pending
 
-    fun cancelInteraction(preserveScrollMode: Boolean = false) =
-        interaction.reset(preserveSelection = true, preserveScrollMode = preserveScrollMode)
-
+    fun cancelInteraction() = interaction.reset(preserveSelection = true)
     fun cancelPendingClick() = interaction.cancelClick()
-
-    fun reset(preserveSelection: Boolean = false) {
-        interaction.reset(preserveSelection)
+    fun reset() {
+        interaction.reset()
+        smoothed = null
         stabilizer.reset()
         lastTimestamp = null
+        model = null
+        closureAt = null; reopenedAt = null
     }
 
-    fun process(
-        timestampMs: Long,
-        nowMs: Long,
-        observation: EyeObservation,
-        predictor: GazePredictor,
-        actionsEnabled: Boolean,
-        clickCandidate: Pair<Double, Double>? = null,
-        targetKey: ((Pair<Double, Double>) -> String?)? = null,
-    ): GazeSample {
-        val hadDwell = pending
-        // Reject duplicates, delayed frames, and timestamps from the wrong clock.
-        if (timestampMs > nowMs || nowMs - timestampMs > 250 ||
+    fun process(timestampMs: Long, nowMs: Long, observation: EyeObservation,
+        predictor: GazeModel?, actionsEnabled: Boolean,
+        targetKey: ((Pair<Double, Double>) -> String?)? = null): GazeSample {
+        if (timestampMs > nowMs || nowMs - timestampMs > trackingMaxAgeMs ||
             lastTimestamp?.let { timestampMs <= it } == true) {
             val previous = lastTimestamp
-            reset(preserveSelection = true)
+            val hadDwell = pending
+            reset()
             lastTimestamp = previous
             return GazeSample(timestampMs, TrackingQuality.STALE, null, null, null, 0f,
                 if (hadDwell) listOf(EyeAction.Cancel) else emptyList())
         }
-        var cancelled = false
-        if (predictor !== model || lastTimestamp?.let { timestampMs - it > 250 } == true) {
-            cancelled = hadDwell
-            reset(preserveSelection = true)
-            model = predictor
-        }
+        if (model !== predictor || lastTimestamp?.let { timestampMs - it > trackingMaxAgeMs } == true) reset()
+        model = predictor
         lastTimestamp = timestampMs
-        val features = observation.features?.takeIf { observation.state == EyeState.OPEN && it.vector().all(Double::isFinite) }
-        val raw = features?.let(predictor::predict)?.takeIf { it.first.isFinite() && it.second.isFinite() }
-        val quality = when (observation.state) {
-            EyeState.LOST -> TrackingQuality.LOST
-            EyeState.CLOSED -> TrackingQuality.CLOSED
-            EyeState.UNCERTAIN -> TrackingQuality.UNCERTAIN
-            EyeState.LEFT_WINK, EyeState.RIGHT_WINK -> TrackingQuality.UNCERTAIN
-            EyeState.OPEN -> if (raw == null) TrackingQuality.OUT_OF_RANGE else TrackingQuality.TRACKING
+        if (observation.state == EyeState.LOST) {
+            closureAt = null; reopenedAt = null; smoothed = null; stabilizer.reset()
+        } else if (observation.state != EyeState.OPEN) {
+            if (closureAt == null) closureAt = timestampMs
+            reopenedAt = null
+        } else if (closureAt != null && reopenedAt == null) reopenedAt = timestampMs
+        val settling = observation.state == EyeState.OPEN && reopenedAt?.let { timestampMs-it < 150 } == true
+        val held = closureAt != null && timestampMs-closureAt!! <= 1200
+        if (observation.state == EyeState.OPEN && !settling) { closureAt=null; reopenedAt=null }
+        val features = observation.features.takeIf { observation.state == EyeState.OPEN && !settling }
+        val position = features?.let { predictor?.predict(it) }
+        val filtered = position?.let { stabilizer.update(it, timestampMs) }
+        smoothed = if (filtered != null) filtered.point else if (held) smoothed else {
+            stabilizer.reset(); null
         }
-        val point = raw?.let { stabilizer.update(it, timestampMs) }
-        if (quality == TrackingQuality.LOST || quality == TrackingQuality.OUT_OF_RANGE) stabilizer.reset()
-        val actions = mutableListOf<EyeAction>()
-        if (cancelled) actions += EyeAction.Cancel
-        if (!actionsEnabled) {
-            if (pending) actions += EyeAction.Cancel
-            cancelInteraction()
+        val quality = when {
+            settling || filtered?.confirmed == false -> TrackingQuality.UNCERTAIN
+            features != null -> if (position == null) TrackingQuality.OUT_OF_RANGE else TrackingQuality.TRACKING
+            observation.state == EyeState.LOST -> TrackingQuality.LOST
+            observation.state == EyeState.CLOSED -> TrackingQuality.CLOSED
+            else -> TrackingQuality.UNCERTAIN
+        }
+        val actions = if (actionsEnabled && predictor != null && nowMs-timestampMs in 0..actionMaxAgeMs) {
+            // Coordinate conversion failure is not face loss: pause movement without clearing the mode.
+            val eye = observation.state
+            interaction.update(timestampMs, eye, if (quality == TrackingQuality.TRACKING) smoothed else null, targetKey = if (quality == TrackingQuality.TRACKING) smoothed?.let { targetKey?.invoke(it) } else null, receivedAt = nowMs)
         } else {
-            val eye = if (quality == TrackingQuality.OUT_OF_RANGE) EyeState.LOST else observation.state
-            val candidate = clickCandidate?.takeIf { it.first in 0.0..1.0 && it.second in 0.0..1.0 }
-            val clickPoint = candidate ?: point
-            actions += interaction.update(timestampMs, eye, point, clickPoint,
-                clickPoint?.let { targetKey?.invoke(it) }, nowMs)
+            val hadDwell = pending
+            cancelInteraction()
+            if (hadDwell) listOf(EyeAction.Cancel) else emptyList()
         }
-        return GazeSample(timestampMs, quality, features, raw, point, interaction.progress, actions, interaction.scrollMode)
+        return GazeSample(timestampMs, quality, features, position, smoothed, interaction.progress, actions, interaction.scrollMode)
     }
 }

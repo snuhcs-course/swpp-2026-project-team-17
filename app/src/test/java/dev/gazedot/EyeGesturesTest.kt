@@ -140,7 +140,7 @@ class EyeGesturesTest {
         val f = Feed(); f.wink(EyeState.LEFT_WINK); f.frame(EyeState.LOST, null)
         assertFalse(f.controller.enabled)
         f.wink(EyeState.RIGHT_WINK)
-        f.controller.update(f.now + 50, f.now + 400, EyeState.OPEN, .5 to .9)
+        f.controller.update(f.now + 50, f.now + 600, EyeState.OPEN, .5 to .9)
         assertFalse(f.controller.enabled)
     }
 
@@ -160,11 +160,11 @@ class EyeGesturesTest {
     }
 
     @Test fun bilateralAndUnilateralEyeStatesAreClassifiedSeparately() {
-        assertEquals(EyeState.OPEN, LandmarkFeatures.eyeState(.2, .2))
-        assertEquals(EyeState.CLOSED, LandmarkFeatures.eyeState(.05, .05))
-        assertEquals(EyeState.LEFT_WINK, LandmarkFeatures.eyeState(.05, .2))
-        assertEquals(EyeState.RIGHT_WINK, LandmarkFeatures.eyeState(.2, .05))
-        assertEquals(EyeState.UNCERTAIN, LandmarkFeatures.eyeState(.13, .2))
-        assertEquals(EyeState.LOST, LandmarkFeatures.eyeState(Double.NaN, .2))
+        assertEquals(EyeState.OPEN, EyeObservations.eyeState(.2, .2))
+        assertEquals(EyeState.CLOSED, EyeObservations.eyeState(.05, .05))
+        assertEquals(EyeState.LEFT_WINK, EyeObservations.eyeState(.05, .2))
+        assertEquals(EyeState.RIGHT_WINK, EyeObservations.eyeState(.2, .05))
+        assertEquals(EyeState.UNCERTAIN, EyeObservations.eyeState(.13, .2))
+        assertEquals(EyeState.LOST, EyeObservations.eyeState(Double.NaN, .2))
     }
 }

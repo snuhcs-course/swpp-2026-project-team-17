@@ -17,6 +17,7 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.animation.LinearInterpolator
+import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
@@ -35,9 +36,14 @@ internal class PostCalibrationTutorialView(
     private enum class Step { CALIBRATED, BUTTON, SCROLL, FINISHED }
     private var step = Step.CALIBRATED
     private var closed = false
+    private var lastFrameAt=0L
+    private val exitButton = Button(context).apply {
+        text="튜토리얼 건너뛰기"
+        setOnClickListener { close(); onFinished() }
+    }
     private val dwell = TutorialDwell()
     private val retryGesture = EyeGestureDetector()
-    private val scrolling = ScrollController()
+    private val scrolling = ScrollController(useBars=true)
     private var practice = ScrollPractice()
     private val ink = Color.rgb(17, 18, 70)
     private val font = resources.getFont(R.font.geologica)
@@ -75,6 +81,7 @@ internal class PostCalibrationTutorialView(
             updateLayout()
             insets
         }
+        addView(exitButton, LayoutParams(-1, -2, Gravity.BOTTOM))
         showStep(Step.CALIBRATED)
     }
 
@@ -93,29 +100,35 @@ internal class PostCalibrationTutorialView(
         dwell.reset(); retryGesture.reset(); scrolling.reset()
         TrackerState.localDwellProgress = 0f
         TrackerState.localScrollMode = false
+        TrackerState.localBarDirection=null;TrackerState.localBarProgress=0f
         target?.setProgress(0f)
     }
 
     fun onFrame(sample: GazeSample?, eye: EyeState) {
         if (closed || step !in listOf(Step.BUTTON, Step.SCROLL)) return
         val now = SystemClock.uptimeMillis()
-        if (sample == null || now - sample.timestampMs !in 0..250 || !TrackerState.running) {
+        if (sample == null || now - sample.timestampMs !in 0..500 || !TrackerState.running || !TrackerState.controls) {
             dwell.reset(); retryGesture.reset(); scrolling.reset()
             animation?.cancel(); animation = null
             TrackerState.localDwellProgress = 0f
             TrackerState.localScrollMode = false
+        TrackerState.localBarDirection=null;TrackerState.localBarProgress=0f
             target?.setProgress(0f)
             updateScrollStatus()
             return
         }
+        if(sample.timestampMs<=lastFrameAt)return
+        lastFrameAt=sample.timestampMs
         if (step == Step.SCROLL) {
+            if (eye != EyeState.OPEN || sample.point == null) { animation?.cancel(); animation = null }
             val result = scrolling.update(sample.timestampMs, now, eye, sample.point)
             TrackerState.localScrollMode = scrolling.enabled
+            TrackerState.localBarDirection=scrolling.bars.direction;TrackerState.localBarProgress=scrolling.bars.progress
             if (result.wink) result.modeChanged?.let(practice::modeChanged)
             if (result.modeChanged == false) { animation?.cancel(); animation = null }
             result.direction?.let(::animateScroll)
             updateScrollStatus()
-            if (practice.complete(scrolling.enabled)) finishTutorial()
+            if ((practice.up && practice.down)) finishTutorial()
             return
         }
         if (retryGesture.update(sample.timestampMs, eye) == EyeGesture.DOUBLE_BLINK) {
@@ -128,7 +141,7 @@ internal class PostCalibrationTutorialView(
         val location = IntArray(2)
         button.getLocationOnScreen(location)
         val visible = Rect()
-        val inside = gaze != null && gaze.fresh(now) && button.isShown &&
+        val inside = eye == EyeState.OPEN && gaze != null && gaze.fresh(now) && button.isShown &&
             button.getLocalVisibleRect(visible) &&
             visible.contains((gaze.x * displayWidth - location[0]).toInt(),
                 (gaze.y * displayHeight - location[1]).toInt()) &&
@@ -166,7 +179,7 @@ internal class PostCalibrationTutorialView(
                     animation = null
                     if (!closed && step == Step.SCROLL) {
                         updateScrollStatus()
-                        if (practice.complete(scrolling.enabled)) finishTutorial()
+                        if ((practice.up && practice.down)) finishTutorial()
                     }
                 }
             })
@@ -177,14 +190,10 @@ internal class PostCalibrationTutorialView(
     private fun finishTutorial() {
         if (closed || step != Step.SCROLL) return
         showStep(Step.FINISHED)
-        onFinished()
     }
 
     private fun updateScrollStatus() {
-        scrollStatus?.text = "스크롤 모드 ${if (scrolling.enabled) "켜짐 · 파란 커서" else "꺼짐 · 빨간 커서"}\n" +
-            "↑ ${if (practice.up) "✓" else "○"}  ↓ ${if (practice.down) "✓" else "○"}  " +
-            "← ${if (practice.left) "✓" else "○"}  → ${if (practice.right) "✓" else "○"}" +
-            if (practice.up && practice.down) "\n윙크로 모드를 끄면 완료됩니다." else "\n위·아래로 한 번씩 스크롤해 보세요."
+        scrollStatus?.text="위쪽 바 ${if(practice.up) "✓" else "○"} · 아래쪽 바 ${if(practice.down) "✓" else "○"}\n바를 바라보면 이동 · 가운데를 보면 정지"
     }
 
     private fun label(value: String, weight: Int = 700, alignment: Int = Gravity.CENTER) = TextView(context).apply {
@@ -199,11 +208,14 @@ internal class PostCalibrationTutorialView(
 
     private fun showStep(next: Step) {
         step = next
+        lastFrameAt=0L
+        exitButton.text=if(next==Step.FINISHED) "메인으로 돌아가기" else "튜토리얼 건너뛰기"
         removeCallbacks(advance); removeCallbacks(freshnessCheck)
         animation?.cancel(); animation = null
         dwell.reset(); retryGesture.reset(); scrolling.reset()
         TrackerState.localDwellProgress = 0f
         TrackerState.localScrollMode = false
+        TrackerState.localBarDirection=null;TrackerState.localBarProgress=0f
         target = null; scrollPanel = null; horizontalPanel = null; scrollStatus = null
         column.removeAllViews()
         fun text(value: String, size: Int, weight: Int = 700): TextView {
@@ -230,11 +242,11 @@ internal class PostCalibrationTutorialView(
             Step.SCROLL -> {
                 practice = ScrollPractice()
                 text("이제 시선으로 화면을 스크롤해 볼까요?", 23)
-                text("왼쪽/오른쪽 눈을 깜빡이면 스크롤 모드가 켜집니다. 화면의 윗부분을 바라보면 위로, 아랫부분을 바라보면 아래로 스크롤할 수 있어요.", 18)
-                text("모드가 켜지면 커서 중앙이 파란색으로 바뀝니다. 왼쪽/오른쪽 1/3을 바라보면 가로로도 스크롤해요.", 16, 500)
-                text("스크롤 모드를 끄고 싶다면 다시 한번 왼쪽/오른쪽 눈을 깜빡여 주세요.", 18)
-                text("주의 : Don't flirt while using the app", 16, 800)
-                text("위·아래·좌·우 1/3: 해당 방향 · 중앙: 정지", 14, 500)
+                text("화면 위·아래 가장자리 안쪽을 바라보면 얇은 바가 나타납니다. 바에 시선을 유지하면 스크롤됩니다.", 18)
+                text("바의 진행 표시가 차면 스크롤됩니다. 시선을 가운데로 옮기면 추가 스크롤이 멈춥니다.", 16, 500)
+                text("위·아래로 한 번씩 스크롤하면 완료됩니다.", 18)
+                text("윙크 없이 사용할 수 있어요", 16, 800)
+                text("위쪽 바: 위로 · 아래쪽 바: 아래로 · 중앙: 정지", 14, 500)
                 val frame = FrameLayout(context).apply { tag = "scroll-demo"; setBackgroundColor(Color.rgb(245, 247, 251)) }
                 val panel = ScrollView(context).apply { isFillViewport = true }
                 val horizontal = HorizontalScrollView(context).apply { isFillViewport = true }

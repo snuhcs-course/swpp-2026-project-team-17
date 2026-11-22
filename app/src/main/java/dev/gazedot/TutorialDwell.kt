@@ -20,7 +20,7 @@ internal class TutorialDwell {
     }
 
     fun update(inside: Boolean, sampleAt: Long, now: Long): Boolean {
-        if (!inside || now - sampleAt !in 0..MAX_SAMPLE_GAP_MS ||
+        if (!inside || now - sampleAt !in 0..500 ||
             lastSampleAt?.let { sampleAt <= it } == true) {
             reset()
             return false
@@ -38,7 +38,7 @@ internal class TutorialDwell {
     companion object {
         const val DURATION_MS = 1_000L
         // The existing camera emits at most ~15 fps. A missing stream must not count as a fixation.
-        const val MAX_SAMPLE_GAP_MS = 250L
+        const val MAX_SAMPLE_GAP_MS = 500L
     }
 }
 
