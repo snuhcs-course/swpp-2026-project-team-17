@@ -19,6 +19,8 @@ class GazeModel private constructor(
     val correction: ResidualCorrection? = null,
     private val leftModel: GazeModel? = null, private val rightModel: GazeModel? = null,
     val headCorrection: HeadCorrection? = null,
+    private val screenCorrectionX: Double = 0.0,
+    private val screenCorrectionY: Double = 0.0,
 ) {
     /** Largest singular value of the raw-centimetre to screen mapping (before clipping). */
     val mappingGain: Double get() {
@@ -29,10 +31,16 @@ class GazeModel private constructor(
     fun predict(f: EyeFeatures): Pair<Double, Double>? {
         val p=predictUncorrected(f) ?: return null
         val corrected=correction?.apply(p.first,p.second) ?: p
-        return corrected.first.coerceIn(0.0,1.0) to corrected.second.coerceIn(0.0,1.0)
+        return (corrected.first + screenCorrectionX).coerceIn(0.0,1.0) to
+            (corrected.second + screenCorrectionY).coerceIn(0.0,1.0)
     }
-    fun withCorrection(value: ResidualCorrection?) = GazeModel(meanX,meanY,stdX,stdY,wx,wy,reference,fitError,value,leftModel,rightModel,headCorrection)
-    fun withHeadCorrection(value: HeadCorrection?) = GazeModel(meanX,meanY,stdX,stdY,wx,wy,reference,fitError,null,leftModel,rightModel,value)
+    fun withCorrection(value: ResidualCorrection?) = GazeModel(meanX,meanY,stdX,stdY,wx,wy,reference,fitError,value,leftModel,rightModel,headCorrection,screenCorrectionX,screenCorrectionY)
+    fun withHeadCorrection(value: HeadCorrection?) = GazeModel(meanX,meanY,stdX,stdY,wx,wy,reference,fitError,null,leftModel,rightModel,value,screenCorrectionX,screenCorrectionY)
+    fun withScreenCorrection(dx: Double, dy: Double): GazeModel? {
+        if (!dx.isFinite() || !dy.isFinite()) return null
+        return GazeModel(meanX,meanY,stdX,stdY,wx,wy,reference,fitError,correction,leftModel,rightModel,headCorrection,
+            screenCorrectionX + dx,screenCorrectionY + dy)
+    }
     fun predictUncorrected(f: EyeFeatures): Pair<Double, Double>? {
         val raw=predictBase(f) ?: return null
         return if(headCorrection==null) raw else headCorrection.apply(f.head ?: return null,raw)

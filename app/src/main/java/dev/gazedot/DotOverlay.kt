@@ -93,7 +93,10 @@ class DotOverlay(context: Context) {
             layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
         }
         if (android.os.Build.VERSION.SDK_INT >= 30) {
-            setFitInsetsTypes(WindowInsets.Type.systemBars())
+            // Keep full-display gaze coordinates aligned on the trusted accessibility
+            // overlay. The untrusted application-overlay fallback must avoid system bars.
+            setFitInsetsTypes(if (type == WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY)
+                0 else WindowInsets.Type.systemBars())
             setFitInsetsIgnoringVisibility(true)
         }
     }
