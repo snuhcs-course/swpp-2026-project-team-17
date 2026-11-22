@@ -1,0 +1,32 @@
+{
+  "functions": {
+    "api/analyze.mjs": {
+      "maxDuration": 30
+    },
+    "api/predictions.mjs": {
+      "maxDuration": 30
+    },
+    "api/public-predictions.mjs": {
+      "maxDuration": 30
+    }
+  },
+  "outputDirectory": "public",
+  "rewrites": [
+    {
+      "source": "/v1/config",
+      "destination": "/api/prediction-config"
+    },
+    {
+      "source": "/v1/predictions",
+      "destination": "/api/predictions"
+    },
+    {
+      "source": "/v2/config",
+      "destination": "/api/public-config"
+    },
+    {
+      "source": "/v2/predictions",
+      "destination": "/api/public-predictions"
+    }
+  ]
+}

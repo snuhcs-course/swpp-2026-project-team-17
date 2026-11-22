@@ -9,7 +9,7 @@ val predictionProperties = Properties().apply {
     val config = rootProject.file("online-prediction.properties")
     if (config.isFile) config.inputStream().use { load(it) }
 }
-val predictionUrl = predictionProperties.getProperty("PREDICTION_SERVER_URL", "")
+val predictionUrl = predictionProperties.getProperty("PREDICTION_SERVER_URL", "https://notouch-server.vercel.app")
     .replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "").replace("\r", "")
 android {
     namespace = "dev.gazedot"
@@ -18,10 +18,10 @@ android {
         applicationId = "dev.gazedot"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 31
+        versionName = "0.1.31"
         buildConfigField("String", "PREDICTION_SERVER_URL", "\"$predictionUrl\"")
-        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
+        ndk { abiFilters += (providers.gradleProperty("targetAbi").orNull?.let { listOf(it) } ?: listOf("arm64-v8a", "armeabi-v7a", "x86_64")) }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

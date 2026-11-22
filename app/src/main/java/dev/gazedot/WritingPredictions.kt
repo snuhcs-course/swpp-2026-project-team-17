@@ -31,13 +31,15 @@ internal class WritingPredictions(private val changed: () -> Unit) {
         val c = URL(endpoint + path).openConnection() as HttpsURLConnection
         connection = c
         try {
-            c.connectTimeout = 2_000; c.readTimeout = 3_000
+            c.connectTimeout = 5_000; c.readTimeout = 25_000
             c.instanceFollowRedirects = false
             c.setRequestProperty("X-NoTouch-Session", session)
             if (body != null) {
                 c.requestMethod = "POST"; c.doOutput = true
                 c.setRequestProperty("Content-Type", "application/json; charset=utf-8")
-                c.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
+                val bytes = body.toString().toByteArray(Charsets.UTF_8)
+                InstallationProof.headers(path, bytes).forEach { (name, value) -> c.setRequestProperty(name, value) }
+                c.outputStream.use { it.write(bytes) }
             }
             if (c.responseCode != 200) throw PredictionFailure(c.responseCode)
             val bytes = c.inputStream.use { it.readBytesLimited(16_384) }
@@ -54,7 +56,7 @@ internal class WritingPredictions(private val changed: () -> Unit) {
         val ticket = generation
         worker.execute {
             val policy = runCatching {
-                val json = request("/v1/config")
+                val json = request("/v2/config")
                 check(json.getBoolean("enabled"))
                 PredictionPolicy(json.getString("policy_id"), json.getString("provider"), json.getString("model"), json.getString("notice"))
                     .also { check(it.id.isNotBlank() && it.provider.isNotBlank() && it.model.isNotBlank()) }
@@ -85,11 +87,11 @@ internal class WritingPredictions(private val changed: () -> Unit) {
                     changed()
                 }
             }
-            main.postDelayed(timeout, 5_000)
+            main.postDelayed(timeout, 30_000)
             worker.execute {
                 if (ticket != generation || !active) return@execute
                 val outcome = runCatching {
-                    request("/v1/predictions", JSONObject().put("text", input.text)
+                    request("/v2/predictions", JSONObject().put("text", input.text)
                         .put("version", input.version).put("policy_id", policy.id))
                 }
                 val result = outcome.getOrNull()
@@ -99,6 +101,10 @@ internal class WritingPredictions(private val changed: () -> Unit) {
                     if ((outcome.exceptionOrNull() as? PredictionFailure)?.code == 412) {
                         active = false
                         message = "예측 제공자 설정이 바뀌었어요. 온라인 예측 설정에서 안내를 다시 확인해 주세요."
+                    } else if ((outcome.exceptionOrNull() as? PredictionFailure)?.code == 429) {
+                        message = "AI 사용량 한도에 도달했어요. 직접 입력을 계속할 수 있어요."
+                    } else if ((outcome.exceptionOrNull() as? PredictionFailure)?.code == 401) {
+                        message = "기기 인증에 실패했어요. 휴대폰의 날짜·시간 자동 설정을 확인해 주세요."
                     } else if (result == null || result.optLong("version", -1) != input.version) {
                         message = "예측을 가져오지 못했어요. 직접 입력을 계속할 수 있어요."
                     } else {

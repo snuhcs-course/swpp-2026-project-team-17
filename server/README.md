@@ -1,3 +1,5 @@
+> **현재 배포 연결 (2026-11-22):** Android texting은 `https://notouch-server.vercel.app`의 `/v2/config`, `/v2/predictions`를 사용합니다. 설치별 Android Keystore 서명 인증이며, APK에는 API 키나 공용 토큰을 넣지 않습니다. 운영 서버 코드는 [vercel/README.md](vercel/README.md)에 있습니다. 실제 배포 모델은 `gpt-5.4`, 서버 환경변수는 `OPENAI_API_KEY`입니다. 아래 내용은 보존한 **이전 FastAPI /v1 개발 서버** 설명이며 현재 Android /v2 클라이언트와 직접 호환되지 않습니다. 공개 배포에 아래 로컬 서버를 그대로 사용하지 마세요.
+
 # NoTouch 예측 중계 서버
 
 FastAPI 중계 서버와 Android 클라이언트 연결 코드는 구현되어 있습니다. **OpenAI Responses API + `gpt-6-luna` + 추론 `none`으로 연결합니다.** 실제 API 키는 서버 로컬 `.env`에서 입력합니다. 공유 예제는 온라인 예측을 비활성화하며, 단위 테스트는 전부 가짜 제공자 응답을 사용합니다.
