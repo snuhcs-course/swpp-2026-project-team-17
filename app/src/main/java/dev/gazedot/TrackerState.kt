@@ -7,7 +7,7 @@ object TrackerState {
     @Volatile var eyeProfile: EyeProfile? = null
     var faceFrame: FaceFrame? = null
     @Volatile var faceSetupActive = false
-    var inferenceStatus = "iTracker 준비 전"
+    var inferenceStatus = "MediaPipe 준비 전"
     var controls = false
         set(value) {
             if (field == value) return

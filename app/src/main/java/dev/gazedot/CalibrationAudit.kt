@@ -17,8 +17,10 @@ object CalibrationAudit {
         fun span(axis:(EyeFeatures)->Double)=centers.maxOf(axis)-centers.minOf(axis)
         val sx=span{it.x};val sy=span{it.y}
         val noise=sqrt(selected.indices.flatMap{i->selected[i].map{(it.x-centers[i].x).pow(2)+(it.y-centers[i].y).pow(2)}}.average())
-        val raw="iTracker 목표 간 범위 X %.3f / Y %.3f cm, 고정 응시 흔들림 RMS %.3f cm".format(sx,sy,noise)
+        val raw="눈 특징 목표 간 범위 X %.3f / Y %.3f 특징단위, 고정 응시 흔들림 RMS %.3f 특징단위".format(sx,sy,noise)
         if(model==null)return CalibrationAuditResult(null,"보정 불가 · 출력 분리 또는 적합도 부족\n$raw")
+        if(selected.flatten().any { model.predictBase(it)==null })
+            return CalibrationAuditResult(null,"보정 중 얼굴 위치·거리가 크게 달라졌습니다. 같은 자세에서 다시 측정해 주세요.\n$raw")
         val jitter=selected.indices.map { i ->
             val pts=selected[i].map { model.predictBase(it)!! }
             val mx=pts.map{it.first}.average();val my=pts.map{it.second}.average()
@@ -31,7 +33,7 @@ object CalibrationAudit {
         val p90=errors[((errors.size-1)*.9).toInt()]
         // Explicit engineering limits in normalized screen units, not a clinical accuracy claim.
         val accepted=jitter<=.08 && rms<=.12 && p90<=.20
-        val report="$raw\n보정 배율 최대 %.3f 화면단위/cm\n보정 후 고정점 흔들림 최대 RMS %.3f\n미학습 후반 표본 오차 RMS %.3f / P90 %.3f\n%s\n학습 14개/점, 검증 나머지 · 동일 목표의 시간 분리 검증(새 위치 정확도 검증은 별도)".format(
+        val report="$raw\n보정 배율 최대 %.3f 화면단위/특징단위\n보정 후 고정점 흔들림 최대 RMS %.3f\n미학습 후반 표본 오차 RMS %.3f / P90 %.3f\n%s\n학습 14개/점, 검증 나머지 · 동일 목표의 시간 분리 검증(새 위치 정확도 검증은 별도)".format(
             model.mappingGain,jitter,rms,p90,if(accepted) "보정 품질 검사 통과" else "보정 품질 미달 · 흔들리는 보정값을 적용하지 않았습니다")
         return CalibrationAuditResult(if(accepted) model else null,report)
     }

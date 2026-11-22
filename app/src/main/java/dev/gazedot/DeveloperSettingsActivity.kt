@@ -28,17 +28,17 @@ class DeveloperSettingsActivity : ComponentActivity() {
             root.addView(Button(this).apply { text = label; setOnClickListener { action() } })
         }
         button("도움 · 인식 문제 해결하기") { startActivity(Intent(this, RecoveryActivity::class.java)) }
-        button("시선 모델 상태 · iTracker") { status.text=TrackerState.inferenceStatus+"\n사전학습 가중치 고정 · 5점은 화면 좌표 맞춤만 수행" }
+        button("시선 모델 상태 · MediaPipe") { status.text=TrackerState.inferenceStatus+"\n양쪽 눈을 따로 보정 · 5점 화면 좌표 맞춤" }
         button("시선 원인 진단 · 6초 고정 응시") { startActivity(Intent(this,GazeDiagnosticActivity::class.java)) }
-        button("최근 calibration 품질 결과") { status.text=getSharedPreferences("personal",MODE_PRIVATE).getString("calibration_audit","새 버전에서 보정한 기록이 없습니다") }
+        button("최근 calibration 품질 결과") { status.text=getSharedPreferences("personal",MODE_PRIVATE).getString("calibration_audit_v30","새 버전에서 보정한 기록이 없습니다") }
         button("최근 시선 진단 결과 공유") {
-            val data=getSharedPreferences("personal",MODE_PRIVATE).getString("gaze_diagnostic",null)
+            val data=getSharedPreferences("personal",MODE_PRIVATE).getString("gaze_diagnostic_v30",null)
             if(data==null) status.text="진단 기록 없음" else startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply{type="text/plain";putExtra(Intent.EXTRA_TEXT,data)},"진단 결과 공유"))
         }
         button("최근 영상 처리 오류") {
             status.text=getSharedPreferences("personal",MODE_PRIVATE).getString("last_frame_error","기록된 오류 없음")
         }
-        root.addView(TextView(this).apply {text="시선 모델: iTracker / Eye Tracking for Everyone (Krafka et al., CVPR 2016). 연구용 모델 · 폰 안에서 실행합니다."})
+        root.addView(TextView(this).apply {text="시선 모델: MediaPipe 얼굴·홍채 특징 + 양안 회귀. iTracker 없이 폰 안에서 실행합니다."})
         button("홍채 기준 측정 결과") {
             val prefs=getSharedPreferences("personal",MODE_PRIVATE)
             status.text=prefs.getString("eye_profile_report","홍채 측정 전")

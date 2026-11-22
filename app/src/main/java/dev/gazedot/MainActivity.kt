@@ -450,6 +450,7 @@ class MainActivity : ComponentActivity() {
         private val targets = listOf(.5 to .5, .18 to .18, .82 to .18, .82 to .82, .18 to .82)
         private var index = 0
         private var since = SystemClock.uptimeMillis()
+        private var targetStartedAt = since
         private val samples = mutableListOf<EyeFeatures>()
         private val fixations = mutableListOf<CalibrationFixation>()
         private var poseReference: HeadPose? = null
@@ -460,7 +461,7 @@ class MainActivity : ComponentActivity() {
             override fun run() {
                 if (closed || calibration !== this@CalibrationView) return
                 val now = SystemClock.uptimeMillis()
-                if (now - since > 15000) {
+                if (now - targetStartedAt > 15000) {
                     finish(null, "눈 표본이 부족합니다. 조명·거리·안경 반사를 확인하고 다시 보정하세요.")
                     return
                 }
@@ -483,11 +484,14 @@ class MainActivity : ComponentActivity() {
             // Keep collecting open-eye features even when the old model rejects this pose.
             val f = sample?.calibrationFeatures(now, lastSampleAt, 750)
             if (f == null) {
-                if (lastSampleAt>0 && now-lastSampleAt>1200) { samples.clear(); since=now }
+                if (samples.isNotEmpty()) { samples.clear(); poseReference=null; since=now }
                 hint = "${TrackerState.eyeState} · ${TrackerState.inferenceStatus}"
                 invalidate(); return
             }
-            if(f.source != GazeSource.ITRACKER) { samples.clear(); hint="iTracker 출력 대기"; return }
+            if(f.source != GazeSource.LANDMARK) { samples.clear(); hint="MediaPipe 눈 특징 대기"; return }
+            if (lastSampleAt>0 && sample.timestampMs-lastSampleAt>1200) {
+                samples.clear(); poseReference=null; since=now
+            }
             lastSampleAt = sample.timestampMs
             val head = f.head
             if (head == null) {
@@ -502,7 +506,7 @@ class MainActivity : ComponentActivity() {
                 invalidate(); return
             }
             hint = "${index + 1} / 5 · 파란 점을 계속 바라보세요"
-            if (elapsed < 1000) return
+            if (sample.timestampMs < since + 1000) return
             samples += f
             if (samples.size >= 22 && elapsed >= 2500) {
                 val eye = medianFeatures(samples)
@@ -518,14 +522,14 @@ class MainActivity : ComponentActivity() {
                 val point = DisplayCoordinates(bounds.width(), bounds.height())
                     .normalize(location[0] + width * xy.first, location[1] + height * xy.second)
                 fixations += CalibrationFixation(samples.toList(), point.first, point.second)
-                index++; samples.clear(); poseReference=null; since = SystemClock.uptimeMillis()
+                index++; samples.clear(); poseReference=null; since = SystemClock.uptimeMillis(); targetStartedAt=since
                 // Five-point screen mapping; no head-motion training or mid-session break.
                 if (index == targets.size) {
                     val audit = CalibrationAudit.fit(fixations)
-                    getSharedPreferences("personal",MODE_PRIVATE).edit().putString("calibration_audit",audit.report).apply()
+                    getSharedPreferences("personal",MODE_PRIVATE).edit().putString("calibration_audit_v30",audit.report).apply()
                     val rows=fixations.flatMap { group -> group.samples.map { f -> listOf(group.x,group.y,f.x,f.y,f.faceX,f.faceY,f.scale) } }
-                    runCatching { java.io.File(filesDir,"last-calibration-audit.json").writeText(org.json.JSONObject()
-                        .put("version",29).put("report",audit.report).put("rows",org.json.JSONArray(rows)).toString()) }
+                    runCatching { java.io.File(filesDir,"last-calibration-audit-v30.json").writeText(org.json.JSONObject()
+                        .put("version",30).put("source","mediapipe-binocular").put("report",audit.report).put("rows",org.json.JSONArray(rows)).toString()) }
                     finish(audit.model, if (audit.model == null) "보정 실패 · ${audit.report}"
                         else "보정 완료 · 품질 검사 통과. 실제 오차는 시선 원인 진단에서 확인하세요.")
                 }
@@ -553,7 +557,7 @@ class MainActivity : ComponentActivity() {
             val target = targets.getOrNull(index) ?: return
             val d = resources.displayMetrics.density
             paint.color = Color.WHITE; paint.textSize = 15 * d; paint.textAlign = Paint.Align.CENTER
-            canvas.drawText("iTracker 화면 맞춤 ${index + 1}/5", width / 2f, 55 * d, paint)
+            canvas.drawText("MediaPipe 화면 맞춤 ${index + 1}/5", width / 2f, 55 * d, paint)
             paint.textSize = 12 * d
             canvas.drawText(hint, width / 2f, height - 70 * d, paint)
             canvas.drawText("중단하려면 뒤로 가기", width / 2f, height - 45 * d, paint)

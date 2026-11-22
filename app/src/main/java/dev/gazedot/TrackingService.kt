@@ -31,7 +31,6 @@ class TrackingService : LifecycleService() {
     private val main = Handler(Looper.getMainLooper())
     @Volatile private var closing = false
     private var landmarker: FaceLandmarker? = null
-    private var iTracker: ITrackerEngine? = null
     private var cameraProvider: ProcessCameraProvider? = null
     private var analysis: ImageAnalysis? = null
     private var overlay: DotOverlay? = null
@@ -156,9 +155,8 @@ class TrackingService : LifecycleService() {
                             .setOutputFaceBlendshapes(true).setOutputFacialTransformationMatrixes(true)
                             .setMinFaceDetectionConfidence(0.6f).setMinFacePresenceConfidence(0.6f)
                             .setMinTrackingConfidence(0.6f).build())
-                    iTracker = ITrackerEngine(this)
-                    main.post { if (!closing) {TrackerState.inferenceStatus="iTracker 사전학습 모델 준비 완료";bindCamera()} }
-                } catch (e: Exception) { main.post { fail("MediaPipe/iTracker 모델 로딩 실패 · ${e.javaClass.simpleName}") } }
+                    main.post { if (!closing) {TrackerState.inferenceStatus="MediaPipe 양안 시선 추정 준비 완료";bindCamera()} }
+                } catch (e: Exception) { main.post { fail("MediaPipe 모델 로딩 실패 · ${e.javaClass.simpleName}") } }
             }
         } catch (e: SecurityException) { fail("카메라·실행 권한을 확인해 주세요", RecoverySetting.CAMERA) }
         catch (e: Exception) { fail("추적을 시작하지 못했어요") }
@@ -236,13 +234,7 @@ class TrackingService : LifecycleService() {
             val landmarkObservation = landmarks?.let {
                 EyeObservations.observe(it, upright.width, upright.height,face,TrackerState.eyeProfile)
             } ?: EyeObservation(EyeState.LOST, null, 0.0, 0.0)
-            val cnnStart=SystemClock.uptimeMillis()
-            stage = "iTracker 영상 전처리·추론"
-            val cnn = if(!setupOnly && ControlAccessibilityService.instance?.choosing != true && landmarkObservation.state == EyeState.OPEN && landmarkObservation.features != null && landmarks != null)
-                iTracker?.predict(upright,landmarks) else null
-            val cnnMs=SystemClock.uptimeMillis()-cnnStart
-            val observation=landmarkObservation.copy(features=if(cnn==null)null else landmarkObservation.features?.copy(
-                x=cnn.first,y=cnn.second,leftX=cnn.first,leftY=cnn.second,rightX=cnn.first,rightY=cnn.second,source=GazeSource.ITRACKER))
+            val observation = landmarkObservation
             main.post {
                 if (closing || epoch != trackingEpoch || cameraFault != null || setupOnly != TrackerState.faceSetupActive) return@post
                 val at = SystemClock.uptimeMillis()
@@ -256,8 +248,9 @@ class TrackingService : LifecycleService() {
                     return@post
                 }
                 GazeTrace.record(now,at-now,observation.state,observation.features,TrackerState.model)
-                TrackerState.inferenceStatus=if(cnn!=null) "전체 %d ms · iTracker %d ms%s".format(at-now,cnnMs,if(at-now>500) " · 지연: 조작 대기" else "")
-                    else "iTracker 대기 · 양쪽 눈/얼굴이 온전히 보여야 합니다"
+                TrackerState.inferenceStatus=if(observation.features!=null)
+                    "MediaPipe 양안 · 전체 %d ms%s".format(at-now,if(at-now>500) " · 지연: 조작 대기" else "")
+                    else "MediaPipe 대기 · 눈/얼굴 검출 확인 중"
                 if (TrackerState.collecting) {
                     lastResult=at
                     TrackerState.faceFrame=face
@@ -489,7 +482,7 @@ class TrackingService : LifecycleService() {
         TrackerState.microphoneReady = false
         TrackerState.controls = false
         overlay?.close()
-        worker.execute { landmarker?.close(); landmarker = null; iTracker?.close();iTracker=null }
+        worker.execute { landmarker?.close(); landmarker = null }
         worker.shutdown()
         TrackerState.publish(null, if (TrackerState.status.startsWith("추적 중")) "추적 중지됨" else TrackerState.status)
         stopForeground(STOP_FOREGROUND_REMOVE)

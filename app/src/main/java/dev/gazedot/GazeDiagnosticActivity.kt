@@ -56,16 +56,16 @@ class GazeDiagnosticActivity: ComponentActivity() {
         val target=(loc[0]+chart.width/2.0)/bounds.width() to (loc[1]+chart.height/2.0)/bounds.height()
         val rows=GazeTrace.since(started+1000)
         val report=GazeTrace.report(rows,target,model?.mappingGain ?: 0.0)
-        val json=JSONObject().put("version",29).put("report",report).put("target",JSONArray(listOf(target.first,target.second)))
+        val json=JSONObject().put("version",30).put("source","mediapipe-binocular").put("raw_units","eye-width-normalized").put("report",report).put("target",JSONArray(listOf(target.first,target.second)))
             .put("rows",JSONArray(rows.map { r -> JSONObject().put("at",r.at).put("latency_ms",r.latency).put("eye",r.eye)
-                .put("raw_cm",r.raw?.let{JSONArray(listOf(it.first,it.second))} ?: JSONObject.NULL)
+                .put("raw_eye_features",r.raw?.let{JSONArray(listOf(it.first,it.second))} ?: JSONObject.NULL)
                 .put("mapped_unclipped",r.mapped?.let{JSONArray(listOf(it.first,it.second))} ?: JSONObject.NULL)
                 .put("head",r.head?.let{JSONArray(it)} ?: JSONObject.NULL) }))
-            .put("filtered",JSONArray(filtered)).put("calibration",getSharedPreferences("personal",MODE_PRIVATE).getString("calibration_audit","없음"))
-        json.put("calibration_samples",runCatching { JSONObject(java.io.File(filesDir,"last-calibration-audit.json").readText()) }.getOrNull() ?: JSONObject.NULL)
+            .put("filtered",JSONArray(filtered)).put("calibration",getSharedPreferences("personal",MODE_PRIVATE).getString("calibration_audit_v30","없음"))
+        json.put("calibration_samples",runCatching { JSONObject(java.io.File(filesDir,"last-calibration-audit-v30.json").readText()) }.getOrNull() ?: JSONObject.NULL)
         val data=json.toString(2)
-        runCatching { java.io.File(filesDir,"last-gaze-diagnostic.json").writeText(data) }
-        getSharedPreferences("personal",MODE_PRIVATE).edit().putString("gaze_diagnostic",data).apply()
+        runCatching { java.io.File(filesDir,"last-gaze-diagnostic-v30.json").writeText(data) }
+        getSharedPreferences("personal",MODE_PRIVATE).edit().putString("gaze_diagnostic_v30",data).apply()
         showResult(report,data)
     }
     private fun showResult(report:String,data:String){

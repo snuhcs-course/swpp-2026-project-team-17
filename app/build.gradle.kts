@@ -1,5 +1,3 @@
-import java.security.MessageDigest
-
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -11,8 +9,8 @@ android {
         applicationId = "dev.gazedot"
         minSdk = 26
         targetSdk = 35
-        versionCode = 29
-        versionName = "0.12.4-calibration-audit"
+        versionCode = 30
+        versionName = "0.13.0-mediapipe-comparison"
         testInstrumentationRunner = "dev.gazedot.FrameLifetimeInstrumentation"
         ndk { abiFilters += providers.gradleProperty("targetAbi").orNull?.let { listOf(it) } ?: listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
     }
@@ -21,7 +19,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
-    androidResources { noCompress += "task" }
+    androidResources { noCompress += "task"; ignoreAssetsPattern = "itracker" }
     buildFeatures { buildConfig = true }
 }
 dependencies {
@@ -30,25 +28,5 @@ dependencies {
     implementation("androidx.camera:camera-camera2:1.4.2")
     implementation("androidx.camera:camera-lifecycle:1.4.2")
     implementation("com.google.mediapipe:tasks-vision:0.10.26")
-    implementation("org.opencv:opencv:4.12.0")
     testImplementation("junit:junit:4.13.2")
 }
-
-val verifyITrackerAssets by tasks.registering {
-    val assetDir = layout.projectDirectory.dir("src/main/assets/itracker")
-    inputs.dir(assetDir)
-    doLast {
-        val weights = assetDir.file("weights.caffemodel").asFile
-        check(weights.isFile) { "Run python tools/itracker/prepare.py before building this research APK" }
-        val hash = MessageDigest.getInstance("SHA-256").digest(weights.readBytes())
-            .joinToString("") { "%02x".format(it) }
-        check(hash == "d748042ebd402a4b6418cdff44a6e64f9bca1256fd3761f7ddc68fd5519ef98a") {
-            "Wrong or incomplete official iTracker checkpoint"
-        }
-        for (name in listOf("left", "right", "face"))
-            check(assetDir.file("mean_$name.f32").asFile.length() == 602112L)
-        check(assetDir.file("deploy.prototxt").asFile.isFile)
-        check(assetDir.file("LICENSE.md").asFile.isFile)
-    }
-}
-tasks.named("preBuild").configure { dependsOn(verifyITrackerAssets) }
