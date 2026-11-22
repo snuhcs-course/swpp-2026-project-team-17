@@ -37,7 +37,7 @@ class MainActivity : ComponentActivity() {
                     if (TrackerState.running && !TrackerState.hasFreshFeatures(SystemClock.uptimeMillis()) &&
                         SystemClock.uptimeMillis() < recoveryDeadline) { handler.postDelayed(this, 100); return }
                     recoveryAction = null
-                    startCalibration()
+                    startCalibration(fromRecovery = true)
                 }
             }
         }
@@ -86,11 +86,12 @@ class MainActivity : ComponentActivity() {
         onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (calibration != null) {
+                    val returnToRecovery = calibration?.returnToRecovery == true
                     calibration?.close()
                     calibration = null
                     TrackerState.cancelCalibration()
                     TrackerState.status = "보정 취소됨"
-                    if (intent.hasExtra(EXTRA_RECOVERY_ACTION)) finish() else showHome()
+                    if (returnToRecovery) finish() else showHome()
                 } else if (tutorial != null) {
                     showHome()
                 } else {
@@ -412,7 +413,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun startCalibration() {
+    private fun startCalibration(fromRecovery: Boolean = false) {
         if (!TrackerState.running || TrackerState.fault != null || !TrackerState.hasFreshFeatures(SystemClock.uptimeMillis())) {
             if (::status.isInitialized) status.text = "보정을 시작할 수 없어요. 카메라를 시작하고 눈이 검출되면 다시 선택해 주세요."
             return
@@ -422,11 +423,12 @@ class MainActivity : ComponentActivity() {
         homeDwell.reset()
         val session = TrackerState.beginCalibration()
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        calibration = CalibrationView(session)
+        // Capture navigation intent for this session, before a new model is applied.
+        calibration = CalibrationView(session, fromRecovery && TrackerState.model != null)
         setContentView(calibration)
     }
 
-    private inner class CalibrationView(private val session: Long) : View(this@MainActivity) {
+    private inner class CalibrationView(private val session: Long, val returnToRecovery: Boolean) : View(this@MainActivity) {
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         private val targets = listOf(.5 to .5, .15 to .15, .5 to .15, .85 to .15,
             .85 to .5, .85 to .85, .5 to .85, .15 to .85, .15 to .5)
@@ -513,7 +515,7 @@ class MainActivity : ComponentActivity() {
             val bounds = DisplaySpace.bounds(this@MainActivity)
             close()
             calibration = null
-            if (intent.hasExtra(EXTRA_RECOVERY_ACTION)) {
+            if (returnToRecovery) {
                 window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 finish()
             } else if (saved.getOrDefault(false) && TrackerState.running) {

@@ -186,7 +186,7 @@ internal class PostCalibrationTutorialView(
 
     private fun updateScrollStatus() {
         scrollStatus?.text = "스크롤 모드 ${if (scrolling.enabled) "켜짐 · 파란 커서" else "꺼짐 · 빨간 커서"}\n" +
-            if (practice.up && practice.down) "윙크로 모드를 끄면 완료됩니다." else "위·아래로 한 번씩 스크롤해 보세요."
+            if (practice.allDirections) "윙크로 모드를 끄면 완료됩니다." else "위·아래·왼쪽·오른쪽으로 한 번씩 스크롤해 보세요."
         updateScrollBadges()
     }
 
@@ -273,7 +273,12 @@ internal class PostCalibrationTutorialView(
                 scrollStatus = text("", 15, 500)
                 column.addView(scrollBadge(ScrollDirection.UP), LinearLayout.LayoutParams(-1, -2))
                 val frame = FrameLayout(context).apply { tag = "scroll-demo"; setBackgroundColor(Color.rgb(245, 247, 251)) }
-                val panel = ScrollView(context).apply { isFillViewport = true }
+                val panel = ScrollView(context).apply {
+                    isFillViewport = true
+                    // HorizontalScrollView measures its child with UNSPECIFIED width.
+                    // A LayoutParams width alone does not guarantee horizontal overflow.
+                    minimumWidth = (displayWidth * 1.8).toInt()
+                }
                 val horizontal = HorizontalScrollView(context).apply { isFillViewport = true }
                 val rows = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
                 repeat(16) { index ->
@@ -286,7 +291,7 @@ internal class PostCalibrationTutorialView(
                     rows.addView(row, LinearLayout.LayoutParams(-1, -2))
                 }
                 panel.addView(rows)
-                horizontal.addView(panel, LayoutParams((displayWidth * 1.8).toInt(), -1))
+                horizontal.addView(panel, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT))
                 frame.addView(horizontal, LayoutParams(-1, -1))
                 column.addView(frame, LinearLayout.LayoutParams(-1, 190))
                 column.addView(scrollBadge(ScrollDirection.DOWN), LinearLayout.LayoutParams(-1, -2))
@@ -319,7 +324,7 @@ internal class PostCalibrationTutorialView(
         if (isAttachedToWindow) announceForAccessibility(when (next) {
             Step.CALIBRATED -> "시선 보정이 완료되었습니다!"
             Step.BUTTON -> "버튼을 1초 동안 바라보세요. 잘 맞지 않으면 양눈을 두 번 깜빡여 다시 보정합니다."
-            Step.SCROLL -> "윙크로 모드를 켜면 커서가 파란색이 됩니다. 위·아래·왼쪽·오른쪽 1/3을 바라보면 스크롤합니다. 위아래 연습 후 윙크로 끄면 완료됩니다."
+            Step.SCROLL -> "윙크로 모드를 켜면 커서가 파란색이 됩니다. 위·아래·왼쪽·오른쪽 1/3을 바라보면 스크롤합니다. 네 방향을 모두 연습한 후 윙크로 끄면 완료됩니다."
             Step.FINISHED -> "튜토리얼이 완료되었습니다!"
         })
     }

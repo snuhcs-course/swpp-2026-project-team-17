@@ -144,7 +144,7 @@ class EyeGesturesTest {
         assertFalse(f.controller.enabled)
     }
 
-    @Test fun tutorialRequiresRealMovementBothWaysAndExplicitWinkOff() {
+    @Test fun tutorialRequiresRealMovementAllFourWaysAndExplicitWinkOff() {
         val practice = ScrollPractice()
         practice.modeChanged(true)
         practice.moved(0); practice.modeChanged(false)
@@ -152,11 +152,35 @@ class EyeGesturesTest {
         practice.modeChanged(true); practice.moved(20)
         assertFalse(practice.complete(true))
         practice.moved(-20)
+        assertFalse(practice.allDirections)
+        practice.moved(-20, 0)
+        assertFalse(practice.allDirections)
+        practice.moved(20, 0)
+        assertTrue(practice.allDirections)
         assertFalse(practice.complete(true))
         // Losing tracking is not a successful wink-off gesture.
         assertFalse(practice.complete(false))
         practice.modeChanged(false)
         assertTrue(practice.complete(false))
+    }
+
+    @Test fun everyDirectionIsRequiredEvenAfterWinkingOff() {
+        for (missing in ScrollDirection.entries) {
+            val practice = ScrollPractice()
+            practice.modeChanged(true)
+            ScrollDirection.entries.filter { it != missing }.forEach {
+                practice.moved(it.dx * 20, it.dy * 20)
+            }
+            practice.moved(0, 0) // Reaching an edge must not count as another direction.
+            practice.modeChanged(false)
+            assertFalse("Missing $missing", practice.complete(false))
+            practice.modeChanged(true)
+            practice.moved(missing.dx * 20, missing.dy * 20)
+            assertTrue(practice.allDirections)
+            assertFalse(practice.complete(true))
+            practice.modeChanged(false)
+            assertTrue(practice.complete(false))
+        }
     }
 
     @Test fun bilateralAndUnilateralEyeStatesAreClassifiedSeparately() {
