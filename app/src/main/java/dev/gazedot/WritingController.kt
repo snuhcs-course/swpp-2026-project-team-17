@@ -20,6 +20,8 @@ internal class WritingController(private val service: ControlAccessibilityServic
     private var nativePanel: NativeWritingPanel? = null
     private var promptPackage: String? = null
     private var closed = false
+    private var openingEditor: android.view.accessibility.AccessibilityNodeInfo? = null
+    private var openingCheck: Runnable? = null
     private val observer: () -> Unit = { onGaze() }
     private val heartbeat = object : Runnable {
         override fun run() {
@@ -101,6 +103,7 @@ internal class WritingController(private val service: ControlAccessibilityServic
     }
 
     private fun removePrompt() {
+        cancelOpening()
         prompt?.let { if (it.isAttachedToWindow) runCatching { manager.removeView(it) } }
         prompt = null; promptPackage = null
         if (nativePanel == null) TrackerState.writingOwnsInput = false
@@ -108,13 +111,52 @@ internal class WritingController(private val service: ControlAccessibilityServic
 
     private fun open() {
         val pkg = foregroundPackage()
+        if (openingEditor != null) return
         if (pkg == null || pkg != promptPackage || !MessagingEditors.supportsPackage(pkg)) {
             removePrompt(); return
         }
         var failure = "입력칸 연결 중 오류가 발생했어요."
-        val target = runCatching { WritingTarget.capture(service) { failure = it } }.getOrNull()
+        val editor = runCatching { WritingTarget.activateEditor(service, pkg) { failure = it } }.getOrNull()
             ?: run { Toast.makeText(service, failure, Toast.LENGTH_LONG).show(); return }
-        if (target.expected.packageName != pkg) { target.close(); removePrompt(); return }
+        openingEditor = editor
+        prompt?.isEnabled = false
+        prompt?.text = "입력칸 여는 중…"
+        val deadline = SystemClock.uptimeMillis() + 2_000
+        val check = object : Runnable {
+            override fun run() {
+                if (closed || openingEditor !== editor) return
+                if (foregroundPackage() != pkg) { cancelOpening(); refreshEntry(); return }
+                val target = runCatching { WritingTarget.capture(service) { failure = it } }.getOrNull()
+                if (target != null) {
+                    val same = target.expected.packageName == pkg &&
+                        target.expected.windowId == editor.windowId && target.expected.nodeKey == editor.hashCode()
+                    if (same && WritingTarget.keyboardVisible(service)) {
+                        cancelOpening()
+                        showPanel(target)
+                        return
+                    }
+                    if (same) failure = "키보드가 열리지 않았어요. 메시지 입력칸을 눌러 다시 시도해 주세요."
+                    target.close()
+                }
+                if (SystemClock.uptimeMillis() >= deadline) {
+                    cancelOpening()
+                    Toast.makeText(service, failure, Toast.LENGTH_LONG).show()
+                } else main.postDelayed(this, 75)
+            }
+        }
+        openingCheck = check
+        main.postDelayed(check, 100)
+    }
+
+    private fun cancelOpening() {
+        openingCheck?.let { main.removeCallbacks(it) }
+        openingCheck = null
+        openingEditor?.recycle(); openingEditor = null
+        prompt?.isEnabled = true
+        prompt?.text = "AI 텍스팅 열기"
+    }
+
+    private fun showPanel(target: WritingTarget) {
         removePrompt()
         val panel = NativeWritingPanel(service, target) {
             nativePanel = null; dwell.screenChanged()

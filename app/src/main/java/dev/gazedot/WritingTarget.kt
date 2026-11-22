@@ -148,6 +148,55 @@ internal class WritingTarget private constructor(
     fun close() { closed = true; main.removeCallbacksAndMessages(null); editor.recycle() }
 
     companion object {
+        fun keyboardVisible(service: AccessibilityService): Boolean {
+            val windows = service.windows
+            return try { windows.any { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD } }
+                finally { windows.forEach { it.recycle() } }
+        }
+
+        /** Select a visible editor structurally; never guess between multiple fields. Caller owns the node. */
+        fun activateEditor(service: AccessibilityService, packageName: String,
+            onFailure: (String) -> Unit): AccessibilityNodeInfo? {
+            val root = service.rootInActiveWindow ?: run {
+                onFailure("현재 앱 화면을 읽지 못했어요."); return null
+            }
+            val candidates = mutableListOf<AccessibilityNodeInfo>()
+            try {
+                if (root.packageName?.toString() != packageName) return null
+                var visits = 0
+                fun visit(node: AccessibilityNodeInfo, depth: Int) {
+                    if (++visits > 350 || depth > 20) return
+                    if (node.isEditable && node.isEnabled && node.isVisibleToUser &&
+                        node.packageName?.toString() == packageName &&
+                        MessagingEditors.supports(packageName, node.isPassword, node.inputType) &&
+                        (node.inputType and InputType.TYPE_MASK_VARIATION) != InputType.TYPE_TEXT_VARIATION_FILTER) {
+                        candidates += AccessibilityNodeInfo.obtain(node)
+                    }
+                    for (i in 0 until node.childCount) {
+                        val child = node.getChild(i) ?: continue
+                        try { visit(child, depth + 1) } finally { child.recycle() }
+                    }
+                }
+                visit(root, 0)
+                val editor = candidates.singleOrNull { it.isFocused } ?: candidates.singleOrNull()
+                if (editor == null || visits > 350) {
+                    onFailure(if (candidates.isEmpty()) "대화방을 열어 메시지 입력칸이 보이게 해 주세요."
+                        else "입력칸이 여러 개예요. 사용할 메시지 입력칸을 선택해 주세요.")
+                    return null
+                }
+                // Focus alone does not reliably show the native IME; clicking the editor does.
+                if (!editor.isFocused || !keyboardVisible(service)) {
+                    editor.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+                    editor.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                }
+                candidates.remove(editor)
+                return editor
+            } finally {
+                candidates.forEach { it.recycle() }
+                root.recycle()
+            }
+        }
+
         fun capture(service: AccessibilityService, onFailure: (String) -> Unit = {}): WritingTarget? {
             val root = service.rootInActiveWindow ?: run {
                 onFailure("현재 앱 화면을 읽지 못했어요."); return null
