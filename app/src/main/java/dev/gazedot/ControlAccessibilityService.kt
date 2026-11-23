@@ -73,33 +73,63 @@ class ControlAccessibilityService : AccessibilityService() {
         }
         return true
     }
+    private val applicationWindow = ApplicationWindowTracker()
+    private var writing: WritingController? = null
     private var busy=false
     private val handler=Handler(Looper.getMainLooper())
     override fun onServiceConnected() {
         instance=this
-        if (TrackerState.fault?.setting == RecoverySetting.ACCESSIBILITY) TrackerState.fault = null
-        TrackerState.notifyListeners()
+        writing?.close()
+        writing = WritingController(this)
+        busy = false
+        applicationWindow.changed(focusedApplicationWindow())
+        TrackerState.accessibilityConnected()
     }
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        writing?.onEvent(event)
         // Ignore our confirmation overlay's own events, not changes in the source app window.
         if(choosing && event?.packageName?.toString()==packageName && event.windowId!=selectionPanel?.snapshot?.window) return
         if (event?.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             closeSelection()
-            TrackerState.cancelActions?.invoke()
+            // Scrolling can emit WINDOW_STATE_CHANGED without leaving the app/window.
+            // Cancel stale clicks in that case, but keep the user's wink-selected mode.
+            if (applicationWindow.changed(focusedApplicationWindow())) TrackerState.cancelActions?.invoke()
+            else TrackerState.cancelPendingClick?.invoke()
         } else if (event?.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED ||
             event?.eventType == AccessibilityEvent.TYPE_VIEW_SCROLLED) {
             if(choosing) closeSelection()
             TrackerState.cancelPendingClick?.invoke()
         }
     }
+    @Suppress("DEPRECATION")
+    private fun focusedApplicationWindow(): ApplicationWindowKey? {
+        val visibleWindows = windows
+        return try {
+            val window = visibleWindows.firstOrNull {
+                it.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION && it.isFocused
+            } ?: return null
+            val root = window.root ?: return null
+            try { root.packageName?.toString()?.let { ApplicationWindowKey(it, window.id) } }
+            finally { root.recycle() }
+        } finally { visibleWindows.forEach { it.recycle() } }
+    }
+
     /** Local identity only: labels/text are neither read nor sent to the cloud. */
     @Suppress("DEPRECATION")
     fun dwellTargetKey(point: Pair<Double, Double>): String? {
         if (!allowed()) return null
-        val root = rootInActiveWindow ?: return null
         val bounds = DisplaySpace.bounds(this)
         val x = (point.first * bounds.width()).toInt()
         val y = (point.second * bounds.height()).toInt()
+        // The keyboard is a separate accessibility window, not a child of the message app.
+        val visibleWindows = windows
+        val keyboardRoot = try {
+            visibleWindows.firstOrNull { window ->
+                window.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_INPUT_METHOD &&
+                    android.graphics.Rect().let { window.getBoundsInScreen(it); it.contains(x, y) }
+            }?.root
+        } finally { visibleWindows.forEach { it.recycle() } }
+        val root = keyboardRoot ?: rootInActiveWindow ?: return null
         var bestArea = Long.MAX_VALUE
         var key: String? = null
         var visits = 0
@@ -123,17 +153,16 @@ class ControlAccessibilityService : AccessibilityService() {
         return try { visit(root, 0); key } finally { root.recycle() }
     }
     private fun reportInterrupted() {
-        if (TrackerState.running) TrackerState.fault = TrackingFault("접근성 조작이 중단되었어요", "접근성 설정에서 NoTouch 눈 조작을 확인한 뒤 조작 재개를 선택해 주세요.", RecoverySetting.ACCESSIBILITY)
-        TrackerState.controls=false
-        TrackerState.cancelActions?.invoke()
-        TrackerState.contextChanged?.invoke()
-        TrackerState.notifyListeners()
+        TrackerState.accessibilityDisconnected()
     }
-    override fun onInterrupt() { closeSelection(); reportInterrupted() }
+    override fun onInterrupt() { closeSelection(); writing?.hide(); reportInterrupted() }
     override fun onDestroy() {
         closeSelection()
-        if(instance===this) instance=null
-        reportInterrupted()
+        writing?.close(); writing = null
+        if (instance === this) {
+            instance = null
+            reportInterrupted()
+        }
         handler.removeCallbacksAndMessages(null); super.onDestroy()
     }
     private fun allowed()=TrackerState.externalActionsAllowed() && !TrackerState.speaking

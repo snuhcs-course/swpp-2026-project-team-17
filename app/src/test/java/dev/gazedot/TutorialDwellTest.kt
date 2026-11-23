@@ -60,13 +60,15 @@ class TutorialDwellTest {
         assertEquals(0f, dwell.progress, 0f)
     }
 
-    @Test fun rejectsStaleFutureAndRepeatedSamples() {
+    @Test fun rejectsStaleAndFutureSamplesButIgnoresFreshDuplicates() {
         val dwell = TutorialDwell()
         assertFalse(dwell.update(true, 0, 501))
         assertFalse(dwell.update(true, 400, 300))
         dwell.update(true, 500, 500)
         dwell.update(true, 600, 600)
         assertFalse(dwell.update(true, 600, 700))
+        assertEquals(.1f, dwell.progress, .001f)
+        assertFalse(dwell.update(true, 600, 1_101))
         assertEquals(0f, dwell.progress, 0f)
     }
 

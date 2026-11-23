@@ -21,11 +21,14 @@ internal class TutorialDwell {
 
     fun update(inside: Boolean, sampleAt: Long, now: Long): Boolean {
         if (!inside || now - sampleAt !in 0..500 ||
-            lastSampleAt?.let { sampleAt <= it } == true) {
+            lastSampleAt?.let { sampleAt < it } == true) {
             reset()
             return false
         }
         expire(now)
+        // UI heartbeats can read the same camera result again. Do not reset a
+        // fixation or advance its clock without a newly captured observation.
+        if (lastSampleAt == sampleAt) return false
         if (lastSampleAt?.let { sampleAt - it > MAX_SAMPLE_GAP_MS } == true) reset()
         // Validate capture age separately from the time spent receiving valid gaze results.
         if (startedAt == null) startedAt = now

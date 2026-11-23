@@ -67,7 +67,23 @@ class DotOverlay(context: Context) {
         setBackgroundColor(Color.rgb(245, 245, 255))
     }
     private var card: ScrollView? = null
-    private var statusAttached = false
+    private val statusBanner = OverlayStatusBanner(
+        setContent = { message, visible ->
+            status.text = message
+            status.visibility = if (visible) View.VISIBLE else View.GONE
+        },
+        addWindow = { manager.addView(status, panelParams(touchable = false)) },
+        removeWindow = {
+            // A registered window can still be awaiting its first attachment/layout.
+            // Do not gate removal on isAttachedToWindow.
+            try {
+                manager.removeViewImmediate(status)
+            } catch (error: IllegalArgumentException) {
+                // Android may already have removed it after an accessibility disconnect.
+                if (status.parent != null) throw error
+            }
+        },
+    )
     init {
         try {
             manager.addView(dot, createParams(overlayType))
@@ -106,15 +122,11 @@ class DotOverlay(context: Context) {
         dot.barDirection=barDirection;dot.barProgress=barProgress
         dot.scrollMode=scrollMode; dot.invalidate()
         if (label.isBlank() || card != null) {
-            if (statusAttached) { manager.removeView(status); statusAttached = false }
+            statusBanner.clear()
             setDotOpacity(.7f)
         } else {
-            status.text = label
-            if (!statusAttached) {
-                if (overlayType == WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY) setDotOpacity(.3f)
-                statusAttached = runCatching { manager.addView(status, panelParams(touchable = false)); true }.getOrDefault(false)
-                if (!statusAttached) setDotOpacity(.7f)
-            }
+            if (overlayType == WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY) setDotOpacity(.3f)
+            if (!statusBanner.show(label)) setDotOpacity(.7f)
         }
     }
 
@@ -124,6 +136,15 @@ class DotOverlay(context: Context) {
             params.alpha = alpha
             manager.updateViewLayout(dot, params)
         }
+    }
+
+    fun raiseDot() {
+        // A newly added writing window otherwise covers this older window.
+        // The dot remains non-touchable, so keyboard and panel touches pass through.
+        if (!dot.isAttachedToWindow) return
+        val params = dot.layoutParams as WindowManager.LayoutParams
+        manager.removeViewImmediate(dot)
+        manager.addView(dot, params)
     }
 
     private fun panelParams(touchable: Boolean) = WindowManager.LayoutParams(
@@ -171,10 +192,10 @@ class DotOverlay(context: Context) {
         card = panel
     }
 
-    fun hideHelp() { card?.let { if (it.isAttachedToWindow) manager.removeView(it) }; card = null }
+    fun hideHelp() { card?.let { if (it.isAttachedToWindow) runCatching { manager.removeView(it) } }; card = null }
     fun close() {
         hideHelp()
-        if (statusAttached) { manager.removeView(status); statusAttached = false }
-        if (dot.isAttachedToWindow) manager.removeView(dot)
+        statusBanner.clear()
+        if (dot.isAttachedToWindow) runCatching { manager.removeView(dot) }
     }
 }

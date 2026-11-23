@@ -160,7 +160,7 @@ class ScrollController(private val useBars:Boolean=false) {
     }
 }
 
-/** Advance only after actual movement in both directions and exiting scroll mode. */
+/** Advance only after actual movement in all four directions and exiting scroll mode. */
 class ScrollPractice {
     private var exitedByWink = false
     var up = false
@@ -181,5 +181,6 @@ class ScrollPractice {
         if (dx > 0) right = true
     }
     fun modeChanged(enabled: Boolean) { exitedByWink = !enabled }
-    fun complete(scrollMode: Boolean) = up && down && !scrollMode && exitedByWink
+    val allDirections get() = up && down && left && right
+    fun complete(scrollMode: Boolean) = allDirections && !scrollMode && exitedByWink
 }

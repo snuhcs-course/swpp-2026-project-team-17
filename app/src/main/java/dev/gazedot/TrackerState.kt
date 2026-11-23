@@ -3,6 +3,39 @@ package dev.gazedot
 /** Accessed on the main thread. Camera worker posts immutable results here. */
 object TrackerState {
     var running = false
+    private var accessibilityInterrupted = false
+    private var resumeAfterAccessibility = false
+
+    fun accessibilityDisconnected() {
+        if (!accessibilityInterrupted) resumeAfterAccessibility = running && controls
+        accessibilityInterrupted = true
+        if (running && (fault == null || fault?.setting == RecoverySetting.ACCESSIBILITY)) {
+            fault = TrackingFault("접근성 조작이 중단되었어요",
+                "NoTouch 눈 조작을 다시 켜면 이전 추적 상태로 돌아갑니다.", RecoverySetting.ACCESSIBILITY)
+        }
+        controls = false
+        cancelActions?.invoke()
+        clearCoordinates()
+        contextChanged?.invoke()
+        notifyListeners()
+    }
+
+    fun accessibilityConnected() {
+        val resume = accessibilityInterrupted && resumeAfterAccessibility && running
+        accessibilityInterrupted = false
+        resumeAfterAccessibility = false
+        if (fault?.setting == RecoverySetting.ACCESSIBILITY) fault = null
+        cancelActions?.invoke()
+        clearCoordinates()
+        if (resume && fault == null) controls = true
+        contextChanged?.invoke()
+        notifyListeners()
+    }
+
+    fun pauseControls() {
+        resumeAfterAccessibility = false
+        controls = false
+    }
     var model: GazeModel? = null
     @Volatile var eyeProfile: EyeProfile? = null
     var faceFrame: FaceFrame? = null
@@ -25,6 +58,14 @@ object TrackerState {
             cancelActions?.invoke()
             contextChanged?.invoke()
         }
+    // Writing UI consumes gaze actions; do not also click or scroll the underlying app.
+    var writingOwnsInput = false
+        set(value) {
+            if (field == value) return
+            field = value
+            cancelActions?.invoke()
+            contextChanged?.invoke()
+        }
     var localDwellProgress = 0f
     var localBarDirection:ScrollDirection?=null
     var localBarProgress=0f
@@ -35,6 +76,7 @@ object TrackerState {
     var fault: TrackingFault? = null
     var signalPending = false
     var contextChanged: (() -> Unit)? = null
+    var raiseGazeOverlay: (() -> Unit)? = null
     private val observers = linkedSetOf<() -> Unit>()
     fun observe(observer: () -> Unit) { observers += observer }
     fun unobserve(observer: () -> Unit) { observers -= observer }
@@ -42,9 +84,9 @@ object TrackerState {
     fun currentStatus(now: Long) = trackingStatus(running, controls, collecting, model != null,
         sample, eyeState, now, fault, signalPending)
     fun externalActionsAllowed() = running && controls && interactionAllowed && !collecting && !precisionTraining &&
-        !helpVisible && !recoveryOpening && fault == null && !signalPending
+        !helpVisible && !recoveryOpening && !writingOwnsInput && fault == null && !signalPending
     fun recognitionHelpEligible(accessibilityReady: Boolean) = running && controls && interactionAllowed &&
-        !collecting && !precisionTraining && !speaking && !recoveryOpening && model != null && fault == null &&
+        !collecting && !precisionTraining && !speaking && !recoveryOpening && !writingOwnsInput && model != null && fault == null &&
         !signalPending && accessibilityReady
     fun settingsStarted() {
         settingsScreens++
@@ -86,6 +128,8 @@ object TrackerState {
     }
 
     fun trackingStopped() {
+        accessibilityInterrupted = false
+        resumeAfterAccessibility = false
         running = false
         controls = false
         cancelCalibration()

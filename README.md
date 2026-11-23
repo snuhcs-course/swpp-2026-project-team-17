@@ -1,14 +1,10 @@
-# NoTouch — gaze response fix (v33)
+# NoTouch — integrated main + texting (v34)
 
-Based on latest main 57a9c18, including its post-calibration screen-offset check and full-display accessibility overlay. This branch changes response latency and measurement timing; it does not replace the trained mapping or add an inference model.
+Merged feature/texting 293e2e3 into main 57a9c18. Main's MediaPipe binocular mapping, calibration verification, selection assistance and vertical edge-scroll bars remain. Native messaging/IME prediction, per-installation API authentication, accessibility reconnect fixes and scroll-window cancellation fixes are integrated. Tutorial completion badges follow the actual vertical bar controls; wink-only instructions do not replace the bar workflow.
 
-- Allow up to about 30 analyzed frames/s instead of capping at about 15; actual rate remains device dependent.
-- Coalesce queued open-eye updates while retaining closures and the first reopening frame so gesture timing is preserved.
-- Replace independent x/y median targets with an actual 2D representative sample; corroborated moves use a short response interval. Single large outliers still cannot trigger actions.
-- Measure post-calibration offset from model output and post-settle capture timestamps rather than display-filter lag.
-- Five-point calibration, latest main's verification screen, gestures and 500ms action freshness are retained. The separate v32 face-registration removal and feature/texting API branch are not merged here.
+Prediction relay defaults to https://notouch-server.vercel.app. No API key belongs in the APK. See server/vercel/README.md for the deployed v2 protocol and currently removed prediction count limits.
 
-## Base main documentation
+## Prior main reference
 
 # NoTouch — main (MediaPipe-only v30)
 

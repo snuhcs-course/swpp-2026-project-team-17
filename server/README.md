@@ -1,44 +1,53 @@
-# NoTouch 서버
+> **현재 배포 연결 (2026-11-22):** Android texting은 `https://notouch-server.vercel.app`의 `/v2/config`, `/v2/predictions`를 사용합니다. 설치별 Android Keystore 서명 인증이며, APK에는 API 키나 공용 토큰을 넣지 않습니다. 운영 서버 코드는 [vercel/README.md](vercel/README.md)에 있습니다. 실제 배포 모델은 `gpt-5.4`, 서버 환경변수는 `OPENAI_API_KEY`입니다. 아래 내용은 보존한 **이전 FastAPI /v1 개발 서버** 설명이며 현재 Android /v2 클라이언트와 직접 호환되지 않습니다. 공개 배포에 아래 로컬 서버를 그대로 사용하지 마세요.
 
-Android → HTTPS `/api/analyze` → OpenAI Responses API. 두 단계 모두 `gpt-5.4`를 사용합니다. OpenAI 키, 프롬프트, 모델 선택은 서버가 관리합니다. 앱은 얼굴 JPEG/특징 또는 시선/UI 후보만 전송합니다.
+# NoTouch 예측 중계 서버
 
-## 배포
+FastAPI 중계 서버와 Android 클라이언트 연결 코드는 구현되어 있습니다. **OpenAI Responses API + `gpt-6-luna` + 추론 `none`으로 연결합니다.** 실제 API 키는 서버 로컬 `.env`에서 입력합니다. 공유 예제는 온라인 예측을 비활성화하며, 단위 테스트는 전부 가짜 제공자 응답을 사용합니다.
 
-1. Vercel에서 이 저장소를 가져오고 **Root Directory를 `server`**, Framework Preset을 **Other**로 설정합니다. Node.js 22를 사용합니다.
-2. Upstash Redis 데이터베이스를 준비합니다. 사용자 영상 저장용이 아니라 서버 인스턴스가 공유하는 호출 횟수 저장용입니다. 기존 Redis를 쓸 경우 `notouch:*` 키 영역을 이 앱 전용으로 사용합니다.
-3. 이 폴더에서 `npm run credentials`를 한 번 실행합니다. 이미 생성된 파일이 있으면 덮어쓰지 않습니다.
-4. Vercel 프로젝트의 환경변수에 다음 네 값을 직접 입력합니다. 비밀 값은 채팅이나 Git에 넣지 않습니다.
+## 나중에 채울 설정
 
-| 환경변수 | 값 |
+`server/.env.example`을 `server/.env`로 복사합니다. 이 작업 공간에는 Luna 연결 값이 들어 있는 로컬 `server/.env`를 만들어 두었습니다. `.env`는 Git에서 제외하며, 실제 API 키를 넣을 위치에 주석이 있습니다. 키를 채팅이나 예제 파일에 붙이지 않습니다.
+
+| 변수 | 용도 |
 |---|---|
-| `OPENAI_API_KEY` | OpenAI 프로젝트의 API 키. 두 기능에 하나의 키 사용 |
-| `NOTOUCH_TOKEN_SHA256` | 생성된 `.token-hash.txt`의 내용 |
-| `UPSTASH_REDIS_REST_URL` | Redis 콘솔의 REST URL |
-| `UPSTASH_REDIS_REST_TOKEN` | Redis 콘솔의 REST token |
+| `AI_PREDICTION_ENABLED` | 공유 예제는 `false`. 실제 연결할 로컬 `.env`에서 `true`로 설정 |
+| `AI_PROVIDER` | `openai` |
+| `AI_MODEL` | `gpt-6-luna` |
+| `AI_API_KEY` | 아직 미입력. 서버에서만 사용하며 APK·문서·예제에 실제 키를 넣지 않음 |
+| `AI_API_BASE_URL` | `https://api.openai.com/v1` — 서버가 뒤에 `/responses`를 붙임 |
+| `AI_REASONING_EFFORT` | `none` — 추가 추론 없이 짧은 예측 생성 |
 
-5. 배포합니다. CLI를 쓰면 Vercel 로그인 후 이 폴더에서 `npx vercel --prod`를 실행합니다. 환경변수 변경 후에는 다시 배포해야 합니다.
-6. 새 APK의 GPT 설정에서 배포 주소 `https://프로젝트.vercel.app`와 `.device-token.txt`의 **NoTouch 접속 토큰**을 입력합니다. OpenAI 키를 앱에 입력하지 않습니다. Vercel Deployment Protection이 적용된 주소는 앱이 접근할 수 없으므로 앱이 접근 가능한 production 주소를 사용합니다.
+프로세스 환경변수는 `.env`보다 우선합니다. 설정 변경 후 서버를 재시작해야 합니다. 필수 값이 비어 있거나 지원하지 않는 제공자이면 `/v1/config`는 비활성 상태를 반환하고 예측 요청은 503으로 종료합니다.
 
-두 토큰 파일은 Git에서 제외했습니다. 접속 토큰은 팀 실험용 공용 자격증명입니다. OpenAI 자체 API에는 사용할 수 없지만 유출되면 이 서버의 한도 안에서 사용할 수 있으므로 공유하지 마세요. 취소하려면 새 토큰을 생성해 서버 해시를 교체하고 재배포합니다. 앱에는 토큰을 영구 저장하지 않으며 추적 종료 시 제거합니다. 서버 주소만 저장합니다. 일반 공개 서비스용 계정/기기별 권한 관리는 별도 구현이 필요합니다.
+모델의 Responses API·구조화 출력·`none` 지원은 [OpenAI 공식 모델 문서](https://developers.openai.com/api/docs/models/gpt-6-luna)에서 확인할 수 있습니다. API 호출은 사용량에 따라 과금됩니다.
 
-## 호출 제한과 오류
+Android에서는 저장소 루트의 `online-prediction.properties.example`을 `online-prediction.properties`로 복사해 `PREDICTION_SERVER_URL`에 유효한 인증서가 있는 HTTPS 중계 서버 주소만 입력한 뒤 다시 빌드합니다. 이 파일도 Git에서 제외합니다. 모델·제공자 키는 Android 설정에 넣지 않습니다. 빈 주소, 동의 거부, 서버 설정 미완료 상태에서는 온라인 예측 없이 작성합니다.
 
-- Redis Lua 스크립트 한 번으로 전체 **분당 12회 / UTC 날짜당 200회**를 원자적으로 검사·예약합니다. 토큰 교체나 앱 재시작, 서버 인스턴스 증가로 초기화되지 않습니다. 두 단계면 2회이며 실패한 OpenAI 호출도 예약 횟수를 소비합니다.
-- 입력 JPEG는 base64 2,000,000자, 후보는 40개, 출력은 800토큰 이내로 제한합니다. 이것은 요금액의 정확한 상한이 아닙니다.
-- 인증 오류 401, 잘못된 입력 400, 크기 초과 413, 호출 한도 429, OpenAI 오류 502, 서버 환경변수/Redis 장애 503입니다. 설정이 빠지거나 Redis가 실패하면 OpenAI를 호출하지 않습니다.
-- 모델, 도구, 프롬프트, 임의의 이미지 URL을 클라이언트가 지정할 수 없습니다. 얼굴 사진/UI 내용을 서버 로그나 DB에 기록하지 않습니다. Redis에는 시간 구간별 카운터만 기록합니다.
-- OpenAI 요청은 `store:false`입니다. 제공자의 모든 데이터 보존이 비활성화된다는 뜻은 아닙니다.
+## 로컬 실행과 테스트
 
-## 검증
+저장소 루트에서 실행합니다(Python 3.10 이상).
 
-`npm test`는 모의 OpenAI/Redis를 이용해 인증, 입력 검증, 서버 소유 모델/스키마, 공유 한도 요청, 장애 시 차단, 오류 비공개 처리를 검증합니다. 실제 Redis Lua 실행·Vercel 배포·OpenAI 실호출은 별도 환경 설정 후 확인해야 합니다. 테스트 성공을 시선 추정 정확도 검증으로 해석하지 않습니다.
+```sh
+python3 -m venv server/.venv
+server/.venv/bin/python -m pip install -r server/requirements.txt
+server/.venv/bin/python -m uvicorn server.main:app --host 127.0.0.1 --port 8000 --no-access-log
+```
 
-참고: [Vercel Node.js Functions](https://vercel.com/docs/functions/runtimes/node-js/advanced-node-configuration), [Vercel 환경변수](https://vercel.com/docs/environment-variables), [Upstash REST API](https://upstash.com/docs/redis/features/restapi).
+개발 서버는 기본으로 루프백에만 바인딩합니다. 실제 Android 연결에는 신뢰할 수 있는 HTTPS 종단이 필요합니다. 배포·도메인·운영 키 설정은 이 저장소 변경에서 수행하지 않았습니다. 공개 서비스로 운영할 때는 배포 환경의 접근 제어와 공유 요청 제한 저장소를 구성해야 합니다. 현재 제한은 서버 프로세스 하나를 기준으로 합니다.
 
-## 현재 배포 상태 (2026-10-07)
+```sh
+server/.venv/bin/python -m unittest discover -s server -p 'test_server.py' -v
+./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintDebug
+```
 
-서버 주소: https://notouch-server.vercel.app
+## 데이터·요청 정책
 
-Vercel production 배포, 서버 인증, 무료 Upstash Redis 연결을 완료했습니다. 자동 유료 전환은 끄고 생성했습니다. 실제 GPT-5.4 화면 후보 분석 요청이 HTTP 200으로 완료됐습니다(약 3.7초, 258토큰). 실제 폰의 시선 정확도 검증은 별도입니다. Vercel 연동은 `KV_REST_API_URL`/`KV_REST_API_TOKEN`을 자동 설정하며 서버가 이 이름도 지원합니다.
-
-앱의 서버 주소에 위 URL을 넣고, 접속 토큰에는 이 폴더의 `.device-token.txt` 내용을 입력합니다. 이 파일은 Git·배포에서 제외됩니다. OpenAI 키를 폰에 입력하지 않습니다.
+- `GET /v1/config`: 활성 상태·제공자·모델·동의 정책 ID·보관 안내만 반환합니다. 제공자 호출이 없습니다.
+- `POST /v1/predictions`: NoTouch 초안 `text`, 입력 `version`, 동의한 `policy_id`만 허용합니다. 대화 내역·카메라·시선 등 추가 필드는 거부하며 오류에 본문을 되돌려 보내지 않습니다.
+- 입력 최대 2,000자, HTTP 본문 최대 16 KiB. 단어 최대 2개, 단어당 최대 80자, 이어쓰기 최대 1개·160자. 단어 범위와 한글 자모 접두어는 앱에서 다시 검증합니다. 이어쓰기는 초안 끝에만 추가합니다.
+- 앱은 350ms 지연으로 연속 입력을 묶습니다. 이전 입력 버전 응답은 버리고, 응시·터치 중인 후보는 그대로 유지합니다. 새 입력·종료 시 이전 요청을 취소하고, 5초가 지나면 오류를 안내합니다. 실패·거부·시간 초과 시 본문을 바꾸거나 자동 재시도하지 않습니다.
+- 서버 제한: IP당 분당 60회, 세션당 동시 1회, 전체 동시 4회, 프로세스당 하루 1,000회. 클라이언트 세션을 바꾸어도 같은 IP의 분당 제한을 우회할 수 없습니다. 요청 제한의 IP·세션 메타데이터는 메모리에서만 다룹니다.
+- 모델·제공자·보관 안내가 바뀌면 정책 ID도 바뀝니다. 기존 동의의 요청은 412로 거부하며 새 제공자에 초안을 보내지 않습니다. 앱에서 안내를 다시 확인해야 합니다.
+- 제공자 키는 서버에서만 사용합니다. HTTPS 제공자 연결의 리다이렉트를 따르지 않으며 요청을 재시도하지 않습니다. 입력·후보·예외 본문·요청 헤더는 로그에 남기지 않고 상태·처리 시간·토큰 사용량만 기록합니다. Uvicorn도 위 명령처럼 접근 로그를 끕니다.
+- OpenAI 요청은 `store:false`이며 이전 응답 ID나 대화 저장소를 사용하지 않습니다. API 데이터는 기본적으로 학습에 쓰이지 않지만 악용 방지 로그는 기본 최대 30일 보관될 수 있고 정책상 예외가 있습니다. [공식 데이터 정책](https://developers.openai.com/api/docs/guides/your-data)
+- 한국어 미완성 자모·단어 후보의 유용성, 실제 응답 시간, 비용은 Luna API에 연결한 뒤 별도로 측정해야 합니다. 서버 단위 테스트는 이 성능을 입증하지 않습니다.
