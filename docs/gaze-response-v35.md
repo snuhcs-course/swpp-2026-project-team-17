@@ -16,3 +16,13 @@ Texting panel and signed prediction requests, underlying-input exclusion while l
 No physical phone was attached for this integration. Build/unit/lint results do not establish gaze accuracy or real-device latency. Compare fixed-head fixation jitter and target arrival with v30/v33, test five-point calibration and recovery, then open a messaging editor. Select a phrase with a one-second gaze, look away and select again; verify exactly one insertion each time. Stop camera input during dwell and verify it cannot complete. Check scrolling and tutorial exits as well.
 
 The supplied debug APK targets arm64-v8a (S23); store submission still requires the team's release signing/build process.
+
+## Executed validation (2026-11-23)
+
+- `:app:testDebugUnitTest :app:assembleDebug :app:lintDebug -PtargetAbi=arm64-v8a --offline --no-daemon`: successful; 178 unit tests, zero failures/errors.
+- `node --test` in server/vercel: 19 tests passed.
+- APK signature v2 verified; package dev.gazedot, versionCode 35, arm64-v8a.
+- SHA-256: `859c9e2c1c0d0f9f3fa57354f839c0d7b72a3972ae8ed00a8ab6d94e9359532a`.
+- APK: `output/apk/NoTouch-v35-S23-gaze-response-integrated-debug.apk`.
+- Drive: https://drive.google.com/file/d/1g_Cp8Mtgy5PXC70vjcHpKRPyCV2aW_CX/view
+- Physical-device behavior remains unverified, as noted above.
