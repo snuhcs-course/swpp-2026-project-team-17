@@ -5,7 +5,7 @@ import kotlin.math.*
 enum class GazeSource { LANDMARK, ITRACKER }
 
 data class EyeFeatures(val x: Double, val y: Double, val faceX: Double, val faceY: Double, val scale: Double,
-    val leftX: Double = x, val leftY: Double = y, val rightX: Double = x, val rightY: Double = y, val head: HeadPose? = null, val source: GazeSource = GazeSource.LANDMARK)
+    val leftX: Double = x, val leftY: Double = y, val rightX: Double = x, val rightY: Double = y, val head: HeadPose? = null, val source: GazeSource = GazeSource.LANDMARK, val quickVertical: Double? = null)
 data class Anchor(val eye: EyeFeatures, val x: Double, val y: Double)
 
 /** Screen mapping over either legacy iris features or frozen iTracker camera-centimetre outputs.
@@ -34,6 +34,15 @@ class GazeModel private constructor(
     }
     /** Keep edge noise symmetric until display smoothing has finished. */
     fun predictForFiltering(f: EyeFeatures): Pair<Double, Double>? {
+        if (isQuickStart) {
+            if (f.source != GazeSource.LANDMARK || f.scale <= 0 ||
+                !listOf(f.x,f.y,f.scale).all { it.isFinite() }) return null
+            // Geometric eye-relative pointer, not calibrated screen gaze. Smooth bounding
+            // prevents a constant offscreen offset being hard-clipped into a frozen edge.
+            val vertical=f.quickVertical ?: (f.y-.02)*8.333333333333334
+            if(!vertical.isFinite()) return null
+            return .5-.5*tanh(f.x*12) to .5+.5*tanh(vertical*3)
+        }
         val p=predictUncorrected(f) ?: return null
         val corrected=correction?.apply(p.first,p.second) ?: p
         val result=corrected.first+screenCorrectionX to corrected.second+screenCorrectionY

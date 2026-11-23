@@ -1,3 +1,7 @@
+## v44: rebuilt nine-point calibration
+
+Separate acquisition state machine, median anchors, explicit result review and single-point remeasurement. Includes quick-start geometry and four-direction edge scrolling. See [design, references and validation](docs/calibration-rebuild-v44.md).
+
 ## v42: optional quick start without calibration
 
 Home offers an explicitly approximate, uncalibrated pointer mode and can restore the previous calibration. Includes edge visibility, edge scroll bars and English predictions. See [behavior and validation](docs/quick-start-v42.md).

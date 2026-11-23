@@ -14,6 +14,19 @@ class EdgeScrollBarTest {
             assertFalse(b.ownsInput)
         }
     }
+    @Test fun horizontalEdgesTriggerScrollWithoutClickAndCornersStayNeutral() {
+        for((x,direction) in listOf(0.0 to ScrollDirection.LEFT,1.0 to ScrollDirection.RIGHT)) {
+            val engine=InteractionEngine(useBars=true)
+            val actions=(1000L..3000L step 100).flatMap { t -> engine.update(t,EyeState.OPEN,x to .5) }
+            assertTrue(actions.any { it==EyeAction.Scroll(direction) })
+            assertFalse(actions.any { it is EyeAction.Click })
+        }
+        for(x in listOf(0.0,1.0)) for(y in listOf(0.0,1.0)) {
+            val b=EdgeScrollBar()
+            for(t in 1000L..2000L step 100) assertNull(b.update(t,t,EyeState.OPEN,x to y))
+            assertFalse(b.ownsInput)
+        }
+    }
     @Test fun revealHoldRepeatAndExit() {
         val b=EdgeScrollBar()
         for(t in 1000L..1700L step 100){assertNull(b.update(t,t,EyeState.OPEN,.5 to .02));assertTrue(b.ownsInput)}

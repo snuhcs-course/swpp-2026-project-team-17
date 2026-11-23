@@ -245,7 +245,9 @@ class TrackingService : LifecycleService() {
             val eyeProfile = naturalEyes.add(face, blends.containsKey("eyeBlinkLeft") && blends.containsKey("eyeBlinkRight"))
             val landmarkObservation = landmarks?.let {
                 EyeObservations.observe(it, upright.width, upright.height,face,eyeProfile,
-                    blends.containsKey("eyeBlinkLeft") && blends.containsKey("eyeBlinkRight"))
+                    blends.containsKey("eyeBlinkLeft") && blends.containsKey("eyeBlinkRight"),
+                    if(blends.containsKey("eyeBlinkLeft") && blends.containsKey("eyeBlinkRight"))
+                        blends.getValue("eyeBlinkLeft").toDouble() to blends.getValue("eyeBlinkRight").toDouble() else null)
             } ?: EyeObservation(EyeState.LOST, null, 0.0, 0.0)
             val observation = landmarkObservation
             frameDelivery.submit(observation.state == EyeState.OPEN) {
@@ -256,6 +258,14 @@ class TrackingService : LifecycleService() {
                 TrackerState.inferenceStatus=if(observation.features!=null)
                     "MediaPipe 양안 · 전체 %d ms%s".format(at-now,if(at-now>500) " · 지연: 조작 대기" else "")
                     else "MediaPipe 대기 · 눈/얼굴 검출 확인 중"
+                if (observation.features == null) {
+                    TrackerState.inferenceStatus="눈 열림 L %.3f / R %.3f · 깜빡임 L %.2f / R %.2f · 개인 기준 %s".format(
+                        observation.leftOpen,observation.rightOpen,face?.leftBlink ?: -1.0,face?.rightBlink ?: -1.0,
+                        if(eyeProfile==null) "준비 중" else "있음")
+                } else if (TrackerState.model?.isQuickStart == true) {
+                    TrackerState.inferenceStatus="빠른 시작 · 눈 X %.3f / Y %.3f · 세로 상대 %.3f · %d ms".format(
+                        observation.features.x,observation.features.y,observation.features.quickVertical ?: 0.0,at-now)
+                }
                 if (TrackerState.collecting) {
                     lastResult=at
                     TrackerState.faceFrame=face
