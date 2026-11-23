@@ -180,7 +180,7 @@ class MainActivity : ComponentActivity() {
             calibration?.close()
             calibration = null
             TrackerState.cancelCalibration()
-            TrackerState.status = "보정이 중단되었습니다. 다시 5점 보정을 시작하세요."
+            TrackerState.status = "보정이 중단되었습니다. 다시 9점 보정을 시작하세요."
             showHome()
         }
     }
@@ -335,7 +335,7 @@ class MainActivity : ComponentActivity() {
             startCalibration()
         }
         addStep("3", "시선 테스트", "필요할 때만 추가 검사·보정을 진행합니다.", 26, "정밀 보정") {
-            if (TrackerState.model == null) status.text = "먼저 5점 보정을 완료해 주세요"
+            if (TrackerState.model == null) status.text = "먼저 9점 보정을 완료해 주세요"
             else startActivity(Intent(this, AccuracyActivity::class.java))
         }
 
@@ -474,7 +474,8 @@ class MainActivity : ComponentActivity() {
 
     private inner class CalibrationView(private val session: Long, val returnToRecovery: Boolean) : View(this@MainActivity) {
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-        private val targets = listOf(.5 to .5, .18 to .18, .82 to .18, .82 to .82, .18 to .82)
+        private val targets = listOf(.5 to .5, .15 to .15, .5 to .15, .85 to .15,
+            .85 to .5, .85 to .85, .5 to .85, .15 to .85, .15 to .5)
         private var index = 0
         private var since = SystemClock.uptimeMillis()
         private var targetStartedAt = since
@@ -532,7 +533,7 @@ class MainActivity : ComponentActivity() {
                 hint = "현재 자세에서 잠시 멈추고 점을 바라보세요"
                 invalidate(); return
             }
-            hint = "${index + 1} / 5 · 파란 점을 계속 바라보세요"
+            hint = "${index + 1} / ${targets.size} · 파란 점을 계속 바라보세요"
             if (sample.timestampMs < since + 1000) return
             samples += f
             if (samples.size >= 22 && elapsed >= 2500) {
@@ -550,7 +551,7 @@ class MainActivity : ComponentActivity() {
                     .normalize(location[0] + width * xy.first, location[1] + height * xy.second)
                 fixations += CalibrationFixation(samples.toList(), point.first, point.second)
                 index++; samples.clear(); poseReference=null; since = SystemClock.uptimeMillis(); targetStartedAt=since
-                // Five-point screen mapping; no head-motion training or mid-session break.
+                // Nine-point screen mapping; no head-motion training or mid-session break.
                 if (index == targets.size) {
                     val audit = CalibrationAudit.fit(fixations)
                     getSharedPreferences("personal",MODE_PRIVATE).edit().putString("calibration_audit_v30",audit.report).apply()
@@ -584,7 +585,7 @@ class MainActivity : ComponentActivity() {
             val target = targets.getOrNull(index) ?: return
             val d = resources.displayMetrics.density
             paint.color = Color.WHITE; paint.textSize = 15 * d; paint.textAlign = Paint.Align.CENTER
-            canvas.drawText("MediaPipe 화면 맞춤 ${index + 1}/5", width / 2f, 55 * d, paint)
+            canvas.drawText("MediaPipe 화면 맞춤 ${index + 1}/${targets.size}", width / 2f, 55 * d, paint)
             paint.textSize = 12 * d
             canvas.drawText(hint, width / 2f, height - 70 * d, paint)
             canvas.drawText("중단하려면 뒤로 가기", width / 2f, height - 45 * d, paint)

@@ -287,7 +287,7 @@ class TrackingService : LifecycleService() {
                     TrackingQuality.CLOSED -> "눈 감김 감지"
                     TrackingQuality.UNCERTAIN -> "눈 상태 확인 중"
                     TrackingQuality.STALE -> "영상 처리가 지연됩니다 · 조작 일시 대기"
-                    TrackingQuality.OUT_OF_RANGE -> if (model == null) "눈 검출됨 · 5점 보정을 시작해 주세요"
+                    TrackingQuality.OUT_OF_RANGE -> if (model == null) "눈 검출됨 · 9점 보정을 시작해 주세요"
                         else "시선 좌표를 사용할 수 없어요 · 얼굴 위치를 확인해 주세요"
                     TrackingQuality.TRACKING -> "추적 중 · 홈으로 나가도 빨간 점이 표시됩니다"
                 }

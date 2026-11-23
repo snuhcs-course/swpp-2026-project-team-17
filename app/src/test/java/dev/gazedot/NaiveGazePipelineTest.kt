@@ -10,16 +10,18 @@ class NaiveGazePipelineTest {
     })!!
     private fun observation(f: EyeFeatures?) = EyeObservation(if (f == null) EyeState.LOST else EyeState.OPEN, f, .2, .2)
 
-    @Test fun isolatedSpikeIsHeldAndCannotTriggerAnAction() {
+    @Test fun isolatedSpikeCannotTriggerAnActionWhileDisplayRemainsContinuous() {
         val m=model();val p=GazePipeline()
         val initial=p.process(1000,1000,observation(eye(0.0,0.0)),m,true)
         val spike=p.process(1100,1100,observation(eye(.05,.04)),m,true)
-        assertEquals(initial.point,spike.point)
+        assertNotNull(spike.point)
         assertEquals(TrackingQuality.UNCERTAIN,spike.quality)
         assertFalse(spike.actions.any { it is EyeAction.Click || it is EyeAction.Scroll })
         val recovered=p.process(1200,1200,observation(eye(0.0,0.0)),m,true)
-        assertEquals(initial.point,recovered.point)
-        assertEquals(TrackingQuality.TRACKING,recovered.quality)
+        assertNotNull(recovered.point)
+        assertEquals(TrackingQuality.UNCERTAIN,recovered.quality)
+        val confirmed=p.process(1300,1300,observation(eye(0.0,0.0)),m,true)
+        assertEquals(TrackingQuality.TRACKING,confirmed.quality)
     }
     @Test fun calibrationIsRequiredButFreshFeaturesRemainAvailable() {
         val f = eye(0.0, 0.0)

@@ -16,7 +16,9 @@ object CalibrationAudit {
         val cx=all.map{it.faceX}.average(); val cy=all.map{it.faceY}.average(); val scale=all.map{it.scale}.average()
         if(all.any { abs(it.faceX-cx)>.12 || abs(it.faceY-cy)>.12 || it.scale !in scale*.72..scale*1.28 })
             return CalibrationAuditResult(null,"보정 중 자세가 크게 달라졌습니다. 같은 자세에서 다시 측정해 주세요.")
-        val train=groups.indices.flatMap { i -> selected[i].take(14).map { Anchor(it,groups[i].x,groups[i].y) } }
+        // v14 fits one robust representative per target, not noisy repeated regressors.
+        // Keep later frames out of fitting so the stability audit is still independent.
+        val train=groups.indices.map { i -> Anchor(medianFeatures(selected[i].take(14)),groups[i].x,groups[i].y) }
         val model=GazeModel.fit(train)
         val centers=selected.map(::medianFeatures)
         fun span(axis:(EyeFeatures)->Double)=centers.maxOf(axis)-centers.minOf(axis)

@@ -1,3 +1,7 @@
+## v37: v14-based screen mapping and continuous pointer
+
+Restores nine-point median-anchor calibration and v14's 0.28 display interpolation (time-normalized). Large displacement no longer locks the pointer; click protection and v36 fixes remain. See [historical comparison and verification](docs/gaze-v14-comparison-v37.md). Run the new nine-point calibration after installing.
+
 ## v36 gaze continuity regression fix
 
 The latest gaze-response-fix build removes runtime face-position/relative-size rejection, restores the pre-v33 fixation response, separates transient gaze confirmation from coordinate errors, and no longer auto-launches a second calibration. See [changes and limits](docs/gaze-continuity-v36.md). Texting integration remains included.
