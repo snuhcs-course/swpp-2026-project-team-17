@@ -102,4 +102,40 @@ class NaiveGazePipelineTest {
         assertTrue(frame(2300,EyeState.OPEN).scrollMode)
         assertFalse(frame(2400,EyeState.LOST,null).scrollMode)
     }
+    @Test fun boundaryNoiseIsSmoothedBeforeClippingInsteadOfPulledInwards() {
+        val m=model()
+        for (edge in listOf(0.0,1.0)) for (vertical in listOf(false,true)) {
+            val pipeline=GazePipeline()
+            var previousClipped=edge
+            var correctedError=0.0;var clippedError=0.0
+            for(i in 0..120) {
+                val desired=edge+if(i%2==0) .04 else -.04
+                val f=if(vertical) eye(0.0,(desired-.5)/7) else eye((desired-.5)/6,0.0)
+                val raw=m.predictForFiltering(f)!!
+                val axis=if(vertical) raw.second else raw.first
+                previousClipped+=.28*(axis.coerceIn(0.0,1.0)-previousClipped)
+                val at=1000L+i*66
+                val sample=pipeline.process(at,at,observation(f),m,false)
+                val output=if(vertical) sample.point!!.second else sample.point!!.first
+                assertTrue(output in 0.0..1.0)
+                if(i>40) {
+                    correctedError+=kotlin.math.abs(output-edge)
+                    clippedError+=kotlin.math.abs(previousClipped-edge)
+                }
+            }
+            assertTrue("both axes and both edges avoid clipping bias",correctedError<clippedError*.5)
+        }
+    }
+    @Test fun extremeOffscreenPredictionCannotLeaveAnUnboundedFilterTail() {
+        val pipeline=GazePipeline();val m=model()
+        pipeline.process(1000,1000,observation(eye(100.0,100.0)),m,false)
+        var sample:GazeSample?=null
+        for(i in 1..20) {
+            val at=1000L+i*66
+            sample=pipeline.process(at,at,observation(eye(0.0,0.0)),m,false)
+            assertTrue(sample.point!!.first in 0.0..1.0)
+        }
+        assertEquals(.5,sample!!.point!!.first,.003)
+        assertEquals(.5,sample!!.point!!.second,.003)
+    }
 }

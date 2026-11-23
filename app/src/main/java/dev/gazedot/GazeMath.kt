@@ -28,11 +28,15 @@ class GazeModel private constructor(
         val trace=a*a+b*b+c*c+d*d;val determinant=(a*d-b*c).pow(2)
         return sqrt((trace+sqrt(max(0.0,trace*trace-4*determinant)))/2)
     }
-    fun predict(f: EyeFeatures): Pair<Double, Double>? {
+    fun predict(f: EyeFeatures): Pair<Double, Double>? = predictForFiltering(f)?.let {
+        it.first.coerceIn(0.0,1.0) to it.second.coerceIn(0.0,1.0)
+    }
+    /** Keep edge noise symmetric until display smoothing has finished. */
+    fun predictForFiltering(f: EyeFeatures): Pair<Double, Double>? {
         val p=predictUncorrected(f) ?: return null
         val corrected=correction?.apply(p.first,p.second) ?: p
-        return (corrected.first + screenCorrectionX).coerceIn(0.0,1.0) to
-            (corrected.second + screenCorrectionY).coerceIn(0.0,1.0)
+        val result=corrected.first+screenCorrectionX to corrected.second+screenCorrectionY
+        return result.takeIf { it.first.isFinite() && it.second.isFinite() }
     }
     fun withCorrection(value: ResidualCorrection?) = GazeModel(meanX,meanY,stdX,stdY,wx,wy,reference,fitError,value,leftModel,rightModel,headCorrection,screenCorrectionX,screenCorrectionY)
     fun withHeadCorrection(value: HeadCorrection?) = GazeModel(meanX,meanY,stdX,stdY,wx,wy,reference,fitError,null,leftModel,rightModel,value,screenCorrectionX,screenCorrectionY)

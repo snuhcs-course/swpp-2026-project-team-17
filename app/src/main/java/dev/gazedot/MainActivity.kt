@@ -474,8 +474,8 @@ class MainActivity : ComponentActivity() {
 
     private inner class CalibrationView(private val session: Long, val returnToRecovery: Boolean) : View(this@MainActivity) {
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-        private val targets = listOf(.5 to .5, .15 to .15, .5 to .15, .85 to .15,
-            .85 to .5, .85 to .85, .5 to .85, .15 to .85, .15 to .5)
+        private val targets = listOf(.5 to .5, .08 to .08, .5 to .08, .92 to .08,
+            .92 to .5, .92 to .92, .5 to .92, .08 to .92, .08 to .5)
         private var index = 0
         private var since = SystemClock.uptimeMillis()
         private var targetStartedAt = since
@@ -585,10 +585,10 @@ class MainActivity : ComponentActivity() {
             val target = targets.getOrNull(index) ?: return
             val d = resources.displayMetrics.density
             paint.color = Color.WHITE; paint.textSize = 15 * d; paint.textAlign = Paint.Align.CENTER
-            canvas.drawText("MediaPipe 화면 맞춤 ${index + 1}/${targets.size}", width / 2f, 55 * d, paint)
+            canvas.drawText("MediaPipe 화면 맞춤 ${index + 1}/${targets.size}", width / 2f, 25 * d, paint)
             paint.textSize = 12 * d
-            canvas.drawText(hint, width / 2f, height - 70 * d, paint)
-            canvas.drawText("중단하려면 뒤로 가기", width / 2f, height - 45 * d, paint)
+            canvas.drawText(hint, width / 2f, height / 2f + 60 * d, paint)
+            canvas.drawText("중단하려면 뒤로 가기", width / 2f, height / 2f + 82 * d, paint)
             val x = (target.first * width).toFloat(); val y = (target.second * height).toFloat()
             paint.color = Color.rgb(96, 165, 250)
             canvas.drawCircle(x, y, 13 * d, paint)

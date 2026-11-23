@@ -61,7 +61,7 @@ class MediaPipeComparisonTest {
             val ly=(y-.5)*.18+n;val ry=(y-.5)*.22+n
             return EyeFeatures((lx+rx)/2,(ly+ry)/2,.5,.5,.3,lx,ly,rx,ry)
         }
-        val groups=listOf(.15,.5,.85).flatMap { x -> listOf(.15,.5,.85).map { y ->
+        val groups=listOf(.08,.5,.92).flatMap { x -> listOf(.08,.5,.92).map { y ->
             CalibrationFixation((0 until 22).map { i -> features(x,y,if(i%2==0) .0002 else -.0002) },x,y)
         } }
         val audit=CalibrationAudit.fit(groups)

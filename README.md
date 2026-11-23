@@ -1,3 +1,7 @@
+## v38: edge calibration and clipping order
+
+Nine-point calibration now samples 8–92% of the screen. Predictions are smoothed before final screen clipping to avoid inward boundary bias. See [implementation and validation](docs/edge-mapping-v38.md). Run the new calibration after installing.
+
 ## v37: v14-based screen mapping and continuous pointer
 
 Restores nine-point median-anchor calibration and v14's 0.28 display interpolation (time-normalized). Large displacement no longer locks the pointer; click protection and v36 fixes remain. See [historical comparison and verification](docs/gaze-v14-comparison-v37.md). Run the new nine-point calibration after installing.
