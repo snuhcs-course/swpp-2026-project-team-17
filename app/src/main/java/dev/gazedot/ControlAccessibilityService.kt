@@ -172,11 +172,11 @@ class ControlAccessibilityService : AccessibilityService() {
     }
     fun scroll(direction: ScrollDirection, width: Int, height: Int): Boolean {
         if(!allowed() || busy) return false
-        val (from, to) = ScrollSettings.swipe(direction, width, height)
+        val swipe = ScrollSettings.swipe(direction, width, height)
         return gesture(Path().apply {
-            moveTo(from.first.toFloat(), from.second.toFloat())
-            lineTo(to.first.toFloat(), to.second.toFloat())
-        }, ScrollSettings.DURATION_MS)
+            moveTo(swipe.from.first.toFloat(), swipe.from.second.toFloat())
+            lineTo(swipe.to.first.toFloat(), swipe.to.second.toFloat())
+        }, swipe.durationMs)
     }
     private fun gesture(path: Path, duration: Long): Boolean {
         val description=GestureDescription.Builder().addStroke(GestureDescription.StrokeDescription(path,0,duration)).build()
