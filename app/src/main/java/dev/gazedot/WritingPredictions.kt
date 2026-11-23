@@ -17,6 +17,7 @@ internal class WritingPredictions(private val changed: () -> Unit) {
     private val worker = Executors.newSingleThreadExecutor()
     private val session = UUID.randomUUID().toString()
     private val gate = PredictionGate()
+    private val reuse = PredictionReuse()
     @Volatile private var generation = 0L
     @Volatile private var connection: HttpsURLConnection? = null
     var policy: PredictionPolicy? = null; private set
@@ -74,8 +75,13 @@ internal class WritingPredictions(private val changed: () -> Unit) {
     fun input(input: PredictionInput) {
         generation++; main.removeCallbacksAndMessages(null); connection?.disconnect()
         gate.input(input.version)
+        if (!active || input.text.isBlank()) { changed(); return }
+        val immediate = reuse.reuse(input)
+        if (immediate.isNotEmpty()) gate.offer(input.version, immediate)
+        message = if (immediate.isEmpty()) "단어·표현 후보를 가져오는 중…" else "완성된 표현을 선택하거나 계속 입력해 주세요"
         changed()
-        if (!active || input.text.isBlank()) return
+        // Two compatible alternatives are already available without another round trip.
+        if (immediate.size >= 2) return
         if (input.text.length > 2_000) { message = "긴 초안은 예측을 쉬어요. 직접 입력은 계속할 수 있어요."; changed(); return }
         val policy = policy ?: return
         val ticket = generation
@@ -109,7 +115,9 @@ internal class WritingPredictions(private val changed: () -> Unit) {
                         message = "예측을 가져오지 못했어요. 직접 입력을 계속할 수 있어요."
                     } else {
                         val words = result.optJSONArray("words") ?: JSONArray()
-                        gate.offer(input.version, input.candidates((0 until words.length()).map { words.optString(it) }, result.optString("continuation")))
+                        val candidates = input.candidates((0 until words.length()).map { words.optString(it) }, result.optString("continuation"))
+                        reuse.remember(input, candidates)
+                        gate.offer(input.version, candidates)
                         message = "후보를 선택하거나 계속 입력해 주세요"
                     }
                     changed()
@@ -124,7 +132,7 @@ internal class WritingPredictions(private val changed: () -> Unit) {
     }
     fun stop() {
         generation++; active = false; main.removeCallbacksAndMessages(null)
-        connection?.disconnect(); gate.clear()
+        connection?.disconnect(); gate.clear(); reuse.clear()
         message = "온라인 예측을 사용하지 않고 있어요. 직접 입력은 계속할 수 있어요."
     }
     fun close() { stop(); worker.shutdownNow() }

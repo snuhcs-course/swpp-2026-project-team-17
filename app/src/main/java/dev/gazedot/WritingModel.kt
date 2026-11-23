@@ -52,14 +52,16 @@ internal data class PredictionInput(val version: Long, val text: String) {
     fun candidates(words: List<String>, continuation: String): List<WritingCandidate> {
         val current = text.substring(wordStart)
         val result = words.asSequence().map { it.trim() }.filter {
-            it.isNotEmpty() && it.length <= 80 && it.none { c -> c.isWhitespace() || c.isISOControl() } &&
+            current.isNotEmpty() && it.isNotEmpty() && it.length <= 80 && it.none { c -> c.isISOControl() } &&
+                it.split(Regex("\\s+")).size <= 6 &&
                 it != current && hangulParts(it).startsWith(hangulParts(current))
         }.distinct().take(2).map {
             WritingCandidate(version, CandidateKind.WORD, wordStart, text.length, current, "$it ")
         }.toMutableList()
         // Continuations are append-only. The server never chooses an editable range.
         if (continuation.isNotBlank() && continuation.length <= 160 &&
-            continuation.none { it.isISOControl() } && text.lastOrNull()?.let { it in 'ㄱ'..'ㅣ' } != true) {
+            continuation.none { it.isISOControl() } &&
+            text.lastOrNull()?.let { it.isWhitespace() || it in ".,!?。！？" } == true) {
             result += WritingCandidate(version, CandidateKind.CONTINUATION, text.length, text.length, "", continuation)
         }
         return result
@@ -164,4 +166,21 @@ internal class PredictionGate {
         }
     }
     fun clear() { held = false; displayed = emptyList(); pending = null; version = -1 }
+}
+
+/** Only the last response, in memory. Never reuse against a different draft prefix. */
+internal class PredictionReuse {
+    private var previous: PredictionInput? = null
+    private var words = emptyList<String>()
+    fun remember(input: PredictionInput, candidates: List<WritingCandidate>) {
+        previous=input
+        words=candidates.filter { it.kind==CandidateKind.WORD }.map { it.replacement.trim() }.take(2)
+    }
+    fun reuse(input: PredictionInput): List<WritingCandidate> {
+        val before=previous ?: return emptyList()
+        if(input.text.take(input.wordStart)!=before.text.take(before.wordStart)) return emptyList()
+        if(!hangulParts(input.text.substring(input.wordStart)).startsWith(hangulParts(before.text.substring(before.wordStart)))) return emptyList()
+        return input.candidates(words, "")
+    }
+    fun clear() { previous=null; words=emptyList() }
 }

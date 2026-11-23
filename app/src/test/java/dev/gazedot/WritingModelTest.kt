@@ -127,4 +127,30 @@ class WritingModelTest {
         assertFalse(dwell.update("phrase", true, 1_600, 1_600))
         assertEquals(0f, dwell.progress, 0f)
     }
+    @Test fun incompleteKoreanGetsCompleteAlternativesInsteadOfSuffixSteps() {
+        val input=PredictionInput(1,"지금 도")
+        val candidates=input.candidates(listOf("도와줘", "도와줄게"),"와")
+        assertEquals(listOf("도와줘 ","도와줄게 "),candidates.map{it.replacement})
+        assertTrue(candidates.all{it.start==3 && it.expected=="도" && it.kind==CandidateKind.WORD})
+        val before=EditorSnapshot("app",1,1,"지금 도",4,4)
+        assertEquals("지금 도와줘 ",before.candidatePlan(candidates[0])!!.text)
+        assertTrue(input.candidates(listOf("와","줘"),"와").isEmpty())
+    }
+    @Test fun completeShortPhrasesPreserveEarlierDraft() {
+        val input=PredictionInput(1,"지금 도")
+        val c=input.candidates(listOf("도와줄 수 있어", "도와주면 좋겠어"),"")
+        assertEquals(2,c.size)
+        assertEquals("도",c[0].expected)
+        assertTrue(PredictionInput(2,"도 ").candidates(emptyList(),"고마워.").single().kind==CandidateKind.CONTINUATION)
+    }
+    @Test fun cachedAlternativesFollowTypingButNeverAnotherContextOrOldVersion() {
+        val cache=PredictionReuse();val input=PredictionInput(1,"지금 도")
+        cache.remember(input,input.candidates(listOf("도와줘","도와줄게"),""))
+        val reused=cache.reuse(PredictionInput(2,"지금 도와"))
+        assertEquals(2,reused.size)
+        assertTrue(reused.all{it.version==2L && it.expected=="도와"})
+        assertTrue(cache.reuse(PredictionInput(3,"내일 도와")).isEmpty())
+        assertTrue(cache.reuse(PredictionInput(4,"지금 돈")).isEmpty())
+        cache.clear();assertTrue(cache.reuse(input).isEmpty())
+    }
 }

@@ -38,9 +38,10 @@ class NativeWritingPanelTest {
         assertNull(editor.copy(start = 1, end = 1).candidatePlan(candidate))
     }
     @Test fun continuationAppendsWithoutReplacingPreviousText() {
-        val editor = EditorSnapshot("com.samsung.android.messaging", 1, 99, "안녕", 2, 2)
-        val candidate = PredictionInput(9, editor.text).candidates(emptyList(), "하세요").single()
-        assertEquals("안녕하세요", editor.candidatePlan(candidate)!!.text)
+        val editor = EditorSnapshot("com.samsung.android.messaging", 1, 99, "안녕. ", 4, 4)
+        val candidate = PredictionInput(9, editor.text).candidates(emptyList(), "나중에 연락할게.").single()
+        assertEquals("안녕. 나중에 연락할게.", editor.candidatePlan(candidate)!!.text)
+        assertTrue(PredictionInput(10,"안녕").candidates(emptyList(),"하세요").isEmpty())
         assertNull(editor.copy(start = 0, end = 2).candidatePlan(candidate))
     }
 }

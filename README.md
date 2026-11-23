@@ -1,3 +1,7 @@
+## v39: complete texting alternatives
+
+Texting predicts complete alternatives such as 도와줘 / 도와줄게 and reuses compatible predictions while typing. See [implementation and validation](docs/texting-completions-v39.md). Includes the v38 edge-mapping fixes.
+
 ## v38: edge calibration and clipping order
 
 Nine-point calibration now samples 8–92% of the screen. Predictions are smoothed before final screen clipping to avoid inward boundary bias. See [implementation and validation](docs/edge-mapping-v38.md). Run the new calibration after installing.

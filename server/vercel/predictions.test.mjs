@@ -29,3 +29,14 @@ test('provider billing failures expose no upstream body',async()=>{
  const fetcher=async url=>url==='https://redis.example'?{ok:true,json:async()=>({result:1})}:{ok:false,json:async()=>({error:{code:'credit_balance_exhausted',message:'secret'}})};
  await assert.rejects(predict(body(),auth,env,fetcher),{status:503,message:'provider_quota_exhausted'});
 });
+
+test('unfinished tokens get complete alternatives, never append-only syllables',async()=>{
+ const fetcher=async(url,opts)=>{
+  if(url==='https://redis.example') return {ok:true,json:async()=>({result:1})};
+  const payload=JSON.parse(opts.body);
+  assert.match(payload.instructions,/도와줘/);
+  return {ok:true,json:async()=>({status:'completed',output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({words:['도와줘','도와줄게'],continuation:'와'})}]}]})};
+ };
+ assert.deepEqual(await predict({...body(),text:'지금 도'},auth,env,fetcher),{version:7,words:['도와줘','도와줄게'],continuation:''});
+ assert.deepEqual(await predict({...body(),text:'지금 '},auth,env,fetcher),{version:7,words:[],continuation:'와'});
+});
