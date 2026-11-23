@@ -1,3 +1,11 @@
+# NoTouch — integrated main + texting (v34)
+
+Merged feature/texting 293e2e3 into main 57a9c18. Main's MediaPipe binocular mapping, calibration verification, selection assistance and vertical edge-scroll bars remain. Native messaging/IME prediction, per-installation API authentication, accessibility reconnect fixes and scroll-window cancellation fixes are integrated. Tutorial completion badges follow the actual vertical bar controls; wink-only instructions do not replace the bar workflow.
+
+Prediction relay defaults to https://notouch-server.vercel.app. No API key belongs in the APK. See server/vercel/README.md for the deployed v2 protocol and currently removed prediction count limits.
+
+## Prior main reference
+
 # NoTouch — main (MediaPipe-only v30)
 
 Main now integrates `mediapipe-gaze-accuracy` at `4b3c525` with the former main history (`fd387cc`). The active Android application tree is the tested v30 implementation.

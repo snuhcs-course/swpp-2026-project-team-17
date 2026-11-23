@@ -15,6 +15,7 @@ class TrackerStateRecoveryTest {
         TrackerState.fault = null
         TrackerState.speaking = false
         TrackerState.precisionTraining = false
+        TrackerState.writingOwnsInput = false
         TrackerState.interactionAllowed = false
     }
     private fun enabled() {
@@ -101,5 +102,69 @@ class TrackerStateRecoveryTest {
         } finally { TrackerState.settingsStopped() }
         assertTrue(TrackerState.externalActionsAllowed())
         assertTrue(cancellations > entryCancellations)
+    }
+
+    @Test fun accessibilityReconnectRestoresTrackingAndLossHelpAfterLeavingRecovery() {
+        enabled()
+        val model = TrackerState.model
+        TrackerState.accessibilityDisconnected()
+        // Android may interrupt and then destroy the same connection.
+        TrackerState.accessibilityDisconnected()
+        assertFalse(TrackerState.controls)
+        assertFalse(TrackerState.recognitionHelpEligible(false))
+        TrackerState.settingsStarted()
+        try {
+            TrackerState.accessibilityConnected()
+            assertTrue(TrackerState.controls)
+            assertNull(TrackerState.fault)
+            assertSame(model, TrackerState.model)
+            assertNull(TrackerState.gaze)
+            assertFalse(TrackerState.externalActionsAllowed())
+        } finally { TrackerState.settingsStopped() }
+        assertTrue(TrackerState.recognitionHelpEligible(true))
+        val policy = RecognitionLossPolicy()
+        assertFalse(policy.update(0, 0, true, TrackerState.recognitionHelpEligible(true)))
+        for (now in 100L..19_900L step 100) assertFalse(policy.update(now, now, true, true))
+        assertTrue(policy.update(20_000, 20_000, true, true))
+    }
+
+    @Test fun accessibilityReconnectPreservesExplicitPauseBeforeOrDuringDisconnect() {
+        enabled()
+        TrackerState.pauseControls()
+        TrackerState.accessibilityDisconnected()
+        TrackerState.accessibilityConnected()
+        assertFalse(TrackerState.controls)
+        enabled()
+        TrackerState.accessibilityDisconnected()
+        TrackerState.pauseControls()
+        TrackerState.accessibilityConnected()
+        assertFalse(TrackerState.controls)
+    }
+
+    @Test fun reconnectCannotRestartStoppedTrackingOrClearCameraFault() {
+        enabled()
+        TrackerState.accessibilityDisconnected()
+        TrackerState.trackingStopped()
+        TrackerState.accessibilityConnected()
+        assertFalse(TrackerState.running)
+        assertFalse(TrackerState.controls)
+        enabled()
+        val cameraFault = TrackingFault("camera", "retry", RecoverySetting.CAMERA)
+        TrackerState.fault = cameraFault
+        TrackerState.accessibilityDisconnected()
+        TrackerState.accessibilityConnected()
+        assertSame(cameraFault, TrackerState.fault)
+        assertFalse(TrackerState.controls)
+    }
+    @Test fun writingAndPrecisionMeasurementIndependentlyBlockUnderlyingActions() {
+        enabled()
+        TrackerState.writingOwnsInput = true
+        assertFalse(TrackerState.externalActionsAllowed())
+        assertFalse(TrackerState.recognitionHelpEligible(true))
+        TrackerState.precisionTraining = true
+        TrackerState.writingOwnsInput = false
+        assertFalse(TrackerState.externalActionsAllowed())
+        TrackerState.precisionTraining = false
+        assertTrue(TrackerState.externalActionsAllowed())
     }
 }

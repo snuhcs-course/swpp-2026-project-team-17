@@ -1,0 +1,3 @@
+# Public relay address only. Never put an OpenAI key or shared client token here.
+# Optional: this production URL is also the default in app/build.gradle.kts.
+PREDICTION_SERVER_URL=https://notouch-server.vercel.app
