@@ -12,7 +12,7 @@
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
     <queries><intent><action android:name="android.speech.RecognitionService" /></intent></queries>
-    <application android:label="NoTouch" android:icon="@drawable/ic_gaze" android:theme="@android:style/Theme.Material.Light.NoActionBar"
+    <application android:label="NoTouch" android:icon="@drawable/notouch_logo" android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:allowBackup="false" android:dataExtractionRules="@xml/data_extraction_rules"
         android:supportsRtl="true" android:usesCleartextTraffic="false">
         <activity android:name=".MainActivity" android:exported="true">
