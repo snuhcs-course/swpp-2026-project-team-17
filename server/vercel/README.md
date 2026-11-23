@@ -1,3 +1,5 @@
+> 2026-11-23 owner-requested update: prediction count caps are disabled by default (config `limits_enabled:false`). No per-installation, IP, minute or day count blocks texting. Proof verification, Redis replay checks, request size limits and provider timeouts remain. Provider billing/rate limits still apply. Set server environment `NOTOUCH_PREDICTION_LIMITS=on` and redeploy to restore the historical quotas below. The separate legacy analyze endpoint is unchanged. Existing apps must reload the online-prediction policy and consent again; no APK rebuild is required.
+
 # Text-entry production relay (v2)
 
 Production base URL: https://notouch-server.vercel.app

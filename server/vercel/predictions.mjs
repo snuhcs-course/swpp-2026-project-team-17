@@ -1,10 +1,11 @@
 import { createHash } from 'node:crypto';
 import { authenticate, reserve, HttpError } from './core.mjs';
-export const notice = '작성 중인 NoTouch 초안만 OpenAI에 전송합니다. 서버는 본문을 저장하지 않으며 store:false를 사용합니다. 제공자의 악용 방지 로그는 기본 최대 30일 보관될 수 있습니다. 팀 테스트 공유 한도는 분당 12회, 하루 200회입니다.';
+export const notice = '작성 중인 NoTouch 초안만 OpenAI에 전송합니다. 서버는 본문을 저장하지 않으며 store:false를 사용합니다. 제공자의 악용 방지 로그는 기본 최대 30일 보관될 수 있습니다. 중계 서버의 문자 예측 호출 횟수 제한은 현재 해제되어 있습니다.';
 export function config(env = process.env) {
   const enabled = Boolean(env.OPENAI_API_KEY && env.NOTOUCH_TOKEN_SHA256 && (env.NOTOUCH2_KV_REST_API_TOKEN || env.KV_REST_API_TOKEN || env.UPSTASH_REDIS_REST_TOKEN));
-  return {enabled, provider:'openai', model:'gpt-5.4', notice,
-    policy_id:createHash('sha256').update('texting-v1|gpt-5.4|'+notice).digest('hex')};
+  const policyNotice = env.NOTOUCH_PREDICTION_LIMITS === 'on' ? notice.replace('중계 서버의 문자 예측 호출 횟수 제한은 현재 해제되어 있습니다.', '공유 한도는 분당 12회, 하루 200회입니다.') : notice;
+  return {enabled, limits_enabled:env.NOTOUCH_PREDICTION_LIMITS === 'on', provider:'openai', model:'gpt-5.4', notice:policyNotice,
+    policy_id:createHash('sha256').update('texting-v1|gpt-5.4|'+policyNotice).digest('hex')};
 }
 export async function predict(body, authorization, env=process.env, fetcher=fetch) {
   authenticate(authorization,env);
@@ -16,7 +17,7 @@ export async function predictAuthorized(body, env=process.env, fetcher=fetch, po
       typeof body.text!=='string' || !body.text.length || body.text.length>2000 ||
       !Number.isSafeInteger(body.version) || body.version<0) throw new HttpError(422,'invalid_request');
   if (body.policy_id!==policy.policy_id) throw new HttpError(412,'consent_required');
-  await reserve(env,fetcher);
+  if (env.NOTOUCH_PREDICTION_LIMITS === 'on') await reserve(env,fetcher);
   try {
     const response=await fetcher('https://api.openai.com/v1/responses',{
       method:'POST',redirect:'error',signal:AbortSignal.timeout(18000),

@@ -4,7 +4,7 @@ import {generateKeyPairSync,sign,randomBytes} from 'node:crypto';
 import {canonical,verifyProof,reserveInstallation} from './installation-auth.mjs';
 import {publicConfig,publicPredict} from './public-predictions.mjs';
 const now=Date.now();
-const env={OPENAI_API_KEY:'test-provider-key',KV_REST_API_URL:'https://quota.example',KV_REST_API_TOKEN:'test-redis-key'};
+const env={NOTOUCH_PREDICTION_LIMITS:'on',OPENAI_API_KEY:'test-provider-key',KV_REST_API_URL:'https://quota.example',KV_REST_API_TOKEN:'test-redis-key'};
 function proof(raw,time=now,curve='prime256v1') {
  const {privateKey,publicKey}=generateKeyPairSync('ec',{namedCurve:curve});
  const nonce=randomBytes(16).toString('hex');
@@ -69,4 +69,24 @@ test('HTTP adapter rejects wrong method, media type, oversize and unsigned body'
  assert.equal(await call('POST',{},'{}'),415);
  assert.equal(await call('POST',{'content-type':'application/json'},'a'.repeat(16385)),413);
  assert.equal(await call('POST',{'content-type':'application/json'},'{}'),401);
+});
+
+test('default uncapped mode bypasses all count caps but retains proof and replay checks',async()=>{
+ const unlimited={...env};delete unlimited.NOTOUCH_PREDICTION_LIMITS;
+ const policy=publicConfig(unlimited);assert.equal(policy.limits_enabled,false);
+ const body=Buffer.from(JSON.stringify({text:'test',version:1,policy_id:policy.policy_id}));
+ let calls=0;
+ const fetcher=async(url,options)=>{
+  calls++;
+  if(url==='https://quota.example') {
+   const args=JSON.parse(options.body);
+   assert.deepEqual(args.slice(8,12),['0','0','0','0']);
+   return Response.json({result:1});
+  }
+  return Response.json({status:'completed',output:[{type:'message',content:[{type:'output_text',text:'{"words":[],"continuation":""}'}]}]});
+ };
+ await publicPredict(body,proof(body),'192.0.2.1',unlimited,fetcher,now);
+ assert.equal(calls,2); // One replay check plus provider; no shared count reservation.
+ await assert.rejects(publicPredict(body,proof(body),'192.0.2.1',unlimited,async()=>Response.json({result:-1}),now),e=>e.status===409);
+ await assert.rejects(publicPredict(body,{},'192.0.2.1',unlimited,fetcher,now),e=>e.status===401);
 });

@@ -17,3 +17,12 @@ Base: course/feature/texting 4fbc3ac (latest scrolling fix retained). Changes ar
 No physical Android device was attached. Real Android Keystore creation and end-to-end UI interaction on S23 still need a device test. JVM interoperation and actual server tests do not replace that test. Anonymous proof does not attest an official app; global limits bound call count but can be exhausted by abuse. Current quotas are conservative and not a promise of large-scale availability.
 
 APK is debug-signed for testing. Release AAB builds successfully and is unsigned (no META-INF signature entries); use the team's existing release/upload signing key and verify store versionCode before submission. Store publication/review was not performed.
+
+
+## 2026-11-23: owner-authorized removal of prediction count caps
+
+- Default is uncapped (`NOTOUCH_PREDICTION_LIMITS` only enables caps when explicitly `on`). Installation/IP counters no longer deny by count; the prediction shared quota reservation is skipped. Signature, replay, input size and provider timeouts remain enforced. Existing provider account limits still apply.
+- 19 Node tests passed, including uncapped routing and authentication/replay enforcement with caps disabled.
+- Deployment dpl_BWenWpwifVRKEZNn6VECdn5k6qfB is live at the same production URL.
+- Live /v2/config: enabled=true, limits_enabled=false. Signed prediction 200; unsigned/tampered 401; replay 409; legacy config 200.
+- Consent policy changed to disclose removed limits. Existing Android clients must reload online prediction settings and consent again; no rebuild is required.

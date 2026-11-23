@@ -3,7 +3,8 @@ import {sha256,verifyProof,reserveInstallation} from './installation-auth.mjs';
 import {HttpError} from './core.mjs';
 export function publicConfig(env=process.env) {
   const base=config(env);
-  const notice='NoTouch에서 작성 중인 초안만 OpenAI로 보내며 다른 앱의 내용은 보내지 않습니다. 서버는 초안 본문을 저장하지 않으며 OpenAI store:false를 사용합니다. 제공자의 악용 방지 로그는 기본 최대 30일 보관될 수 있습니다. 설치별 공개키 식별자와 IP 주소 해시, 사용량은 부정 사용 방지를 위해 최대 48시간 저장합니다. 설치별 분당 6회·하루 50회, 전체 분당 12회·하루 200회 제한으로 예측을 사용할 수 없을 때도 직접 입력은 가능합니다.';
+  const baseNotice='NoTouch에서 작성 중인 초안만 OpenAI로 보내며 다른 앱의 내용은 보내지 않습니다. 서버는 초안 본문을 저장하지 않으며 OpenAI store:false를 사용합니다. 제공자의 악용 방지 로그는 기본 최대 30일 보관될 수 있습니다. 설치별 공개키 식별자와 IP 주소 해시, 사용량은 부정 사용 방지를 위해 최대 48시간 저장합니다. 설치별 분당 6회·하루 50회, 전체 분당 12회·하루 200회 제한으로 예측을 사용할 수 없을 때도 직접 입력은 가능합니다.';
+  const notice=env.NOTOUCH_PREDICTION_LIMITS === 'on' ? baseNotice : baseNotice.replace('설치별 분당 6회·하루 50회, 전체 분당 12회·하루 200회 제한으로 예측을 사용할 수 없을 때도 직접 입력은 가능합니다.', '중계 서버의 기기별·IP별·전체 문자 예측 호출 횟수 제한은 해제되어 있습니다. 제공자 측 제한이나 장애로 예측을 사용할 수 없을 때도 직접 입력은 가능합니다.');
   return {...base,enabled:Boolean(env.OPENAI_API_KEY&&(env.NOTOUCH2_KV_REST_API_TOKEN||env.UPSTASH_REDIS_REST_TOKEN||env.KV_REST_API_TOKEN)),notice,
     auth_scheme:'installation-p256-v1',policy_id:sha256(`texting-v2|${base.model}|${notice}`)};
 }

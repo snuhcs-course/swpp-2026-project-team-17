@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {config,predict} from './predictions.mjs';
 const token='a'.repeat(43),auth='Bearer '+token;
-const env={OPENAI_API_KEY:'mock',NOTOUCH_TOKEN_SHA256:createHash('sha256').update(token).digest('hex'),KV_REST_API_URL:'https://redis.example',KV_REST_API_TOKEN:'mock'};
+const env={NOTOUCH_PREDICTION_LIMITS:'on',OPENAI_API_KEY:'mock',NOTOUCH_TOKEN_SHA256:createHash('sha256').update(token).digest('hex'),KV_REST_API_URL:'https://redis.example',KV_REST_API_TOKEN:'mock'};
 const body=()=>({text:'안녕하',version:7,policy_id:config(env).policy_id});
 test('auth, consent and fields fail before a paid request',async()=>{
  const no=()=>{throw Error('unexpected fetch')};

@@ -21,7 +21,7 @@ export function verifyProof(headers, raw, now=Date.now()) {
 export const installationQuotaScript=`
 if redis.call('EXISTS', KEYS[1]) == 1 then return -1 end
 for i=2,5 do
- if tonumber(redis.call('GET',KEYS[i]) or '0') >= tonumber(ARGV[i-1]) then return 0 end
+ if tonumber(ARGV[i-1]) > 0 and tonumber(redis.call('GET',KEYS[i]) or '0') >= tonumber(ARGV[i-1]) then return 0 end
 end
 redis.call('SET',KEYS[1],'1','EX',180)
 for i=2,5 do
@@ -33,6 +33,7 @@ export async function reserveInstallation(identity, ip, env=process.env, fetcher
   const url=env.NOTOUCH2_KV_REST_API_URL||env.UPSTASH_REDIS_REST_URL||env.KV_REST_API_URL;
   const token=env.NOTOUCH2_KV_REST_API_TOKEN||env.UPSTASH_REDIS_REST_TOKEN||env.KV_REST_API_TOKEN;
   if(!/^https:\/\/[^/]+\/?$/.test(url||'')||!token) throw new HttpError(503,'quota_store_unavailable');
+  const limits=env.NOTOUCH_PREDICTION_LIMITS === 'on' ? ['6','50','12','100'] : ['0','0','0','0'];
   const minute=Math.floor(now/60000),day=Math.floor(now/86400000);
   const ipHash=sha256(`${day}:${ip}`);
   const keys=[`notouch:proof:${identity.id}:${identity.nonce}`,
@@ -41,7 +42,7 @@ export async function reserveInstallation(identity, ip, env=process.env, fetcher
   try {
     const response=await fetcher(url,{method:'POST',redirect:'error',signal:AbortSignal.timeout(4000),
       headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},
-      body:JSON.stringify(['EVAL',installationQuotaScript,'5',...keys,'6','50','12','100','120','172800','120','172800'])});
+      body:JSON.stringify(['EVAL',installationQuotaScript,'5',...keys,...limits,'120','172800','120','172800'])});
     if(!response.ok) throw Error();
     const result=await response.json();
     if(result.error|| ![-1,0,1].includes(result.result)) throw Error();
