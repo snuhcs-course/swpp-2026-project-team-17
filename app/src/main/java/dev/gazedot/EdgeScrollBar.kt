@@ -16,8 +16,8 @@ class EdgeScrollBar {
         if(lastAt>0 && at-lastAt>500)reset()
         lastAt=at
         val next=if(p.first in .1.. .9) when {
-            p.second in .04.. .14 -> ScrollDirection.UP
-            p.second in .86.. .96 -> ScrollDirection.DOWN
+            p.second in 0.0.. .06 -> ScrollDirection.UP
+            p.second in .94.. 1.0 -> ScrollDirection.DOWN
             else -> null
         } else null
         ownsInput=next!=null

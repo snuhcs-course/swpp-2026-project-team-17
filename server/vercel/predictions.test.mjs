@@ -51,3 +51,15 @@ test('six complete alternatives are supported by request schema and response val
  };
  assert.deepEqual((await predict({...body(),text:'도'},auth,env,fetcher)).words,words);
 });
+
+test('English drafts keep English full-word alternatives',async()=>{
+ const words=['Help','Healing','Heat','Heaters','Headphones','Hearing'];
+ const fetcher=async(url,opts)=>{
+  if(url==='https://redis.example') return {ok:true,json:async()=>({result:1})};
+  const payload=JSON.parse(opts.body);
+  assert.match(payload.instructions,/Do not translate English input into Korean/);
+  assert.equal(JSON.parse(payload.input).draft,'I need He');
+  return {ok:true,json:async()=>({status:'completed',output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({words,continuation:''})}]}]})};
+ };
+ assert.deepEqual((await predict({...body(),text:'I need He'},auth,env,fetcher)).words,words);
+});

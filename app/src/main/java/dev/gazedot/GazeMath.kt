@@ -21,6 +21,7 @@ class GazeModel private constructor(
     val headCorrection: HeadCorrection? = null,
     private val screenCorrectionX: Double = 0.0,
     private val screenCorrectionY: Double = 0.0,
+    val isQuickStart: Boolean = false,
 ) {
     /** Largest singular value of the raw-centimetre to screen mapping (before clipping). */
     val mappingGain: Double get() {
@@ -38,12 +39,12 @@ class GazeModel private constructor(
         val result=corrected.first+screenCorrectionX to corrected.second+screenCorrectionY
         return result.takeIf { it.first.isFinite() && it.second.isFinite() }
     }
-    fun withCorrection(value: ResidualCorrection?) = GazeModel(meanX,meanY,stdX,stdY,wx,wy,reference,fitError,value,leftModel,rightModel,headCorrection,screenCorrectionX,screenCorrectionY)
-    fun withHeadCorrection(value: HeadCorrection?) = GazeModel(meanX,meanY,stdX,stdY,wx,wy,reference,fitError,null,leftModel,rightModel,value,screenCorrectionX,screenCorrectionY)
+    fun withCorrection(value: ResidualCorrection?) = GazeModel(meanX,meanY,stdX,stdY,wx,wy,reference,fitError,value,leftModel,rightModel,headCorrection,screenCorrectionX,screenCorrectionY,isQuickStart)
+    fun withHeadCorrection(value: HeadCorrection?) = GazeModel(meanX,meanY,stdX,stdY,wx,wy,reference,fitError,null,leftModel,rightModel,value,screenCorrectionX,screenCorrectionY,isQuickStart)
     fun withScreenCorrection(dx: Double, dy: Double): GazeModel? {
         if (!dx.isFinite() || !dy.isFinite()) return null
         return GazeModel(meanX,meanY,stdX,stdY,wx,wy,reference,fitError,correction,leftModel,rightModel,headCorrection,
-            screenCorrectionX + dx,screenCorrectionY + dy)
+            screenCorrectionX + dx,screenCorrectionY + dy,isQuickStart)
     }
     fun predictUncorrected(f: EyeFeatures): Pair<Double, Double>? {
         val raw=predictBase(f) ?: return null
@@ -66,6 +67,13 @@ class GazeModel private constructor(
     }
 
     companion object {
+        /** Uncalibrated heuristic, not a measured personal mapping or pretrained gaze model.
+         * Upright camera pixels are unmirrored: image-right iris movement is screen-left.
+         * No initial fixation, automatic centering or saved user labels are required. */
+        fun quickStart() = GazeModel(0.0, .02, 1.0, 1.0,
+            doubleArrayOf(.5, -5.0, 0.0), doubleArrayOf(.5, 0.0, 8.333333333333334),
+            EyeFeatures(0.0,.02,.5,.5,.3),Double.NaN,isQuickStart=true)
+
         fun fit(anchors: List<Anchor>): GazeModel? {
             if(anchors.map{it.eye.source}.distinct().size != 1)return null
             val base = fitSingle(anchors) ?: return null

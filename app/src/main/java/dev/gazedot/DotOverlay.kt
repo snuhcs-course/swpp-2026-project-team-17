@@ -39,7 +39,10 @@ class DotOverlay(context: Context) {
             val d=resources.displayMetrics.density
             getLocationOnScreen(viewOrigin)
             barDirection?.let {
-                val by=(displayBounds.height()*(if(it==ScrollDirection.UP) .09 else .91)-viewOrigin[1]).toFloat()
+                // Anchor to the display edge, not 9% inside the application content.
+                // A fallback overlay may be inset by Android; keep its strip visible.
+                val screenY=if(it==ScrollDirection.UP) 4*d else displayBounds.height()-4*d
+                val by=(screenY-viewOrigin[1]).coerceIn(3*d,(height-3*d).coerceAtLeast(3*d))
                 val l=(displayBounds.width()*.1-viewOrigin[0]).toFloat()
                 val r=(displayBounds.width()*.9-viewOrigin[0]).toFloat()
                 paint.color=Color.rgb(140,160,185)

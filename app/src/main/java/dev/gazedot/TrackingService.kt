@@ -244,7 +244,8 @@ class TrackingService : LifecycleService() {
             val face=landmarks?.let { FaceGeometry.extract(it,upright.width,upright.height,now,transform,blends) }
             val eyeProfile = naturalEyes.add(face, blends.containsKey("eyeBlinkLeft") && blends.containsKey("eyeBlinkRight"))
             val landmarkObservation = landmarks?.let {
-                EyeObservations.observe(it, upright.width, upright.height,face,eyeProfile)
+                EyeObservations.observe(it, upright.width, upright.height,face,eyeProfile,
+                    blends.containsKey("eyeBlinkLeft") && blends.containsKey("eyeBlinkRight"))
             } ?: EyeObservation(EyeState.LOST, null, 0.0, 0.0)
             val observation = landmarkObservation
             frameDelivery.submit(observation.state == EyeState.OPEN) {

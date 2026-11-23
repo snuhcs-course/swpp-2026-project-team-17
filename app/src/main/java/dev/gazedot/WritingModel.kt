@@ -54,7 +54,7 @@ internal data class PredictionInput(val version: Long, val text: String) {
         val result = words.asSequence().map { it.trim() }.filter {
             current.isNotEmpty() && it.isNotEmpty() && it.length <= 80 && it.none { c -> c.isISOControl() } &&
                 it.split(Regex("\\s+")).size <= 6 &&
-                it != current && hangulParts(it).startsWith(hangulParts(current))
+                !it.equals(current, ignoreCase = true) && hangulParts(it).startsWith(hangulParts(current), ignoreCase = true)
         }.distinct().take(6).map {
             WritingCandidate(version, CandidateKind.WORD, wordStart, text.length, current, "$it ")
         }.toMutableList()
@@ -179,7 +179,7 @@ internal class PredictionReuse {
     fun reuse(input: PredictionInput): List<WritingCandidate> {
         val before=previous ?: return emptyList()
         if(input.text.take(input.wordStart)!=before.text.take(before.wordStart)) return emptyList()
-        if(!hangulParts(input.text.substring(input.wordStart)).startsWith(hangulParts(before.text.substring(before.wordStart)))) return emptyList()
+        if(!hangulParts(input.text.substring(input.wordStart)).startsWith(hangulParts(before.text.substring(before.wordStart)), ignoreCase = true)) return emptyList()
         return input.candidates(words, "")
     }
     fun clear() { previous=null; words=emptyList() }

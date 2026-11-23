@@ -1,3 +1,11 @@
+## v42: optional quick start without calibration
+
+Home offers an explicitly approximate, uncalibrated pointer mode and can restore the previous calibration. Includes edge visibility, edge scroll bars and English predictions. See [behavior and validation](docs/quick-start-v42.md).
+
+## v41: edge-target eye visibility
+
+Calibration preserves samples through short blinks and uses personal eye opening plus available blink evidence for narrowed eyes at edge targets. See [changes and phone checks](docs/calibration-edge-visibility-v41.md). Includes v40 texting personalization.
+
 ## v40: six suggestions and local preference learning
 
 Texting offers up to six complete alternatives in two columns and learns the frequency of successfully inserted choices on this device. See [implementation and validation](docs/texting-personalization-v40.md).

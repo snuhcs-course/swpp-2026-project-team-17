@@ -25,6 +25,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var status: TextView
     private lateinit var cameraButton: Button
     private lateinit var calibrationButton: Button
+    private lateinit var quickStartButton: Button
     private lateinit var stopButton: Button
     private lateinit var resumeButton: Button
     private var recoveryAction: String? = null
@@ -321,7 +322,7 @@ class MainActivity : ComponentActivity() {
 
                 if (number == "1") {
                     cameraButton = button
-                } else {
+                } else if (number == "2") {
                     calibrationButton = button
                 }
             }
@@ -348,6 +349,21 @@ class MainActivity : ComponentActivity() {
         fun addHomeAction(button: View) {
             content.addView(button, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(16) })
         }
+        quickStartButton = pill("보정 없이 빠른 시작") {
+            if (TrackerState.model?.isQuickStart == true) TrackerState.disableQuickStart()
+            else {
+                TrackerState.enableQuickStart()
+                if (!TrackerState.running) startTracking()
+                else if (!TrackerState.controls) startService(Intent(this, TrackingService::class.java).setAction(TrackingService.ACTION_RESUME))
+            }
+            status.text = homeStatus()
+            updateHomeButtons()
+        }
+        addHomeAction(quickStartButton)
+        content.addView(TextView(this).apply {
+            text="빠른 시작은 개인 보정 없는 대략적 위치입니다. 정확한 조작에는 9점 보정을 사용하세요."
+            textSize=14f; setTextColor(ink); gravity=Gravity.CENTER
+        }, LinearLayout.LayoutParams(-1,-2))
         resumeButton = pill("조작 재개") {
             if (TrackerState.running) startService(Intent(this, TrackingService::class.java).setAction(TrackingService.ACTION_RESUME))
         }
@@ -364,7 +380,9 @@ class MainActivity : ComponentActivity() {
     private fun updateHomeButtons() {
         if (!::cameraButton.isInitialized || !::calibrationButton.isInitialized || !::stopButton.isInitialized) return
         cameraButton.isEnabled = !TrackerState.running
-        calibrationButton.text = if (TrackerState.model == null) "보정 시작" else "다시 보정하기"
+        calibrationButton.text = if (TrackerState.model == null || TrackerState.model?.isQuickStart == true) "보정 시작" else "다시 보정하기"
+        if (::quickStartButton.isInitialized) quickStartButton.text =
+            if (TrackerState.model?.isQuickStart == true) "빠른 시작 끄기 · 보정 모드" else "보정 없이 빠른 시작"
         calibrationButton.isEnabled = TrackerState.running && TrackerState.fault == null && TrackerState.hasFreshFeatures(SystemClock.uptimeMillis())
         resumeButton.visibility = if (TrackerState.running && !TrackerState.controls) View.VISIBLE else View.GONE
         stopButton.isEnabled = TrackerState.running
@@ -406,7 +424,7 @@ class MainActivity : ComponentActivity() {
     private fun homeStatus(): String {
         val current = TrackerState.currentStatus(SystemClock.uptimeMillis())
         val calibrationMessage = TrackerState.status.takeIf { it.startsWith("보정 실패") || it.startsWith("보정 취소") || it.startsWith("보정이 중단") || it.startsWith("눈 표본이 부족") }
-        return calibrationMessage ?: listOf(current.message, current.advice, if(TrackerState.running) TrackerState.inferenceStatus else "").filter { it.isNotBlank() }.joinToString("\n")
+        return calibrationMessage ?: listOf(if(TrackerState.model?.isQuickStart == true) "빠른 시작 · 보정 없는 대략적 시선점" else "", current.message, current.advice, if(TrackerState.running) TrackerState.inferenceStatus else "").filter { it.isNotBlank() }.joinToString("\n")
     }
 
     private fun reportPermissionFault(message: String, setting: RecoverySetting) {
@@ -482,6 +500,7 @@ class MainActivity : ComponentActivity() {
         private val samples = mutableListOf<EyeFeatures>()
         private val fixations = mutableListOf<CalibrationFixation>()
         private var poseReference: HeadPose? = null
+        private val continuity = CalibrationContinuity()
         private var lastSampleAt = 0L
         private var closed = false
         private var hint = "편한 자세에서 파란 점을 바라보세요 · 보정 중에는 자세를 유지하세요"
@@ -512,12 +531,12 @@ class MainActivity : ComponentActivity() {
             // Keep collecting open-eye features even when the old model rejects this pose.
             val f = sample?.calibrationFeatures(now, lastSampleAt, 750)
             if (f == null) {
-                if (samples.isNotEmpty()) { samples.clear(); poseReference=null; since=now }
-                hint = "${TrackerState.eyeState} · ${TrackerState.inferenceStatus}"
+                if (continuity.missing(now)) { samples.clear(); poseReference=null; since=now }
+                hint = "${index + 1}/${targets.size} · ${samples.size}/22개 유지 · ${TrackerState.eyeState} · ${TrackerState.inferenceStatus}"
                 invalidate(); return
             }
             if(f.source != GazeSource.LANDMARK) { samples.clear(); hint="MediaPipe 눈 특징 대기"; return }
-            if (lastSampleAt>0 && sample.timestampMs-lastSampleAt>1200) {
+            if (lastSampleAt>0 && sample.timestampMs-lastSampleAt>750) {
                 samples.clear(); poseReference=null; since=now
             }
             lastSampleAt = sample.timestampMs
@@ -534,7 +553,8 @@ class MainActivity : ComponentActivity() {
                 invalidate(); return
             }
             hint = "${index + 1} / ${targets.size} · 파란 점을 계속 바라보세요"
-            if (sample.timestampMs < since + 1000) return
+            val resumed = continuity.valid(sample.timestampMs)
+            if (sample.timestampMs < since + 1000 || !resumed) return
             samples += f
             if (samples.size >= 22 && elapsed >= 2500) {
                 val eye = medianFeatures(samples)
@@ -550,7 +570,7 @@ class MainActivity : ComponentActivity() {
                 val point = DisplayCoordinates(bounds.width(), bounds.height())
                     .normalize(location[0] + width * xy.first, location[1] + height * xy.second)
                 fixations += CalibrationFixation(samples.toList(), point.first, point.second)
-                index++; samples.clear(); poseReference=null; since = SystemClock.uptimeMillis(); targetStartedAt=since
+                index++; samples.clear(); poseReference=null; continuity.reset(); since = SystemClock.uptimeMillis(); targetStartedAt=since
                 // Nine-point screen mapping; no head-motion training or mid-session break.
                 if (index == targets.size) {
                     val audit = CalibrationAudit.fit(fixations)

@@ -4,6 +4,17 @@ import org.junit.Test
 
 class CompletionPreferencesTest {
     private val alternatives=listOf("도와줘","도와줄게","도와주세요","도착했어","도착하면","도전해봐")
+    @Test fun englishCapitalizationDoesNotHideCompletionsAndEarlierTextIsPreserved() {
+        val input=PredictionInput(1,"I need He")
+        val candidates=input.candidates(listOf("help","healing","heat","heaters","headphones","hearing"),"")
+        assertEquals(6,candidates.size)
+        val editor=EditorSnapshot("test",1,1,input.text,input.text.length,input.text.length)
+        assertEquals("I need help ",editor.candidatePlan(candidates.first())!!.text)
+        val preferences=CompletionPreferences()
+        preferences.record(candidates.last())
+        assertEquals("hearing ",preferences.rank(input,candidates).first().replacement)
+        assertTrue(input.candidates(listOf("Hello","world"),"").size==1)
+    }
     @Test fun sixCandidatesAreKeptAndCacheCanReuseAllSix() {
         val input=PredictionInput(1,"도")
         val candidates=input.candidates(alternatives+"도와줘","")
