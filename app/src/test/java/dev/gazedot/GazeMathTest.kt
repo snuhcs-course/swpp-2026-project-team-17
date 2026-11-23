@@ -4,6 +4,18 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class GazeMathTest {
+    @Test fun validPerEyeSignalsDoNotDependOnAnUnusedAveragedFeatureFit() {
+        fun features(x:Double,y:Double)=EyeFeatures(0.0,0.0,.5,.5,.3,
+            leftX=(x-.5)*.3,leftY=(y-.5)*.2,rightX=-(x-.5)*.4,rightY=-(y-.5)*.25)
+        val anchors=listOf(.08,.5,.92).flatMap{x->listOf(.08,.5,.92).map{y->Anchor(features(x,y),x,y)}}
+        val model=GazeModel.fit(anchors)
+        assertNotNull(model)
+        for(x in listOf(.02,.3,.7,.98)) for(y in listOf(.02,.3,.7,.98)) {
+            val p=model!!.predict(features(x,y))!!
+            assertEquals(x,p.first,.01);assertEquals(y,p.second,.01)
+        }
+        assertTrue(model!!.mappingGain.isFinite())
+    }
     private fun eye(x: Double, y: Double) = EyeFeatures(x, y, .5, .5, .25)
     @Test fun recoversMappingAtUnseenPoint() {
         val anchors = listOf(.15, .5, .85).flatMap { x -> listOf(.15, .5, .85).map { y ->

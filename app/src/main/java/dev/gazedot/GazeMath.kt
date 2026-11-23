@@ -25,6 +25,7 @@ class GazeModel private constructor(
 ) {
     /** Largest singular value of the raw-centimetre to screen mapping (before clipping). */
     val mappingGain: Double get() {
+        if (leftModel != null && rightModel != null) return maxOf(leftModel.mappingGain,rightModel.mappingGain)
         val a=wx[1]/stdX;val b=wx[2]/stdY;val c=wy[1]/stdX;val d=wy[2]/stdY
         val trace=a*a+b*b+c*c+d*d;val determinant=(a*d-b*c).pow(2)
         return sqrt((trace+sqrt(max(0.0,trace*trace-4*determinant)))/2)
@@ -85,13 +86,14 @@ class GazeModel private constructor(
 
         fun fit(anchors: List<Anchor>): GazeModel? {
             if(anchors.map{it.eye.source}.distinct().size != 1)return null
-            val base = fitSingle(anchors) ?: return null
             // The pretrained CNN has already fused both eyes and face information.
-            if(anchors.first().eye.source == GazeSource.ITRACKER)return base
+            if(anchors.first().eye.source == GazeSource.ITRACKER)return fitSingle(anchors)
+            // Fit each eye once, then average SCREEN coordinates. An unused third fit
+            // on averaged eye features can cancel valid signals and reject both eyes.
             val left = fitSingle(anchors.map { it.copy(eye=it.eye.copy(x=it.eye.leftX,y=it.eye.leftY)) }) ?: return null
             val right = fitSingle(anchors.map { it.copy(eye=it.eye.copy(x=it.eye.rightX,y=it.eye.rightY)) }) ?: return null
-            return GazeModel(base.meanX,base.meanY,base.stdX,base.stdY,base.wx,base.wy,base.reference,
-                maxOf(base.fitError,left.fitError,right.fitError),leftModel=left,rightModel=right)
+            return GazeModel(left.meanX,left.meanY,left.stdX,left.stdY,left.wx,left.wy,left.reference,
+                maxOf(left.fitError,right.fitError),leftModel=left,rightModel=right)
         }
         private fun fitSingle(anchors: List<Anchor>): GazeModel? {
             if (anchors.size < 5 || anchors.any { a ->

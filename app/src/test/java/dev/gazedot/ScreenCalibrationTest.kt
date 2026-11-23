@@ -4,6 +4,12 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ScreenCalibrationTest {
+    @Test fun futureFrameCannotLockOutNormalCameraFrames() {
+        val c=ScreenCalibration(0);val target=.5 to .5
+        c.observe(sample(999999,.5,.5),650,target,"missing")
+        c.observe(sample(700,.5,.5),700,target,"missing")
+        assertEquals(1,c.count)
+    }
     private fun sample(t:Long,x:Double,y:Double)=GazeSample(t,TrackingQuality.OUT_OF_RANGE,
         EyeFeatures((x-.5)*.3,(y-.5)*.2,.5,.5,.3,head=null),null,null,0f,emptyList())
     private fun complete(c:ScreenCalibration,start:Long=0):Long {

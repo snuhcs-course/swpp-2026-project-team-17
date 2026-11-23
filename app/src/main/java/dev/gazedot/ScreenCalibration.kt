@@ -24,6 +24,8 @@ internal class ScreenCalibration(startAt: Long) {
 
     fun observe(sample: GazeSample?, now: Long, targetOnDisplay: Pair<Double,Double>, missingReason: String) {
         if(review!=null) return
+        // A malformed future timestamp must not poison all later valid samples.
+        if(sample!=null && sample.timestampMs>now) { hint="새 눈 표본 대기";return }
         if(sample!=null && sample.timestampMs<=lastSeen) return
         if(sample!=null) lastSeen=sample.timestampMs
         val f=sample?.calibrationFeatures(now,-1,750)?.takeIf {

@@ -1,3 +1,7 @@
+## v45: simple per-eye mapping and merged horizontal scrolling
+
+Nine targets → one screen mapping per eye → average screen coordinates. Removed an unused third regression that could reject valid per-eye data. Includes fix/horizontal-scrolling. See [changes and validation](docs/simple-binocular-v45.md).
+
 ## v44: rebuilt nine-point calibration
 
 Separate acquisition state machine, median anchors, explicit result review and single-point remeasurement. Includes quick-start geometry and four-direction edge scrolling. See [design, references and validation](docs/calibration-rebuild-v44.md).
