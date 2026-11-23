@@ -11,6 +11,11 @@ object CalibrationAudit {
         if(groups.size<5 || groups.any{it.samples.size<20}) return CalibrationAuditResult(null,"표본 부족 · 각 점 20개 이상 필요")
         // Equal target weights; early samples fit, later samples independently check stability.
         val selected=groups.map { it.samples.takeLast(22) }
+        // Pose consistency is a training-data check, not a runtime kill switch.
+        val all=selected.flatten()
+        val cx=all.map{it.faceX}.average(); val cy=all.map{it.faceY}.average(); val scale=all.map{it.scale}.average()
+        if(all.any { abs(it.faceX-cx)>.12 || abs(it.faceY-cy)>.12 || it.scale !in scale*.72..scale*1.28 })
+            return CalibrationAuditResult(null,"보정 중 자세가 크게 달라졌습니다. 같은 자세에서 다시 측정해 주세요.")
         val train=groups.indices.flatMap { i -> selected[i].take(14).map { Anchor(it,groups[i].x,groups[i].y) } }
         val model=GazeModel.fit(train)
         val centers=selected.map(::medianFeatures)

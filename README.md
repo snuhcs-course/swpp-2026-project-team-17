@@ -1,3 +1,7 @@
+## v36 gaze continuity regression fix
+
+The latest gaze-response-fix build removes runtime face-position/relative-size rejection, restores the pre-v33 fixation response, separates transient gaze confirmation from coordinate errors, and no longer auto-launches a second calibration. See [changes and limits](docs/gaze-continuity-v36.md). Texting integration remains included.
+
 ## v35 integrated gaze-response-fix
 
 Includes main + texting (signed online predictions and duplicate-frame dwell fix), the v33 gaze response/calibration-check fixes, and v32 natural eye baseline without the forced face-alignment screen. See [integration and validation](docs/gaze-response-v35.md).

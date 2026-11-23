@@ -48,9 +48,10 @@ class GazeModel private constructor(
     fun predictBase(f: EyeFeatures): Pair<Double, Double>? {
         if(f.source != reference.source)return null
         if (!listOf(f.x, f.y, f.faceX, f.faceY, f.scale).all { it.isFinite() }) return null
-        // A changed pose/distance invalidates this simple calibration. Do not invent a point.
-        if (f.source == GazeSource.LANDMARK && (f.scale !in reference.scale * 0.72..reference.scale * 1.28 ||
-            abs(f.faceX - reference.faceX) > 0.12 || abs(f.faceY - reference.faceY) > 0.12)) return null
+        // Iris coordinates are relative to eye corners, not the face's image location.
+        // Translation/ordinary handheld distance changes must not discard valid eyes.
+        // Detection handles occlusion; reject only degenerate geometry here.
+        if (f.scale <= 0.0) return null
         if (leftModel != null && rightModel != null) {
             val left = leftModel.predictUncorrected(f.copy(x=f.leftX, y=f.leftY)) ?: return null
             val right = rightModel.predictUncorrected(f.copy(x=f.rightX, y=f.rightY)) ?: return null

@@ -334,7 +334,7 @@ class MainActivity : ComponentActivity() {
         addStep("2", "시선 보정", "기기를 움직이지 말고 얼굴을 카메라에서 약\n30~50cm 떨어진 위치에 맞춰 주세요.", 26, "보정 시작") {
             startCalibration()
         }
-        addStep("3", "시선 테스트", "추가 보정 후 새 목표에서 오차를 확인합니다.", 26, "정밀 보정") {
+        addStep("3", "시선 테스트", "필요할 때만 추가 검사·보정을 진행합니다.", 26, "정밀 보정") {
             if (TrackerState.model == null) status.text = "먼저 5점 보정을 완료해 주세요"
             else startActivity(Intent(this, AccuracyActivity::class.java))
         }
@@ -571,11 +571,7 @@ class MainActivity : ComponentActivity() {
             close()
             calibration = null
             if (saved.getOrDefault(false) && TrackerState.running) {
-                if (returnToRecovery) finish() else {
-                    val bounds = DisplaySpace.bounds(this@MainActivity)
-                    calibrationCheck = CalibrationCheckView(bounds.width(), bounds.height())
-                    setContentView(calibrationCheck)
-                }
+                if (returnToRecovery) finish() else showCalibrationTutorial()
             } else if (returnToRecovery) finish() else {
                 showHome()
                 android.app.AlertDialog.Builder(this@MainActivity)

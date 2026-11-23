@@ -28,17 +28,23 @@ class NaiveGazePipelineTest {
         assertTrue(sample.actions.isEmpty())
         assertEquals(f, sample.calibrationFeatures(1000, 0))
     }
-    @Test fun oldPoseRejectionAndScreenClampingArePreserved() {
-        val model = model()
-        val pipeline = GazePipeline(250,250)
-        val outside = pipeline.process(1000, 1000, observation(eye(.2, -.2)), model, false)
-        assertEquals(1.0, outside.point!!.first, 0.0)
-        assertEquals(0.0, outside.point.second, 0.0)
-        val moved = eye(0.0, 0.0).copy(faceX = .7)
-        val sample = pipeline.process(1066, 1066, observation(moved), model, true)
-        assertNull(sample.point)
-        assertTrue(sample.actions.isEmpty())
-        assertEquals(moved, sample.calibrationFeatures(1066, 1000))
+    @Test fun handheldTranslationDoesNotDiscardValidCoordinatesOrRestartFixation() {
+        val m = model()
+        val pipeline = GazePipeline()
+        val actions = mutableListOf<EyeAction>()
+        for (i in 0..20) {
+            val f=eye(0.0,0.0).copy(faceX=if(i%2==0) .37 else .63,
+                faceY=if(i%2==0) .36 else .64, scale=if(i%2==0) .21 else .39)
+            val t=1000L+i*66
+            val sample=pipeline.process(t,t,observation(f),m,true)
+            assertEquals(TrackingQuality.TRACKING,sample.quality)
+            assertEquals(.5,sample.point!!.first,.01)
+            actions+=sample.actions
+        }
+        assertTrue(actions.any{it is EyeAction.Click})
+        val outside=GazePipeline().process(3000,3000,observation(eye(.2,-.2)),m,false)
+        assertEquals(1.0,outside.point!!.first,0.0)
+        assertEquals(0.0,outside.point.second,0.0)
     }
     @Test fun delayedFramesCannotClickOrLeakCoordinates() {
         val model = model()
@@ -87,7 +93,7 @@ class NaiveGazePipelineTest {
         frame(1600,EyeState.LEFT_WINK,null)
         val enabled=frame(1900,EyeState.OPEN)
         assertTrue(enabled.scrollMode)
-        val missing=frame(2100,EyeState.OPEN,eye(0.0,0.0).copy(faceX=.9))
+        val missing=frame(2100,EyeState.OPEN,eye(Double.NaN,0.0))
         assertEquals(TrackingQuality.OUT_OF_RANGE,missing.quality)
         assertTrue(missing.scrollMode)
         assertFalse(missing.actions.any{it is EyeAction.Scroll || it is EyeAction.Click})

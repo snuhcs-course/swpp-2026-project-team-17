@@ -12,7 +12,13 @@ class GazeMathTest {
         val model = GazeModel.fit(anchors)!!
         val p = model.predict(eye((.32 - .5) * .3, (.71 - .5) * .2))!!
         assertEquals(.32, p.first, .01); assertEquals(.71, p.second, .01)
-        assertNull(model.predict(eye(0.0, 0.0).copy(faceX = .9)))
+        val baseline = model.predict(eye(0.0, 0.0))!!
+        for (faceX in listOf(.2, .37, .5, .63, .9)) for (scale in listOf(.16, .18, .25, .32, .36)) {
+            val moved = model.predict(eye(0.0, 0.0).copy(faceX = faceX, faceY = .7, scale = scale))!!
+            assertEquals(baseline.first, moved.first, 1e-9)
+            assertEquals(baseline.second, moved.second, 1e-9)
+        }
+        assertNull(model.predict(eye(0.0, 0.0).copy(scale = 0.0)))
         assertNull(model.predict(eye(Double.NaN, 0.0)))
     }
     @Test fun rejectsStationaryEyesAndContradictoryCalibration() {

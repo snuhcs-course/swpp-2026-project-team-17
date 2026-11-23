@@ -12,7 +12,7 @@ class CalibrationPoseTest {
     @Test fun eyeCalibrationRejectsHeadRotationEvenWhenFaceCentreIsUnchanged() {
         assertFalse(CalibrationPose.stable(reference.copy(yaw=20.0),reference))
         assertFalse(CalibrationPose.stable(reference.copy(roll=10.0),reference))
-        assertFalse(CalibrationPose.stable(reference.copy(iris=.031),reference))
+        assertTrue(CalibrationPose.stable(reference.copy(iris=.031),reference))
         assertFalse(CalibrationPose.stable(reference.copy(x=.55),reference))
         assertFalse(CalibrationPose.stable(reference.copy(iris=0.0),reference))
     }
@@ -22,5 +22,9 @@ class CalibrationPoseTest {
         assertEquals(2.0,CalibrationPose.angle(p.pitch,r.pitch),.00001)
         assertTrue(CalibrationPose.stable(p,r))
         assertEquals(2.0/12,p.relativeTo(r)[1],.00001)
+    }
+    @Test fun changingProjectedIrisSizeIsNotHeadMovement() {
+        for (diameter in listOf(.018, .022, .025, .031))
+            assertTrue(CalibrationPose.stable(reference.copy(iris=diameter),reference))
     }
 }
