@@ -38,6 +38,34 @@ class ApplicationWindowTrackerTest {
         assertTrue(actions.none { it is EyeAction.Click })
     }
 
+    @Test fun sameWindowUpdatesKeepHorizontalScrollingButAnotherAppResetsIt() {
+        val windows = ApplicationWindowTracker()
+        val launcher = ApplicationWindowKey("launcher.app", 7)
+        windows.changed(launcher)
+        val engine = InteractionEngine()
+        var now = 1000L
+        val actions = mutableListOf<EyeAction>()
+        fun frame(eye: EyeState = EyeState.OPEN, point: Pair<Double, Double>? = .9 to .5) {
+            now += 50
+            actions += engine.update(now, eye, point)
+        }
+        frame()
+        repeat(3) { frame(EyeState.LEFT_WINK, null) }
+        frame()
+        assertTrue(engine.scrollMode)
+        repeat(60) { i ->
+            // A page switch reports state/content/scroll events from the same launcher window.
+            if (windows.changed(launcher)) engine.reset(preserveSelection = true) else engine.cancelClick()
+            frame(point = if (i < 30) .9 to .5 else .1 to .5)
+        }
+        assertTrue(engine.scrollMode)
+        val scrolls = actions.filterIsInstance<EyeAction.Scroll>().map { it.direction }
+        assertTrue(ScrollDirection.RIGHT in scrolls && ScrollDirection.LEFT in scrolls)
+        assertTrue(actions.none { it is EyeAction.Click })
+        if (windows.changed(ApplicationWindowKey("other.app", 9))) engine.reset(preserveSelection = true)
+        assertFalse(engine.scrollMode)
+    }
+
     @Test fun appSwitchDialogAndUnknownWindowStillRequireReset() {
         val windows = ApplicationWindowTracker()
         val first = ApplicationWindowKey("first.app", 1)
