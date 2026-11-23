@@ -18,8 +18,8 @@ android {
         applicationId = "dev.gazedot"
         minSdk = 26
         targetSdk = 35
-        versionCode = 39
-        versionName = "0.15.2-texting-completions"
+        versionCode = 40
+        versionName = "0.15.3-personal-completions"
         testInstrumentationRunner = "dev.gazedot.FrameLifetimeInstrumentation"
         ndk { abiFilters += providers.gradleProperty("targetAbi").orNull?.let { listOf(it) } ?: listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
         buildConfigField("String", "PREDICTION_SERVER_URL", "\"$predictionUrl\"")

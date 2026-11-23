@@ -29,7 +29,7 @@ internal class NativeWritingPanel(
     private val main = Handler(Looper.getMainLooper())
     private val prefs = service.getSharedPreferences("notouch_native_writing", 0)
     private val store = WritingStore(service)
-    private val predictions = WritingPredictions { renderCandidates() }
+    private val predictions = WritingPredictions(store) { renderCandidates() }
     private val dwell = WritingDwell()
     private val buttons = linkedMapOf<String, Button>()
     private val panel = LinearLayout(service).apply {
@@ -218,6 +218,12 @@ internal class NativeWritingPanel(
                 settings.addView(actions)
             }
         }
+        settings.addView(text("선택해서 입력한 표현의 빈도를 이 기기에만 저장해 추천 순서에 반영합니다.", 13f))
+        val learning = row()
+        button("setting:clear-learning", "학습한 추천 초기화", learning) {
+            store.clearLearned(); submitInput(); showNotice("학습한 추천을 초기화했어요.")
+        }
+        settings.addView(learning)
         val fold = row()
         button("setting:fold", "설정 접기", fold) { toggleSettings() }
         settings.addView(fold)
@@ -275,9 +281,14 @@ internal class NativeWritingPanel(
             buttons.keys.filter { it.startsWith("candidate:") || it.startsWith("phrase:") }.toList().forEach(buttons::remove)
             candidates.removeAllViews()
             if (items.isEmpty()) return
-            val words = row()
+            var wordRow: LinearLayout? = null
+            var wordCount=0
             items.forEachIndexed { index, candidate ->
-                val parent = if (candidate.kind == CandidateKind.WORD) words else row()
+                val parent = if (candidate.kind == CandidateKind.WORD) {
+                    if(wordCount%2==0) wordRow=row().also { candidates.addView(it) }
+                    wordCount++
+                    wordRow!!
+                } else row().also { candidates.addView(it) }
                 val key = "candidate:$index"
                 button(key, candidate.replacement, parent) { apply(candidate) }.apply {
                     textSize = 18f
@@ -288,12 +299,7 @@ internal class NativeWritingPanel(
                         false
                     }
                 }
-                if (candidate.kind == CandidateKind.CONTINUATION) {
-                    if (words.parent == null && words.childCount > 0) candidates.addView(words)
-                    candidates.addView(parent)
-                }
             }
-            if (words.parent == null && words.childCount > 0) candidates.addView(words, 0)
         }
         buttons.filterKeys { it.startsWith("candidate:") }.values.forEach { it.isEnabled = !inFlight && !target.invalid }
     }
@@ -311,7 +317,10 @@ internal class NativeWritingPanel(
         syncEditor()
         if (closed || candidate.version != version || last.candidatePlan(candidate) == null) return
         inFlight = true; renderCandidates()
-        target.applyCandidate(candidate, ::finishWrite)
+        target.applyCandidate(candidate) { result ->
+            if (result == WriteResult.CONFIRMED) store.accepted(candidate)
+            finishWrite(result)
+        }
     }
 
     private fun finishWrite(result: WriteResult) {

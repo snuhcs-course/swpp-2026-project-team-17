@@ -40,3 +40,14 @@ test('unfinished tokens get complete alternatives, never append-only syllables',
  assert.deepEqual(await predict({...body(),text:'지금 도'},auth,env,fetcher),{version:7,words:['도와줘','도와줄게'],continuation:''});
  assert.deepEqual(await predict({...body(),text:'지금 '},auth,env,fetcher),{version:7,words:[],continuation:'와'});
 });
+
+test('six complete alternatives are supported by request schema and response validator',async()=>{
+ const words=['도와줘','도와줄게','도와주세요','도착했어','도착하면','도전해봐'];
+ const fetcher=async(url,opts)=>{
+  if(url==='https://redis.example') return {ok:true,json:async()=>({result:1})};
+  const payload=JSON.parse(opts.body);
+  assert.equal(payload.text.format.schema.properties.words.maxItems,6);
+  return {ok:true,json:async()=>({status:'completed',output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({words,continuation:''})}]}]})};
+ };
+ assert.deepEqual((await predict({...body(),text:'도'},auth,env,fetcher)).words,words);
+});

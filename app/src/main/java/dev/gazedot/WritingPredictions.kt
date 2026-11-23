@@ -12,7 +12,7 @@ import javax.net.ssl.HttpsURLConnection
 internal data class PredictionPolicy(val id: String, val provider: String, val model: String, val notice: String)
 
 /** Only the NoTouch draft and opaque request metadata leave the device. No default provider/model. */
-internal class WritingPredictions(private val changed: () -> Unit) {
+internal class WritingPredictions(private val store: WritingStore, private val changed: () -> Unit) {
     private val main = Handler(Looper.getMainLooper())
     private val worker = Executors.newSingleThreadExecutor()
     private val session = UUID.randomUUID().toString()
@@ -76,12 +76,12 @@ internal class WritingPredictions(private val changed: () -> Unit) {
         generation++; main.removeCallbacksAndMessages(null); connection?.disconnect()
         gate.input(input.version)
         if (!active || input.text.isBlank()) { changed(); return }
-        val immediate = reuse.reuse(input)
+        val immediate = store.rank(input, reuse.reuse(input))
         if (immediate.isNotEmpty()) gate.offer(input.version, immediate)
         message = if (immediate.isEmpty()) "단어·표현 후보를 가져오는 중…" else "완성된 표현을 선택하거나 계속 입력해 주세요"
         changed()
-        // Two compatible alternatives are already available without another round trip.
-        if (immediate.size >= 2) return
+        // Five or six compatible alternatives are already available without another round trip.
+        if (immediate.size >= 5) return
         if (input.text.length > 2_000) { message = "긴 초안은 예측을 쉬어요. 직접 입력은 계속할 수 있어요."; changed(); return }
         val policy = policy ?: return
         val ticket = generation
@@ -117,7 +117,7 @@ internal class WritingPredictions(private val changed: () -> Unit) {
                         val words = result.optJSONArray("words") ?: JSONArray()
                         val candidates = input.candidates((0 until words.length()).map { words.optString(it) }, result.optString("continuation"))
                         reuse.remember(input, candidates)
-                        gate.offer(input.version, candidates)
+                        gate.offer(input.version, store.rank(input, candidates))
                         message = "후보를 선택하거나 계속 입력해 주세요"
                     }
                     changed()

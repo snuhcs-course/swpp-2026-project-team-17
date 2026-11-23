@@ -1,3 +1,7 @@
+## v40: six suggestions and local preference learning
+
+Texting offers up to six complete alternatives in two columns and learns the frequency of successfully inserted choices on this device. See [implementation and validation](docs/texting-personalization-v40.md).
+
 ## v39: complete texting alternatives
 
 Texting predicts complete alternatives such as 도와줘 / 도와줄게 and reuses compatible predictions while typing. See [implementation and validation](docs/texting-completions-v39.md). Includes the v38 edge-mapping fixes.

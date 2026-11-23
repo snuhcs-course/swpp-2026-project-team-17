@@ -55,7 +55,7 @@ internal data class PredictionInput(val version: Long, val text: String) {
             current.isNotEmpty() && it.isNotEmpty() && it.length <= 80 && it.none { c -> c.isISOControl() } &&
                 it.split(Regex("\\s+")).size <= 6 &&
                 it != current && hangulParts(it).startsWith(hangulParts(current))
-        }.distinct().take(2).map {
+        }.distinct().take(6).map {
             WritingCandidate(version, CandidateKind.WORD, wordStart, text.length, current, "$it ")
         }.toMutableList()
         // Continuations are append-only. The server never chooses an editable range.
@@ -174,7 +174,7 @@ internal class PredictionReuse {
     private var words = emptyList<String>()
     fun remember(input: PredictionInput, candidates: List<WritingCandidate>) {
         previous=input
-        words=candidates.filter { it.kind==CandidateKind.WORD }.map { it.replacement.trim() }.take(2)
+        words=candidates.filter { it.kind==CandidateKind.WORD }.map { it.replacement.trim() }.take(6)
     }
     fun reuse(input: PredictionInput): List<WritingCandidate> {
         val before=previous ?: return emptyList()
