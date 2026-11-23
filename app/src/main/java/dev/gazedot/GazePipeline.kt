@@ -12,6 +12,13 @@ data class GazeSample(
     val actions: List<EyeAction>,
     val scrollMode: Boolean = false,
 ) {
+    /** Bias calibration must not learn display smoothing or pre-settle queued frames. */
+    fun calibrationCheckPoint(nowMs: Long, targetAtMs: Long, settleMs: Long = 900): Pair<Double, Double>? =
+        rawPoint?.takeIf {
+            quality == TrackingQuality.TRACKING && nowMs-timestampMs in 0..250 &&
+                timestampMs-targetAtMs >= settleMs && it.first.isFinite() && it.second.isFinite()
+        }
+
     fun calibrationFeatures(nowMs: Long, after: Long, maxAgeMs: Long = 250): EyeFeatures? = features?.takeIf {
         timestampMs > after && nowMs - timestampMs in 0..maxAgeMs &&
             quality in listOf(TrackingQuality.TRACKING, TrackingQuality.OUT_OF_RANGE)

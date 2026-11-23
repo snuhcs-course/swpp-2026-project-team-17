@@ -29,6 +29,7 @@ class TrackingService : LifecycleService() {
     @Volatile private var trackingEpoch = 0L
     private val worker = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
+    private val frameDelivery = LatestFrameDelivery({ main.post(it); Unit }, { main.removeCallbacks(it) })
     @Volatile private var closing = false
     private var landmarker: FaceLandmarker? = null
     private var cameraProvider: ProcessCameraProvider? = null
@@ -217,7 +218,7 @@ class TrackingService : LifecycleService() {
         val setupOnly = TrackerState.faceSetupActive
         try {
             val now = SystemClock.uptimeMillis()
-            if (closing || now - lastFrame < 66) return
+            if (closing || now - lastFrame < 33) return
             lastFrame = now
             raw = frame.toBitmap()
             val matrix = Matrix().apply { postRotate(frame.imageInfo.rotationDegrees.toFloat()) }
@@ -235,8 +236,8 @@ class TrackingService : LifecycleService() {
                 EyeObservations.observe(it, upright.width, upright.height,face,TrackerState.eyeProfile)
             } ?: EyeObservation(EyeState.LOST, null, 0.0, 0.0)
             val observation = landmarkObservation
-            main.post {
-                if (closing || epoch != trackingEpoch || cameraFault != null || setupOnly != TrackerState.faceSetupActive) return@post
+            frameDelivery.submit(observation.state == EyeState.OPEN) {
+                if (closing || epoch != trackingEpoch || cameraFault != null || setupOnly != TrackerState.faceSetupActive) return@submit
                 val at = SystemClock.uptimeMillis()
                 if(setupOnly) {
                     lastResult=at
@@ -245,7 +246,7 @@ class TrackingService : LifecycleService() {
                     TrackerState.frameAt=now
                     TrackerState.inferenceStatus="홍채 기준 측정 · MediaPipe만 실행 중"
                     TrackerState.publish(null,"얼굴·홍채 기준 측정 중")
-                    return@post
+                    return@submit
                 }
                 GazeTrace.record(now,at-now,observation.state,observation.features,TrackerState.model)
                 TrackerState.inferenceStatus=if(observation.features!=null)
@@ -260,13 +261,13 @@ class TrackingService : LifecycleService() {
                     TrackerState.publishSample(GazeSample(now,
                         if(valid && observation.features!=null) TrackingQuality.OUT_OF_RANGE else TrackingQuality.UNCERTAIN,
                         if(valid) observation.features else null,null,null,0f,emptyList()),TrackerState.inferenceStatus)
-                    return@post
+                    return@submit
                 }
                 if (at - now > 500) {
                     resetTracking()
                     TrackerState.signalPending = true
                     TrackerState.publish(null, "영상 처리가 지연됩니다 · 조작 일시 대기")
-                    return@post
+                    return@submit
                 }
                 lastResult = at
                 TrackerState.signalPending = false

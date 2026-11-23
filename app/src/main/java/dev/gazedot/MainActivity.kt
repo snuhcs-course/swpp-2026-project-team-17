@@ -631,7 +631,7 @@ class MainActivity : ComponentActivity() {
         private var correctionY = 0.0
         private var correctionApplied = false
         private var correctionLimited = false
-        private var hint = "파란 점을 바라보고 빨간 점을 확인해 주세요"
+        private var hint = "파란 점을 계속 바라보세요 · 빨간 점을 따라보지 마세요"
         private val tick = object : Runnable {
             override fun run() {
                 if (closed || calibrationCheck !== this@CalibrationCheckView) return
@@ -659,7 +659,8 @@ class MainActivity : ComponentActivity() {
             if (closed || report || index >= targets.size || width == 0 || height == 0) return
             val now = SystemClock.uptimeMillis()
             val elapsed = now - since
-            val point = sample?.point
+            // Fit positional bias from model output, not the lagging display filter.
+            val point = sample?.calibrationCheckPoint(now, since, settleMs)
             if (sample == null || sample.quality != TrackingQuality.TRACKING ||
                 now - sample.timestampMs !in 0..250 || sample.timestampMs <= lastSampleAt ||
                 point == null || !point.first.isFinite() || !point.second.isFinite()) {
@@ -669,7 +670,7 @@ class MainActivity : ComponentActivity() {
             }
             lastSampleAt = sample.timestampMs
             if (elapsed >= settleMs) samples += point
-            hint = if (elapsed < settleMs) "시선을 안정시키는 중…" else "빨간 점 위치를 측정 중…"
+            hint = if (elapsed < settleMs) "시선을 안정시키는 중…" else "시선 위치를 측정 중…"
             if (elapsed >= minPointTimeMs && samples.size >= minSamples) savePoint()
             invalidate()
         }

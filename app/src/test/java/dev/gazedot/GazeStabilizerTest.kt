@@ -38,4 +38,22 @@ class GazeStabilizerTest {
             assertEquals("",trackingOverlayLabel(state,false,true,false,""))
         }
     }
+
+    @Test fun repeatedSmallMoveReachesTargetWithin200msAt15fps() {
+        val f=GazeStabilizer(); f.update(.5 to .5,0)
+        for(i in 1..3) f.update(.55 to .5,i*66L)
+        val r=f.update(.55 to .5,200)
+        assertTrue("small intentional moves must not have a long tail",r.point.first>.545)
+    }
+    @Test fun diagonalInputsDoNotCreateAnAxisOnlyDetour() {
+        val f=GazeStabilizer();f.update(.5 to .5,0)
+        val p=f.update(.46 to .54,66).point
+        assertEquals("both coordinates stay on the input segment",1.0,p.first+p.second,1e-9)
+    }
+    @Test fun sustainedSlowMotionDoesNotKeepOldFixationLocked() {
+        val f=GazeStabilizer();f.update(.2 to .5,0)
+        var p=.2 to .5
+        for(i in 1..30) p=f.update((.2+i*.015) to .5,i*66L).point
+        assertTrue("less than 4% screen lag",.65-p.first<.04)
+    }
 }
