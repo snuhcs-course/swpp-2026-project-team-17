@@ -68,10 +68,6 @@ class MainActivity : ComponentActivity() {
             handler.postDelayed(this, 50)
         }
     }
-    private val faceSetup = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if(result.resultCode == android.app.Activity.RESULT_OK && TrackerState.running) startScreenCalibration()
-        else { TrackerState.status="얼굴 기준 측정 취소 · 기존 보정 유지"; showHome() }
-    }
     private fun showCalibrationTutorial() {
         if(!TrackerState.running) { showHome(); return }
         val bounds=DisplaySpace.bounds(this)
@@ -454,14 +450,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private var pendingCalibrationRecovery = false
     private fun startCalibration(fromRecovery: Boolean = false) {
         if(!TrackerState.running || TrackerState.fault!=null) { status.text="먼저 카메라를 시작하세요";return }
         tutorial?.close();tutorial=null
-        pendingCalibrationRecovery = fromRecovery
-        faceSetup.launch(Intent(this,FaceSetupActivity::class.java))
+        startScreenCalibration(fromRecovery)
     }
-    private fun startScreenCalibration(fromRecovery: Boolean = pendingCalibrationRecovery) {
+    private fun startScreenCalibration(fromRecovery: Boolean = false) {
         if (!TrackerState.running || TrackerState.fault != null) {
             if (::status.isInitialized) status.text = "보정을 시작할 수 없어요. 카메라를 시작하고 눈이 검출되면 다시 선택해 주세요."
             return
@@ -489,7 +483,7 @@ class MainActivity : ComponentActivity() {
         private var poseReference: HeadPose? = null
         private var lastSampleAt = 0L
         private var closed = false
-        private var hint = "머리는 고정하고 파란 점을 바라보세요"
+        private var hint = "편한 자세에서 파란 점을 바라보세요 · 보정 중에는 자세를 유지하세요"
         private val tick = object : Runnable {
             override fun run() {
                 if (closed || calibration !== this@CalibrationView) return

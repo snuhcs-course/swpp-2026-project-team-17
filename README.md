@@ -1,3 +1,7 @@
+## v35 integrated gaze-response-fix
+
+Includes main + texting (signed online predictions and duplicate-frame dwell fix), the v33 gaze response/calibration-check fixes, and v32 natural eye baseline without the forced face-alignment screen. See [integration and validation](docs/gaze-response-v35.md).
+
 # NoTouch — integrated main + texting (v34)
 
 Merged feature/texting 293e2e3 into main 57a9c18. Main's MediaPipe binocular mapping, calibration verification, selection assistance and vertical edge-scroll bars remain. Native messaging/IME prediction, per-installation API authentication, accessibility reconnect fixes and scroll-window cancellation fixes are integrated. Tutorial completion badges follow the actual vertical bar controls; wink-only instructions do not replace the bar workflow.

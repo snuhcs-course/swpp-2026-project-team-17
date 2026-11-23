@@ -24,6 +24,7 @@ import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarker
 import java.util.concurrent.Executors
 
 class TrackingService : LifecycleService() {
+    private val naturalEyes = NaturalEyeBaseline()
     private val pipeline = GazePipeline(500,500,useBars=true)
     private lateinit var voice: VoiceInput
     @Volatile private var trackingEpoch = 0L
@@ -225,7 +226,6 @@ class TrackingService : LifecycleService() {
         var sharedImage: MPImage? = null
         var stage = "카메라 영상 변환"
         val epoch = trackingEpoch
-        val setupOnly = TrackerState.faceSetupActive
         try {
             val now = SystemClock.uptimeMillis()
             if (closing || now - lastFrame < 33) return
@@ -242,22 +242,15 @@ class TrackingService : LifecycleService() {
             val transform=result?.facialTransformationMatrixes()?.orElse(null)?.firstOrNull()
             val blends=result?.faceBlendshapes()?.orElse(null)?.firstOrNull()?.associate { it.categoryName() to it.score() } ?: emptyMap()
             val face=landmarks?.let { FaceGeometry.extract(it,upright.width,upright.height,now,transform,blends) }
+            val eyeProfile = naturalEyes.add(face, blends.containsKey("eyeBlinkLeft") && blends.containsKey("eyeBlinkRight"))
             val landmarkObservation = landmarks?.let {
-                EyeObservations.observe(it, upright.width, upright.height,face,TrackerState.eyeProfile)
+                EyeObservations.observe(it, upright.width, upright.height,face,eyeProfile)
             } ?: EyeObservation(EyeState.LOST, null, 0.0, 0.0)
             val observation = landmarkObservation
             frameDelivery.submit(observation.state == EyeState.OPEN) {
-                if (closing || epoch != trackingEpoch || cameraFault != null || setupOnly != TrackerState.faceSetupActive) return@submit
+                if (closing || epoch != trackingEpoch || cameraFault != null) return@submit
                 val at = SystemClock.uptimeMillis()
-                if(setupOnly) {
-                    lastResult=at
-                    TrackerState.signalPending=false
-                    TrackerState.faceFrame=face?.takeIf{at-now in 0..750}
-                    TrackerState.frameAt=now
-                    TrackerState.inferenceStatus="홍채 기준 측정 · MediaPipe만 실행 중"
-                    TrackerState.publish(null,"얼굴·홍채 기준 측정 중")
-                    return@submit
-                }
+                TrackerState.eyeProfile = eyeProfile
                 GazeTrace.record(now,at-now,observation.state,observation.features,TrackerState.model)
                 TrackerState.inferenceStatus=if(observation.features!=null)
                     "MediaPipe 양안 · 전체 %d ms%s".format(at-now,if(at-now>500) " · 지연: 조작 대기" else "")
@@ -448,7 +441,7 @@ class TrackingService : LifecycleService() {
             TrackerState.sample?.quality in listOf(TrackingQuality.TRACKING, TrackingQuality.CLOSED, TrackingQuality.UNCERTAIN)
         overlay?.show(if (showPoint) TrackerState.sample?.point else null,
             if (enabled) TrackerState.sample?.dwellProgress ?: 0f else TrackerState.localDwellProgress,
-            trackingOverlayLabel(state, showPoint, TrackerState.collecting || TrackerState.faceSetupActive ||
+            trackingOverlayLabel(state, showPoint, TrackerState.collecting ||
                 TrackerState.precisionTraining || TrackerState.helpVisible || TrackerState.recoveryOpening,
                 TrackerState.speaking, TrackerState.actionStatus),
             if (enabled) TrackerState.sample?.scrollMode == true else TrackerState.localScrollMode,
