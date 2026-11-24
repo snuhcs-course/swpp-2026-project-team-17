@@ -25,18 +25,7 @@ object LandmarkFeatures {
         val l = eye(362, 263, 473, 386, 374) ?: return null
         val scale = hypot((p[33].x() - p[263].x()).toDouble(),
             (p[33].y() - p[263].y()).toDouble() * height / width)
-        fun vertical(iris:Int,upper:Int,lower:Int): Double? {
-            val center=point(iris);val top=point(upper);val bottom=point(lower)
-            val dx=bottom.first-top.first;val dy=bottom.second-top.second
-            val squared=dx*dx+dy*dy
-            if(squared<1) return null
-            return ((center.first-(top.first+bottom.first)/2)*dx+
-                (center.second-(top.second+bottom.second)/2)*dy)/squared
-        }
-        val quickLeft=vertical(473,386,374)
-        val quickRight=vertical(468,159,145)
-        val quickY=if(quickLeft!=null && quickRight!=null) (quickLeft+quickRight)/2 else null
         return EyeFeatures((r.first + l.first) / 2, (r.second + l.second) / 2,
-            p[1].x().toDouble(), p[1].y().toDouble(), scale, l.first, l.second, r.first, r.second, quickVertical=quickY)
+            p[1].x().toDouble(), p[1].y().toDouble(), scale, l.first, l.second, r.first, r.second)
     }
 }

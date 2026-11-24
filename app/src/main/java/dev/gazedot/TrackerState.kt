@@ -37,25 +37,6 @@ object TrackerState {
         controls = false
     }
     var model: GazeModel? = null
-    private var modelBeforeQuickStart: GazeModel? = null
-    fun enableQuickStart() {
-        if (model?.isQuickStart == true) return
-        modelBeforeQuickStart = model
-        cancelActions?.invoke()
-        model = GazeModel.quickStart()
-        clearCoordinates()
-        status = "빠른 시작 · 보정 없는 대략적 시선점"
-        contextChanged?.invoke()
-    }
-    fun disableQuickStart() {
-        if (model?.isQuickStart != true) return
-        cancelActions?.invoke()
-        model = modelBeforeQuickStart
-        modelBeforeQuickStart = null
-        clearCoordinates()
-        status = if(model == null) "9점 보정을 시작해 주세요" else "기존 보정 모드로 전환했습니다"
-        contextChanged?.invoke()
-    }
     @Volatile var eyeProfile: EyeProfile? = null
     var faceFrame: FaceFrame? = null
     var inferenceStatus = "MediaPipe 준비 전"
@@ -146,7 +127,6 @@ object TrackerState {
     }
 
     fun trackingStopped() {
-        modelBeforeQuickStart = null
         accessibilityInterrupted = false
         resumeAfterAccessibility = false
         running = false
@@ -176,7 +156,6 @@ object TrackerState {
         try {
             if (result == null) return false
             model = result
-            modelBeforeQuickStart = null
             return true
         } finally {
             cancelCalibration()

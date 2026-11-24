@@ -25,7 +25,6 @@ class MainActivity : ComponentActivity() {
     private lateinit var status: TextView
     private lateinit var cameraButton: Button
     private lateinit var calibrationButton: Button
-    private lateinit var quickStartButton: Button
     private lateinit var stopButton: Button
     private lateinit var resumeButton: Button
     private var recoveryAction: String? = null
@@ -349,21 +348,6 @@ class MainActivity : ComponentActivity() {
         fun addHomeAction(button: View) {
             content.addView(button, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(16) })
         }
-        quickStartButton = pill("보정 없이 빠른 시작") {
-            if (TrackerState.model?.isQuickStart == true) TrackerState.disableQuickStart()
-            else {
-                TrackerState.enableQuickStart()
-                if (!TrackerState.running) startTracking()
-                else if (!TrackerState.controls) startService(Intent(this, TrackingService::class.java).setAction(TrackingService.ACTION_RESUME))
-            }
-            status.text = homeStatus()
-            updateHomeButtons()
-        }
-        addHomeAction(quickStartButton)
-        content.addView(TextView(this).apply {
-            text="빠른 시작은 개인 보정 없는 대략적 위치입니다. 정확한 조작에는 9점 보정을 사용하세요."
-            textSize=14f; setTextColor(ink); gravity=Gravity.CENTER
-        }, LinearLayout.LayoutParams(-1,-2))
         resumeButton = pill("조작 재개") {
             if (TrackerState.running) startService(Intent(this, TrackingService::class.java).setAction(TrackingService.ACTION_RESUME))
         }
@@ -380,9 +364,7 @@ class MainActivity : ComponentActivity() {
     private fun updateHomeButtons() {
         if (!::cameraButton.isInitialized || !::calibrationButton.isInitialized || !::stopButton.isInitialized) return
         cameraButton.isEnabled = !TrackerState.running
-        calibrationButton.text = if (TrackerState.model == null || TrackerState.model?.isQuickStart == true) "보정 시작" else "다시 보정하기"
-        if (::quickStartButton.isInitialized) quickStartButton.text =
-            if (TrackerState.model?.isQuickStart == true) "빠른 시작 끄기 · 보정 모드" else "보정 없이 빠른 시작"
+        calibrationButton.text = if (TrackerState.model == null) "보정 시작" else "다시 보정하기"
         calibrationButton.isEnabled = TrackerState.running && TrackerState.fault == null && TrackerState.hasFreshFeatures(SystemClock.uptimeMillis())
         resumeButton.visibility = if (TrackerState.running && !TrackerState.controls) View.VISIBLE else View.GONE
         stopButton.isEnabled = TrackerState.running
@@ -424,7 +406,7 @@ class MainActivity : ComponentActivity() {
     private fun homeStatus(): String {
         val current = TrackerState.currentStatus(SystemClock.uptimeMillis())
         val calibrationMessage = TrackerState.status.takeIf { it.startsWith("보정 실패") || it.startsWith("보정 취소") || it.startsWith("보정이 중단") || it.startsWith("눈 표본이 부족") }
-        return calibrationMessage ?: listOf(if(TrackerState.model?.isQuickStart == true) "빠른 시작 · 보정 없는 대략적 시선점" else "", current.message, current.advice, if(TrackerState.running) TrackerState.inferenceStatus else "").filter { it.isNotBlank() }.joinToString("\n")
+        return calibrationMessage ?: listOf(current.message, current.advice, if(TrackerState.running) TrackerState.inferenceStatus else "").filter { it.isNotBlank() }.joinToString("\n")
     }
 
     private fun reportPermissionFault(message: String, setting: RecoverySetting) {

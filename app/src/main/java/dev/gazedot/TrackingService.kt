@@ -262,9 +262,6 @@ class TrackingService : LifecycleService() {
                     TrackerState.inferenceStatus="눈 열림 L %.3f / R %.3f · 깜빡임 L %.2f / R %.2f · 개인 기준 %s".format(
                         observation.leftOpen,observation.rightOpen,face?.leftBlink ?: -1.0,face?.rightBlink ?: -1.0,
                         if(eyeProfile==null) "준비 중" else "있음")
-                } else if (TrackerState.model?.isQuickStart == true) {
-                    TrackerState.inferenceStatus="빠른 시작 · 눈 X %.3f / Y %.3f · 세로 상대 %.3f · %d ms".format(
-                        observation.features.x,observation.features.y,observation.features.quickVertical ?: 0.0,at-now)
                 }
                 if (TrackerState.collecting) {
                     lastResult=at

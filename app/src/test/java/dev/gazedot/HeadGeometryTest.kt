@@ -35,8 +35,6 @@ class HeadGeometryTest {
         assertEquals(EyeState.OPEN,withoutHead.state)
         assertNotNull(withoutHead.features)
         assertNull(withoutHead.features!!.head)
-        val quick=GazeModel.quickStart().predict(withoutHead.features!!)!!
-        assertEquals(.5,quick.second,.01)
     }
     @Test fun columnMajorRotationAndInvalidMatrices() {
         val m=floatArrayOf(1f,0f,0f,0f,0f,1f,0f,0f,0f,0f,1f,0f,0f,0f,-40f,1f)

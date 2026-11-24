@@ -1,3 +1,7 @@
+## v46: calibrated tracking only
+
+Removed the quick-start button, heuristic mapping and mode state. Use camera start and nine-point calibration. Existing binocular mapping, four-direction scroll bars and texting remain. Older version sections below are historical.
+
 ## v45: simple per-eye mapping and merged horizontal scrolling
 
 Nine targets → one screen mapping per eye → average screen coordinates. Removed an unused third regression that could reject valid per-eye data. Includes fix/horizontal-scrolling. See [changes and validation](docs/simple-binocular-v45.md).

@@ -5,7 +5,7 @@ import kotlin.math.*
 enum class GazeSource { LANDMARK, ITRACKER }
 
 data class EyeFeatures(val x: Double, val y: Double, val faceX: Double, val faceY: Double, val scale: Double,
-    val leftX: Double = x, val leftY: Double = y, val rightX: Double = x, val rightY: Double = y, val head: HeadPose? = null, val source: GazeSource = GazeSource.LANDMARK, val quickVertical: Double? = null)
+    val leftX: Double = x, val leftY: Double = y, val rightX: Double = x, val rightY: Double = y, val head: HeadPose? = null, val source: GazeSource = GazeSource.LANDMARK)
 data class Anchor(val eye: EyeFeatures, val x: Double, val y: Double)
 
 /** Screen mapping over either legacy iris features or frozen iTracker camera-centimetre outputs.
@@ -21,7 +21,6 @@ class GazeModel private constructor(
     val headCorrection: HeadCorrection? = null,
     private val screenCorrectionX: Double = 0.0,
     private val screenCorrectionY: Double = 0.0,
-    val isQuickStart: Boolean = false,
 ) {
     /** Largest singular value of the raw-centimetre to screen mapping (before clipping). */
     val mappingGain: Double get() {
@@ -35,26 +34,17 @@ class GazeModel private constructor(
     }
     /** Keep edge noise symmetric until display smoothing has finished. */
     fun predictForFiltering(f: EyeFeatures): Pair<Double, Double>? {
-        if (isQuickStart) {
-            if (f.source != GazeSource.LANDMARK || f.scale <= 0 ||
-                !listOf(f.x,f.y,f.scale).all { it.isFinite() }) return null
-            // Geometric eye-relative pointer, not calibrated screen gaze. Smooth bounding
-            // prevents a constant offscreen offset being hard-clipped into a frozen edge.
-            val vertical=f.quickVertical ?: (f.y-.02)*8.333333333333334
-            if(!vertical.isFinite()) return null
-            return .5-.5*tanh(f.x*12) to .5+.5*tanh(vertical*3)
-        }
         val p=predictUncorrected(f) ?: return null
         val corrected=correction?.apply(p.first,p.second) ?: p
         val result=corrected.first+screenCorrectionX to corrected.second+screenCorrectionY
         return result.takeIf { it.first.isFinite() && it.second.isFinite() }
     }
-    fun withCorrection(value: ResidualCorrection?) = GazeModel(meanX,meanY,stdX,stdY,wx,wy,reference,fitError,value,leftModel,rightModel,headCorrection,screenCorrectionX,screenCorrectionY,isQuickStart)
-    fun withHeadCorrection(value: HeadCorrection?) = GazeModel(meanX,meanY,stdX,stdY,wx,wy,reference,fitError,null,leftModel,rightModel,value,screenCorrectionX,screenCorrectionY,isQuickStart)
+    fun withCorrection(value: ResidualCorrection?) = GazeModel(meanX,meanY,stdX,stdY,wx,wy,reference,fitError,value,leftModel,rightModel,headCorrection,screenCorrectionX,screenCorrectionY)
+    fun withHeadCorrection(value: HeadCorrection?) = GazeModel(meanX,meanY,stdX,stdY,wx,wy,reference,fitError,null,leftModel,rightModel,value,screenCorrectionX,screenCorrectionY)
     fun withScreenCorrection(dx: Double, dy: Double): GazeModel? {
         if (!dx.isFinite() || !dy.isFinite()) return null
         return GazeModel(meanX,meanY,stdX,stdY,wx,wy,reference,fitError,correction,leftModel,rightModel,headCorrection,
-            screenCorrectionX + dx,screenCorrectionY + dy,isQuickStart)
+            screenCorrectionX + dx,screenCorrectionY + dy)
     }
     fun predictUncorrected(f: EyeFeatures): Pair<Double, Double>? {
         val raw=predictBase(f) ?: return null
@@ -77,13 +67,6 @@ class GazeModel private constructor(
     }
 
     companion object {
-        /** Uncalibrated heuristic, not a measured personal mapping or pretrained gaze model.
-         * Upright camera pixels are unmirrored: image-right iris movement is screen-left.
-         * No initial fixation, automatic centering or saved user labels are required. */
-        fun quickStart() = GazeModel(0.0, .02, 1.0, 1.0,
-            doubleArrayOf(.5, -5.0, 0.0), doubleArrayOf(.5, 0.0, 8.333333333333334),
-            EyeFeatures(0.0,.02,.5,.5,.3),Double.NaN,isQuickStart=true)
-
         fun fit(anchors: List<Anchor>): GazeModel? {
             if(anchors.map{it.eye.source}.distinct().size != 1)return null
             // The pretrained CNN has already fused both eyes and face information.
