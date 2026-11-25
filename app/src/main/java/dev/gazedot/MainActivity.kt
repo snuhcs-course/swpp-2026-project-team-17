@@ -607,7 +607,6 @@ class MainActivity : ComponentActivity() {
         private val targetTimeoutMs = 8_000L
         private val minSamples = 12
         private val minCorrectionPoints = 3
-        private val maxCorrection = .08
         private var index = 0
         private var since = SystemClock.uptimeMillis()
         private var lastSampleAt = 0L
@@ -616,7 +615,6 @@ class MainActivity : ComponentActivity() {
         private var correctionX = 0.0
         private var correctionY = 0.0
         private var correctionApplied = false
-        private var correctionLimited = false
         private var hint = "파란 점을 바라보고 빨간 점을 확인해 주세요"
         private val tick = object : Runnable {
             override fun run() {
@@ -696,10 +694,9 @@ class MainActivity : ComponentActivity() {
             val valid = results.filterNotNull()
             if (valid.size < minCorrectionPoints) return
             val model = TrackerState.model ?: return
-            val offset = RetargetingOffset.choose(valid.map { it.residual }, maxCorrection) ?: return
+            val offset = RetargetingOffset.choose(valid.map { it.residual }) ?: return
             correctionX = offset.first
             correctionY = offset.second
-            correctionLimited = kotlin.math.abs(correctionX) >= maxCorrection || kotlin.math.abs(correctionY) >= maxCorrection
             TrackerState.model = model.withScreenCorrection(correctionX, correctionY) ?: return
             correctionApplied = true
         }
@@ -766,7 +763,7 @@ class MainActivity : ComponentActivity() {
                     if (correctionApplied) "가로 ${percent(correctionX, true)} · 세로 ${percent(correctionY, true)}"
                     else if (valid.size < minCorrectionPoints) "표본이 ${minCorrectionPoints}곳 미만입니다."
                     else "검증에서 개선이 확인되지 않아 기존 보정을 유지합니다.",
-                    if (correctionLimited) "큰 편차는 8% 이내로 제한했습니다." else "", "",
+                    "",
                     "시선 고정 중 중앙 편차", "가로 ${percent(madX)} · 세로 ${percent(madY)}",
                     "화면 너비/높이 기준 · ${valid.size}/${targets.size}곳 측정")
             }

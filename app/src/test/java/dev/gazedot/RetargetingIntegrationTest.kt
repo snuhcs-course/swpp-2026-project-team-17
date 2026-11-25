@@ -7,6 +7,17 @@ class RetargetingIntegrationTest {
     private fun eye(x: Double, y: Double) = EyeFeatures(
         (x-.5)*.3, (y-.5)*.2, .5, .5, .3)
 
+    @Test fun validatedOffsetAboveEightPercentReachesDisplayedCoordinates() {
+        val m=GazeModel.fit(ScreenCalibration(0).targets.map { (x,y)->Anchor(eye(x,y),x,y) })!!
+        val f=eye(.35,.5)
+        val offset=RetargetingOffset.choose(List(5) { RetargetingResidual(-.15 to .0,-.15 to .0) })!!
+        val corrected=m.withScreenCorrection(offset.first,offset.second)!!
+        val sample=GazePipeline().process(1000,1000,EyeObservation(EyeState.OPEN,f,.22,.22),corrected,false)
+        assertEquals(.5,sample.point!!.first,.01)
+        assertEquals(.5,sample.point.second,.01)
+        assertTrue(sample.actions.isEmpty())
+    }
+
     @Test fun retargetingCorrectionReachesRuntimeAndNewCalibrationDoesNotAccumulateIt() {
         val calibration = ScreenCalibration.fit(ScreenCalibration(0).targets.map { (x,y) ->
             CalibrationFixation(List(24) { eye(x,y) }, x,y)
