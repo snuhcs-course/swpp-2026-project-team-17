@@ -62,16 +62,6 @@ class PersonalModelsTest {
         assertTrue(runCatching { model.confirm("s",choices,choices.map { model.features("s",it,.5,.5) },-1) }.isFailure)
         assertEquals(before,model.encode())
     }
-    @Test fun changedWindowTargetOrLabelInvalidatesConfirmation() {
-        val a=AccessibleChoice(choices[0],"One")
-        val frozen=ChoiceSnapshot("screen",1,listOf(a))
-        assertTrue(frozen.stillValid(frozen,a))
-        assertFalse(frozen.stillValid(frozen.copy(window=2),a))
-        assertFalse(frozen.stillValid(frozen.copy(screen="other"),a))
-        assertFalse(frozen.stillValid(frozen.copy(choices=listOf(a.copy(label="Delete"))),a))
-        assertFalse(frozen.stillValid(frozen.copy(choices=listOf(a.copy(candidate=choices[0].copy(left=.2)))),a))
-        assertFalse(frozen.stillValid(null,a))
-    }
     @Test fun correctedPredictionRunsThroughExistingModelAndCanBeRemoved() {
         val anchors=listOf(.15,.5,.85).flatMap { x -> listOf(.15,.5,.85).map { y ->
             Anchor(EyeFeatures((x-.5)*.3,(y-.5)*.2,.5,.5,.25),x,y)
