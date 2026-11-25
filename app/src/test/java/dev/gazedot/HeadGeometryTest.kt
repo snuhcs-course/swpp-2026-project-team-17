@@ -31,6 +31,10 @@ class HeadGeometryTest {
         val profile=EyeProfile(.23,.08,10.0,10.0,.3,.3)
         val result=EyeObservations.observe(points,600,800,profile=profile)
         assertEquals(EyeState.OPEN,result.state);assertNotNull(result.features)
+        val withoutHead=EyeObservations.observe(points,600,800,hasBlinkEvidence=true,blinkScores=.02 to .03)
+        assertEquals(EyeState.OPEN,withoutHead.state)
+        assertNotNull(withoutHead.features)
+        assertNull(withoutHead.features!!.head)
     }
     @Test fun columnMajorRotationAndInvalidMatrices() {
         val m=floatArrayOf(1f,0f,0f,0f,0f,1f,0f,0f,0f,0f,1f,0f,0f,0f,-40f,1f)

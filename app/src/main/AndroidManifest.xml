@@ -25,7 +25,6 @@
         <activity android:name=".RecoveryActivity" android:exported="false"
             android:taskAffinity="dev.gazedot.recovery" android:excludeFromRecents="true" />
         <activity android:name=".PracticeActivity" android:exported="false" />
-        <activity android:name=".FaceSetupActivity" android:exported="false" />
         <activity android:name=".HeadMotionActivity" android:exported="false" />
         <activity android:name=".GazeDiagnosticActivity" android:exported="false" />
         <activity android:name=".AccuracyActivity" android:exported="false" />

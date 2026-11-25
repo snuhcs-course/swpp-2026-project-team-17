@@ -28,7 +28,7 @@ class DeveloperSettingsActivity : ComponentActivity() {
             root.addView(Button(this).apply { text = label; setOnClickListener { action() } })
         }
         button("도움 · 인식 문제 해결하기") { startActivity(Intent(this, RecoveryActivity::class.java)) }
-        button("시선 모델 상태 · MediaPipe") { status.text=TrackerState.inferenceStatus+"\n양쪽 눈을 따로 보정 · 5점 화면 좌표 맞춤" }
+        button("시선 모델 상태 · MediaPipe") { status.text=TrackerState.inferenceStatus+"\n양쪽 눈을 따로 보정 · 9점 화면 좌표 맞춤" }
         button("시선 원인 진단 · 6초 고정 응시") { startActivity(Intent(this,GazeDiagnosticActivity::class.java)) }
         button("최근 calibration 품질 결과") { status.text=getSharedPreferences("personal",MODE_PRIVATE).getString("calibration_audit_v30","새 버전에서 보정한 기록이 없습니다") }
         button("최근 시선 진단 결과 공유") {
@@ -39,9 +39,10 @@ class DeveloperSettingsActivity : ComponentActivity() {
             status.text=getSharedPreferences("personal",MODE_PRIVATE).getString("last_frame_error","기록된 오류 없음")
         }
         root.addView(TextView(this).apply {text="시선 모델: MediaPipe 얼굴·홍채 특징 + 양안 회귀. iTracker 없이 폰 안에서 실행합니다."})
-        button("홍채 기준 측정 결과") {
-            val prefs=getSharedPreferences("personal",MODE_PRIVATE)
-            status.text=prefs.getString("eye_profile_report","홍채 측정 전")
+        button("눈 뜸 자동 기준 상태") {
+            val profile=TrackerState.eyeProfile
+            status.text=if(profile==null) "기본 눈 판정 사용 중 · 눈이 자연스럽게 열린 표본을 자동 수집합니다. 얼굴 위치 맞추기는 필요하지 않습니다."
+                else "눈 뜸 기준 자동 적용 · 왼쪽 %.3f / 오른쪽 %.3f".format(profile.leftOpen,profile.rightOpen)
         }
         val personal=getSharedPreferences("personal",MODE_PRIVATE)
         root.addView(Switch(this).apply {
@@ -56,7 +57,7 @@ class DeveloperSettingsActivity : ComponentActivity() {
         button("추가 정확도 보정만 해제") {
             TrackerState.model=TrackerState.model?.withCorrection(null)
             TrackerState.cancelActions?.invoke(); TrackerState.clearCoordinates()
-            status.text="기본 5점 보정으로 돌아왔습니다"
+            status.text="기본 9점 보정으로 돌아왔습니다"
         }
         button("최근 정확도 결과") { status.text=personal.getString("accuracy_report","측정 기록 없음") }
         button("버튼 학습 횟수 확인") {
@@ -68,7 +69,7 @@ class DeveloperSettingsActivity : ComponentActivity() {
             status.text="버튼 선택 학습을 초기화했습니다"
         }
         root.addView(TextView(this).apply {
-            text = "5점 보정 후 사용하세요.\n1초 응시: 클릭 · 윙크: 스크롤 모드 · 양눈 두 번 깜빡임: 받아쓰기"
+            text = "9점 보정 후 사용하세요.\n1초 응시: 클릭 · 윙크: 스크롤 모드 · 양눈 두 번 깜빡임: 받아쓰기"
         })
         button("접근성 서비스 설정") { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
         button("받아쓰기 마이크 권한 허용") {

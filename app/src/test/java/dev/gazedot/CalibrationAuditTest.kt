@@ -21,6 +21,16 @@ class CalibrationAuditTest {
         assertNull(r.model)
         assertTrue(r.report.contains("미학습"))
     }
+    @Test fun singleUnreachableCornerCannotHideInAverageError() {
+        val samples=groups { 0.0 }.mapIndexed { index,g ->
+            if(index!=1) g else g.copy(samples=g.samples.mapIndexed { i,f ->
+                if(i<14) f else f.copy(x=f.x+.9)
+            })
+        }
+        val result=CalibrationAudit.fit(samples)
+        assertNull(result.model)
+        assertTrue(result.report.contains("방향별"))
+    }
     @Test fun insufficientDataDoesNotClaimSuccess() {
         assertNull(CalibrationAudit.fit(groups{0.0}.take(3)).model)
     }

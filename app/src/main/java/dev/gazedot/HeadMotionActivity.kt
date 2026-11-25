@@ -13,7 +13,7 @@ class HeadMotionActivity:ComponentActivity() {
     override fun onCreate(savedInstanceState:Bundle?){super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val model=TrackerState.model
-        if(model==null || TrackerState.eyeProfile==null){setContentView(TextView(this).apply{text="얼굴 기준 측정과 9점 보정을 먼저 완료하세요"});return}
+        if(model==null){setContentView(TextView(this).apply{text="9점 화면 보정을 먼저 완료하세요"});return}
         measuring=MotionView(model);setContentView(measuring)
     }
     override fun onStart(){super.onStart();TrackerState.settingsStarted();TrackerState.precisionTraining=true;started=true}

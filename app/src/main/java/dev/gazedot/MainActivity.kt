@@ -68,10 +68,6 @@ class MainActivity : ComponentActivity() {
             handler.postDelayed(this, 50)
         }
     }
-    private val faceSetup = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if(result.resultCode == android.app.Activity.RESULT_OK && TrackerState.running) startScreenCalibration()
-        else { TrackerState.status="얼굴 기준 측정 취소 · 기존 보정 유지"; showHome() }
-    }
     private fun showCalibrationTutorial() {
         if(!TrackerState.running) { showHome(); return }
         val bounds=DisplaySpace.bounds(this)
@@ -184,7 +180,7 @@ class MainActivity : ComponentActivity() {
             calibration?.close()
             calibration = null
             TrackerState.cancelCalibration()
-            TrackerState.status = "보정이 중단되었습니다. 다시 5점 보정을 시작하세요."
+            TrackerState.status = "보정이 중단되었습니다. 다시 9점 보정을 시작하세요."
             showHome()
         }
     }
@@ -325,7 +321,7 @@ class MainActivity : ComponentActivity() {
 
                 if (number == "1") {
                     cameraButton = button
-                } else {
+                } else if (number == "2") {
                     calibrationButton = button
                 }
             }
@@ -338,8 +334,8 @@ class MainActivity : ComponentActivity() {
         addStep("2", "시선 보정", "기기를 움직이지 말고 얼굴을 카메라에서 약\n30~50cm 떨어진 위치에 맞춰 주세요.", 26, "보정 시작") {
             startCalibration()
         }
-        addStep("3", "시선 테스트", "추가 보정 후 새 목표에서 오차를 확인합니다.", 26, "정밀 보정") {
-            if (TrackerState.model == null) status.text = "먼저 5점 보정을 완료해 주세요"
+        addStep("3", "시선 테스트", "필요할 때만 추가 검사·보정을 진행합니다.", 26, "정밀 보정") {
+            if (TrackerState.model == null) status.text = "먼저 9점 보정을 완료해 주세요"
             else startActivity(Intent(this, AccuracyActivity::class.java))
         }
 
@@ -454,14 +450,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private var pendingCalibrationRecovery = false
     private fun startCalibration(fromRecovery: Boolean = false) {
         if(!TrackerState.running || TrackerState.fault!=null) { status.text="먼저 카메라를 시작하세요";return }
         tutorial?.close();tutorial=null
-        pendingCalibrationRecovery = fromRecovery
-        faceSetup.launch(Intent(this,FaceSetupActivity::class.java))
+        startScreenCalibration(fromRecovery)
     }
-    private fun startScreenCalibration(fromRecovery: Boolean = pendingCalibrationRecovery) {
+    private fun startScreenCalibration(fromRecovery: Boolean = false) {
         if (!TrackerState.running || TrackerState.fault != null) {
             if (::status.isInitialized) status.text = "보정을 시작할 수 없어요. 카메라를 시작하고 눈이 검출되면 다시 선택해 주세요."
             return
@@ -480,95 +474,53 @@ class MainActivity : ComponentActivity() {
 
     private inner class CalibrationView(private val session: Long, val returnToRecovery: Boolean) : View(this@MainActivity) {
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-        private val targets = listOf(.5 to .5, .18 to .18, .82 to .18, .82 to .82, .18 to .82)
-        private var index = 0
-        private var since = SystemClock.uptimeMillis()
-        private var targetStartedAt = since
-        private val samples = mutableListOf<EyeFeatures>()
-        private val fixations = mutableListOf<CalibrationFixation>()
-        private var poseReference: HeadPose? = null
-        private var lastSampleAt = 0L
+        private val acquisition = ScreenCalibration(SystemClock.uptimeMillis())
         private var closed = false
-        private var hint = "머리는 고정하고 파란 점을 바라보세요"
+        private val buttons = mutableListOf<Pair<RectF,()->Unit>>()
+        private var reportSaved = false
         private val tick = object : Runnable {
             override fun run() {
                 if (closed || calibration !== this@CalibrationView) return
-                val now = SystemClock.uptimeMillis()
-                if (now - targetStartedAt > 15000) {
-                    finish(null, "눈 표본이 부족합니다. 조명·거리·안경 반사를 확인하고 다시 보정하세요.")
-                    return
-                }
-                invalidate(); postDelayed(this, 100)
+                invalidate();postDelayed(this,100)
             }
         }
-        init { setBackgroundColor(Color.rgb(15, 23, 42)); post(tick) }
-        fun close() {
-            closed = true
-            removeCallbacks(tick)
-            samples.clear()
-            fixations.clear()
-        }
-        override fun onDetachedFromWindow() { close(); super.onDetachedFromWindow() }
-        fun onFrame(sample: GazeSample?) {
-            if (closed || index >= targets.size || width == 0 || height == 0) return
-            val now = SystemClock.uptimeMillis()
-            if (sample != null && sample.timestampMs <= lastSampleAt && now-sample.timestampMs in 0..750) return
-            val elapsed = now - since
-            // Keep collecting open-eye features even when the old model rejects this pose.
-            val f = sample?.calibrationFeatures(now, lastSampleAt, 750)
-            if (f == null) {
-                if (samples.isNotEmpty()) { samples.clear(); poseReference=null; since=now }
-                hint = "${TrackerState.eyeState} · ${TrackerState.inferenceStatus}"
-                invalidate(); return
+        init { setBackgroundColor(Color.rgb(15,23,42));post(tick) }
+        fun close() { closed=true;removeCallbacks(tick) }
+        override fun onDetachedFromWindow() { close();super.onDetachedFromWindow() }
+        fun onFrame(sample:GazeSample?) {
+            if(closed || width==0 || height==0) return
+            val xy=acquisition.targets[acquisition.index]
+            val origin=IntArray(2);getLocationOnScreen(origin)
+            val bounds=DisplaySpace.bounds(this@MainActivity)
+            val target=DisplayCoordinates(bounds.width(),bounds.height()).normalize(
+                origin[0]+width*xy.first,origin[1]+height*xy.second)
+            val reason=when(TrackerState.eyeState) {
+                EyeState.CLOSED,EyeState.LEFT_WINK,EyeState.RIGHT_WINK -> "눈 감김 · 잠시 대기"
+                EyeState.LOST -> "눈 특징을 찾는 중"
+                else -> "새 눈 표본 대기"
             }
-            if(f.source != GazeSource.LANDMARK) { samples.clear(); hint="MediaPipe 눈 특징 대기"; return }
-            if (lastSampleAt>0 && sample.timestampMs-lastSampleAt>1200) {
-                samples.clear(); poseReference=null; since=now
-            }
-            lastSampleAt = sample.timestampMs
-            val head = f.head
-            if (head == null) {
-                samples.clear(); since = now
-                hint = "머리 자세 검출 대기 · 얼굴 전체가 보이게 해 주세요"
-                invalidate(); return
-            }
-            if (poseReference == null) poseReference = head
-            if (!CalibrationPose.stable(head, poseReference!!)) {
-                samples.clear(); since = now; poseReference = head
-                hint = "현재 자세에서 잠시 멈추고 점을 바라보세요"
-                invalidate(); return
-            }
-            hint = "${index + 1} / 5 · 파란 점을 계속 바라보세요"
-            if (sample.timestampMs < since + 1000) return
-            samples += f
-            if (samples.size >= 22 && elapsed >= 2500) {
-                val eye = medianFeatures(samples)
-                // Reject motion within a fixation, rather than fitting mismatched samples.
-                if (samples.any { kotlin.math.abs(it.faceX - eye.faceX) > .045 || kotlin.math.abs(it.faceY - eye.faceY) > .045 }) {
-                    samples.clear(); since = SystemClock.uptimeMillis()
-                    hint = "머리가 움직였습니다 · 같은 점에서 다시 측정합니다"
-                    return
-                }
-                val xy = targets[index]
-                val location = IntArray(2); getLocationOnScreen(location)
-                val bounds = DisplaySpace.bounds(this@MainActivity)
-                val point = DisplayCoordinates(bounds.width(), bounds.height())
-                    .normalize(location[0] + width * xy.first, location[1] + height * xy.second)
-                fixations += CalibrationFixation(samples.toList(), point.first, point.second)
-                index++; samples.clear(); poseReference=null; since = SystemClock.uptimeMillis(); targetStartedAt=since
-                // Five-point screen mapping; no head-motion training or mid-session break.
-                if (index == targets.size) {
-                    val audit = CalibrationAudit.fit(fixations)
-                    getSharedPreferences("personal",MODE_PRIVATE).edit().putString("calibration_audit_v30",audit.report).apply()
-                    val rows=fixations.flatMap { group -> group.samples.map { f -> listOf(group.x,group.y,f.x,f.y,f.faceX,f.faceY,f.scale) } }
-                    runCatching { java.io.File(filesDir,"last-calibration-audit-v30.json").writeText(org.json.JSONObject()
-                        .put("version",30).put("source","mediapipe-binocular").put("report",audit.report).put("rows",org.json.JSONArray(rows)).toString()) }
-                    finish(audit.model, if (audit.model == null) "보정 실패 · ${audit.report}"
-                        else "보정 완료 · 품질 검사 통과. 실제 오차는 시선 원인 진단에서 확인하세요.")
-                }
+            acquisition.observe(sample,SystemClock.uptimeMillis(),target,reason)
+            if(acquisition.review!=null && !reportSaved) {
+                reportSaved=true
+                val result=acquisition.review!!
+                getSharedPreferences("personal",MODE_PRIVATE).edit().putString("calibration_audit_v30",result.report).apply()
+                val rows=acquisition.fixations().flatMap { g -> g.samples.map { f ->
+                    listOf(g.x,g.y,f.leftX,f.leftY,f.rightX,f.rightY,f.faceX,f.faceY,f.scale)
+                } }
+                runCatching { java.io.File(filesDir,"last-calibration-v44.json").writeText(
+                    org.json.JSONObject().put("version",44).put("report",result.report)
+                        .put("rows",org.json.JSONArray(rows)).toString()) }
             }
             invalidate()
         }
+        override fun onTouchEvent(event:MotionEvent):Boolean {
+            if(event.actionMasked==MotionEvent.ACTION_UP) {
+                buttons.firstOrNull { it.first.contains(event.x,event.y) }?.second?.invoke()
+                performClick()
+            }
+            return true
+        }
+        override fun performClick():Boolean { super.performClick();return true }
         private fun finish(model: GazeModel?, message: String) {
             val saved = runCatching {
                 TrackerState.finishCalibration(session, model)
@@ -577,11 +529,7 @@ class MainActivity : ComponentActivity() {
             close()
             calibration = null
             if (saved.getOrDefault(false) && TrackerState.running) {
-                if (returnToRecovery) finish() else {
-                    val bounds = DisplaySpace.bounds(this@MainActivity)
-                    calibrationCheck = CalibrationCheckView(bounds.width(), bounds.height())
-                    setContentView(calibrationCheck)
-                }
+                if (returnToRecovery) finish() else showCalibrationTutorial()
             } else if (returnToRecovery) finish() else {
                 showHome()
                 android.app.AlertDialog.Builder(this@MainActivity)
@@ -591,21 +539,42 @@ class MainActivity : ComponentActivity() {
             }
         }
         override fun onDraw(canvas: Canvas) {
-            val target = targets.getOrNull(index) ?: return
-            val d = resources.displayMetrics.density
-            paint.color = Color.WHITE; paint.textSize = 15 * d; paint.textAlign = Paint.Align.CENTER
-            canvas.drawText("MediaPipe 화면 맞춤 ${index + 1}/5", width / 2f, 55 * d, paint)
-            paint.textSize = 12 * d
-            canvas.drawText(hint, width / 2f, height - 70 * d, paint)
-            canvas.drawText("중단하려면 뒤로 가기", width / 2f, height - 45 * d, paint)
-            val x = (target.first * width).toFloat(); val y = (target.second * height).toFloat()
-            paint.color = Color.rgb(96, 165, 250)
-            canvas.drawCircle(x, y, 13 * d, paint)
-            paint.color = Color.WHITE; canvas.drawCircle(x, y, 3 * d, paint)
-            paint.style = Paint.Style.STROKE; paint.strokeWidth = 3 * d
-            canvas.drawArc(x - 23*d, y - 23*d, x + 23*d, y + 23*d, -90f,
-                360f * (samples.size / 22f).coerceAtMost(1f), false, paint)
-            paint.style = Paint.Style.FILL
+            buttons.clear()
+            val d=resources.displayMetrics.density
+            paint.style=Paint.Style.FILL;paint.textAlign=Paint.Align.CENTER;paint.color=Color.WHITE
+            val review=acquisition.review
+            if(review!=null) {
+                val d=minOf(d,height/720f)
+                paint.textSize=23*d;canvas.drawText("보정 결과",width/2f,90*d,paint)
+                paint.textSize=14*d
+                review.report.split("\n").forEachIndexed { i,line ->
+                    // Wrap long Korean lines to remain readable on narrow phones.
+                    line.chunked(30).forEachIndexed { j,part -> canvas.drawText(part,width/2f,(140+i*56+j*22)*d,paint) }
+                }
+                var y=maxOf(height*.56f,390*d)
+                fun button(label:String,action:()->Unit) {
+                    val box=RectF(24*d,y,width-24*d,y+48*d)
+                    paint.color=Color.rgb(6,108,236);canvas.drawRoundRect(box,12*d,12*d,paint)
+                    paint.color=Color.WHITE;paint.textSize=16*d;canvas.drawText(label,width/2f,y+31*d,paint)
+                    buttons += box to action;y+=60*d
+                }
+                if(review.model!=null) button("이 보정으로 시작") { finish(review.model,"보정 완료 · 실제 움직임을 확인해 주세요") }
+                button("${review.worstTarget+1}번 점만 다시 측정") {
+                    acquisition.retry(review.worstTarget,SystemClock.uptimeMillis());reportSaved=false;invalidate()
+                }
+                button("9개 점 전체 다시 측정") { acquisition.restart(SystemClock.uptimeMillis());reportSaved=false;invalidate() }
+                return
+            }
+            val target=acquisition.targets[acquisition.index]
+            paint.textSize=15*d;canvas.drawText("화면 맞춤 ${acquisition.completedCount+1}/9",width/2f,25*d,paint)
+            paint.textSize=13*d;canvas.drawText(acquisition.hint,width/2f,height/2f+65*d,paint)
+            paint.textSize=12*d;canvas.drawText("깜빡여도 괜찮아요 · 중단은 뒤로 가기",width/2f,height/2f+88*d,paint)
+            val x=(target.first*width).toFloat();val y=(target.second*height).toFloat()
+            paint.color=Color.rgb(96,165,250);canvas.drawCircle(x,y,13*d,paint)
+            paint.color=Color.WHITE;canvas.drawCircle(x,y,3*d,paint)
+            paint.style=Paint.Style.STROKE;paint.strokeWidth=3*d
+            canvas.drawArc(x-23*d,y-23*d,x+23*d,y+23*d,-90f,360f*acquisition.progress,false,paint)
+            paint.style=Paint.Style.FILL
         }
     }
 

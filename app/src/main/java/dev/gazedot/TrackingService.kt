@@ -24,6 +24,7 @@ import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarker
 import java.util.concurrent.Executors
 
 class TrackingService : LifecycleService() {
+    private val naturalEyes = NaturalEyeBaseline()
     private val pipeline = GazePipeline(500,500,useBars=true)
     private lateinit var voice: VoiceInput
     @Volatile private var trackingEpoch = 0L
@@ -224,7 +225,6 @@ class TrackingService : LifecycleService() {
         var sharedImage: MPImage? = null
         var stage = "카메라 영상 변환"
         val epoch = trackingEpoch
-        val setupOnly = TrackerState.faceSetupActive
         try {
             val now = SystemClock.uptimeMillis()
             if (closing || now - lastFrame < 66) return
@@ -241,22 +241,17 @@ class TrackingService : LifecycleService() {
             val transform=result?.facialTransformationMatrixes()?.orElse(null)?.firstOrNull()
             val blends=result?.faceBlendshapes()?.orElse(null)?.firstOrNull()?.associate { it.categoryName() to it.score() } ?: emptyMap()
             val face=landmarks?.let { FaceGeometry.extract(it,upright.width,upright.height,now,transform,blends) }
+            val hasBlinkScores = blends.containsKey("eyeBlinkLeft") && blends.containsKey("eyeBlinkRight")
+            val eyeProfile = naturalEyes.add(face, hasBlinkScores)
             val landmarkObservation = landmarks?.let {
-                EyeObservations.observe(it, upright.width, upright.height,face,TrackerState.eyeProfile)
+                EyeObservations.observe(it, upright.width, upright.height, face, eyeProfile, hasBlinkScores,
+                    if (hasBlinkScores) blends.getValue("eyeBlinkLeft").toDouble() to blends.getValue("eyeBlinkRight").toDouble() else null)
             } ?: EyeObservation(EyeState.LOST, null, 0.0, 0.0)
             val observation = landmarkObservation
             main.post {
-                if (closing || epoch != trackingEpoch || cameraFault != null || setupOnly != TrackerState.faceSetupActive) return@post
+                if (closing || epoch != trackingEpoch || cameraFault != null) return@post
                 val at = SystemClock.uptimeMillis()
-                if(setupOnly) {
-                    lastResult=at
-                    TrackerState.signalPending=false
-                    TrackerState.faceFrame=face?.takeIf{at-now in 0..750}
-                    TrackerState.frameAt=now
-                    TrackerState.inferenceStatus="홍채 기준 측정 · MediaPipe만 실행 중"
-                    TrackerState.publish(null,"얼굴·홍채 기준 측정 중")
-                    return@post
-                }
+                TrackerState.eyeProfile = eyeProfile
                 GazeTrace.record(now,at-now,observation.state,observation.features,TrackerState.model)
                 TrackerState.inferenceStatus=if(observation.features!=null)
                     "MediaPipe 양안 · 전체 %d ms%s".format(at-now,if(at-now>500) " · 지연: 조작 대기" else "")
@@ -293,7 +288,7 @@ class TrackingService : LifecycleService() {
                     TrackingQuality.CLOSED -> "눈 감김 감지"
                     TrackingQuality.UNCERTAIN -> "눈 상태 확인 중"
                     TrackingQuality.STALE -> "영상 처리가 지연됩니다 · 조작 일시 대기"
-                    TrackingQuality.OUT_OF_RANGE -> if (model == null) "눈 검출됨 · 5점 보정을 시작해 주세요"
+                    TrackingQuality.OUT_OF_RANGE -> if (model == null) "눈 검출됨 · 9점 보정을 시작해 주세요"
                         else "시선 좌표를 사용할 수 없어요 · 얼굴 위치를 확인해 주세요"
                     TrackingQuality.TRACKING -> "추적 중 · 홈으로 나가도 빨간 점이 표시됩니다"
                 }
@@ -447,7 +442,7 @@ class TrackingService : LifecycleService() {
             TrackerState.sample?.quality in listOf(TrackingQuality.TRACKING, TrackingQuality.CLOSED, TrackingQuality.UNCERTAIN)
         overlay?.show(if (showPoint) TrackerState.sample?.point else null,
             if (enabled) TrackerState.sample?.dwellProgress ?: 0f else TrackerState.localDwellProgress,
-            trackingOverlayLabel(state, showPoint, TrackerState.collecting || TrackerState.faceSetupActive ||
+            trackingOverlayLabel(state, showPoint, TrackerState.collecting ||
                 TrackerState.precisionTraining || TrackerState.helpVisible || TrackerState.recoveryOpening,
                 TrackerState.speaking, TrackerState.actionStatus),
             if (enabled) TrackerState.sample?.scrollMode == true else TrackerState.localScrollMode,

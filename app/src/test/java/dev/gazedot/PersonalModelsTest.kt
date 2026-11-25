@@ -82,7 +82,7 @@ class PersonalModelsTest {
         assertEquals(original.first+.05,corrected.predict(eye)!!.first,1e-9)
         assertEquals(original.second-.04,corrected.predict(eye)!!.second,1e-9)
         assertEquals(original,corrected.withCorrection(null).predict(eye))
-        assertNull(corrected.predict(eye.copy(faceX=.9)))
+        assertEquals(corrected.predict(eye),corrected.predict(eye.copy(faceX=.9)))
         assertNull(GazeModel.fit(anchors)!!.correction)
     }
 }

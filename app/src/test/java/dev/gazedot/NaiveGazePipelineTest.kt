@@ -28,15 +28,18 @@ class NaiveGazePipelineTest {
         assertTrue(sample.actions.isEmpty())
         assertEquals(f, sample.calibrationFeatures(1000, 0))
     }
-    @Test fun oldPoseRejectionAndScreenClampingArePreserved() {
+    @Test fun faceTranslationKeepsValidMappingAndScreenClampingIsPreserved() {
         val model = model()
         val pipeline = GazePipeline(250,250)
         val outside = pipeline.process(1000, 1000, observation(eye(.2, -.2)), model, false)
         assertEquals(1.0, outside.point!!.first, 0.0)
         assertEquals(0.0, outside.point.second, 0.0)
+        pipeline.reset()
+        val center = pipeline.process(1033, 1033, observation(eye(0.0, 0.0)), model, true)
         val moved = eye(0.0, 0.0).copy(faceX = .7)
         val sample = pipeline.process(1066, 1066, observation(moved), model, true)
-        assertNull(sample.point)
+        assertEquals(TrackingQuality.TRACKING, sample.quality)
+        assertEquals(center.point, sample.point)
         assertTrue(sample.actions.isEmpty())
         assertEquals(moved, sample.calibrationFeatures(1066, 1000))
     }
@@ -87,7 +90,7 @@ class NaiveGazePipelineTest {
         frame(1600,EyeState.LEFT_WINK,null)
         val enabled=frame(1900,EyeState.OPEN)
         assertTrue(enabled.scrollMode)
-        val missing=frame(2100,EyeState.OPEN,eye(0.0,0.0).copy(faceX=.9))
+        val missing=frame(2100,EyeState.OPEN,eye(0.0,0.0).copy(scale=0.0))
         assertEquals(TrackingQuality.OUT_OF_RANGE,missing.quality)
         assertTrue(missing.scrollMode)
         assertFalse(missing.actions.any{it is EyeAction.Scroll || it is EyeAction.Click})

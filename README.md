@@ -1,5 +1,7 @@
 # NoTouch — integrated main + texting (v34)
 
+**Calibration update (2026-11-25):** Main now includes the v46 calibration from `gaze-response-fix`: nine targets, separate per-eye fitting, result review and single-target retry. Mandatory face alignment and uncalibrated quick start are absent. Texting, scrolling and the main logo are preserved. See [integration details and validation](docs/calibration-main-integration.md). The older setup descriptions below are historical.
+
 Merged feature/texting 293e2e3 into main 57a9c18. Main's MediaPipe binocular mapping, calibration verification, selection assistance and vertical edge-scroll bars remain. Native messaging/IME prediction, per-installation API authentication, accessibility reconnect fixes and scroll-window cancellation fixes are integrated. Tutorial completion badges follow the actual vertical bar controls; wink-only instructions do not replace the bar workflow.
 
 Prediction relay defaults to https://notouch-server.vercel.app. No API key belongs in the APK. See server/vercel/README.md for the deployed v2 protocol and currently removed prediction count limits.
