@@ -10,6 +10,27 @@ class NaiveGazePipelineTest {
     })!!
     private fun observation(f: EyeFeatures?) = EyeObservation(if (f == null) EyeState.LOST else EyeState.OPEN, f, .2, .2)
 
+    @Test fun briefDetectionLossDoesNotSnapToUnsmoothedRecoveryPoint() {
+        val p=GazePipeline(); val m=model()
+        val initial=p.process(1000,1000,observation(eye(0.0,0.0)),m,true).point!!
+        val lost=p.process(1066,1066,observation(null),m,true)
+        assertNull(lost.point)
+        assertFalse(lost.actions.any { it is EyeAction.Click || it is EyeAction.Scroll })
+        val raw=m.predictForFiltering(eye(.04,.02))!!
+        val recovered=p.process(1132,1132,observation(eye(.04,.02)),m,true)
+        assertTrue(recovered.point!!.first > initial.first)
+        assertTrue(recovered.point.first < raw.first)
+        assertFalse(recovered.actions.any { it is EyeAction.Click || it is EyeAction.Scroll })
+    }
+    @Test fun prolongedDetectionLossDiscardsOldDisplayHistory() {
+        val p=GazePipeline(); val m=model()
+        p.process(1000,1000,observation(eye(0.0,0.0)),m,true)
+        for(t in 1100L..1600L step 100) assertNull(p.process(t,t,observation(null),m,true).point)
+        val recovered=p.process(1700,1700,observation(eye(.04,.02)),m,true)
+        assertEquals(m.predict(eye(.04,.02))!!.first,recovered.point!!.first,1e-9)
+        assertEquals(0f,recovered.dwellProgress)
+    }
+
     @Test fun isolatedSpikeCannotTriggerAnActionWhileDisplayRemainsContinuous() {
         val m=model();val p=GazePipeline()
         val initial=p.process(1000,1000,observation(eye(0.0,0.0)),m,true)
