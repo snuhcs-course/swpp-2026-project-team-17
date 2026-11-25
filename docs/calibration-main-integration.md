@@ -13,7 +13,7 @@ This selectively ports calibration, not the whole source branch.
 - Results can be applied, the worst target remeasured, or all nine targets restarted. Failed or cancelled acquisition preserves the prior model.
 - Open-eye baselines are collected automatically without blocking setup. Independent MediaPipe blink scores allow visible narrowed eyes at edge targets; real blinks / winks remain excluded.
 - Missing optional head-pose geometry does not block calibration. Ordinary face translation / distance changes no longer invalidate otherwise finite eye-relative mapping. This is not full head-motion compensation.
-- The old automatic post-calibration correction screen is no longer entered. Applying a result proceeds to the existing tutorial.
+- Follow-up: applying a successful nine-point calibration now opens the existing five-target retargeting screen again. Its existing bounded bias correction and result button are unchanged. Normal setup proceeds from that screen to the tutorial; recovery recalibration returns to the previous app after the check. No layout, drawing, labels or button designs were changed.
 - The legacy `CalibrationAudit` helper retains its explicit training-pose consistency check from the source branch; it no longer relies on runtime coordinate rejection. The new nine-point `ScreenCalibration` flow does not call this legacy helper or impose its pose gate.
 
 ## Integration boundaries
@@ -25,3 +25,5 @@ Main's current logo, version metadata, texting / API implementation, scrolling, 
 Command: `gradlew.bat :app:testDebugUnitTest :app:compileDebugKotlin :app:lintDebug -PtargetAbi=arm64-v8a --offline --no-daemon --console=plain`
 
 Results: **BUILD SUCCESSFUL**; 180 JVM tests passed, zero failures/errors/skips. Android debug compilation passed. Lint reported zero errors and 50 warnings. `git diff --check` passed. Physical-phone calibration accuracy and accessibility interaction require device validation; synthetic tests do not establish either. No APK was packaged for this source-integration request.
+
+Retargeting reconnection validation: the same command passed with 181 tests, zero failures/errors/skips and zero lint errors (50 warnings). The added integration test checks that screen-space correction reaches runtime prediction and is not inherited by a newly fitted calibration. Physical navigation and accuracy have not been tested on a phone.

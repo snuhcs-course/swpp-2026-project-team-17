@@ -529,7 +529,9 @@ class MainActivity : ComponentActivity() {
             close()
             calibration = null
             if (saved.getOrDefault(false) && TrackerState.running) {
-                if (returnToRecovery) finish() else showCalibrationTutorial()
+                val bounds = DisplaySpace.bounds(this@MainActivity)
+                calibrationCheck = CalibrationCheckView(bounds.width(), bounds.height(), returnToRecovery)
+                setContentView(calibrationCheck)
             } else if (returnToRecovery) finish() else {
                 showHome()
                 android.app.AlertDialog.Builder(this@MainActivity)
@@ -582,6 +584,7 @@ class MainActivity : ComponentActivity() {
     private inner class CalibrationCheckView(
         private val displayWidth: Int,
         private val displayHeight: Int,
+        private val returnToRecovery: Boolean,
     ) : View(this@MainActivity) {
         private val targets = listOf(.2 to .2, .8 to .2, .8 to .8, .2 to .8, .5 to .5)
         private val results = mutableListOf<CalibrationCheckResult?>()
@@ -698,7 +701,7 @@ class MainActivity : ComponentActivity() {
             if (closed || !report) return
             close()
             calibrationCheck = null
-            showCalibrationTutorial()
+            if (returnToRecovery) finish() else showCalibrationTutorial()
         }
 
         override fun onTouchEvent(event: MotionEvent): Boolean {
