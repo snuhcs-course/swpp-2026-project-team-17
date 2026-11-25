@@ -18,13 +18,16 @@ class GazeStabilizerTest {
         assertFalse(f.update(.8 to .5,100).confirmed)
         assertTrue(f.update(.79 to .5,200).confirmed)
         val r=f.update(.8 to .5,300)
-        assertTrue(r.point.first>.75)
+        assertTrue(r.point.first>.65)
+        var settled=r
+        for(i in 4..12) settled=f.update(.8 to .5,i*100L)
+        assertTrue(settled.point.first>.79)
     }
-    @Test fun alternatingLargeOutliersCannotMoveOrConfirm() {
+    @Test fun alternatingLargeOutliersCannotConfirmActions() {
         val f=GazeStabilizer();f.update(.5 to .5,0)
         for(i in 1..10) {
             val r=f.update((if(i%2==0) .9 else .1) to .5,i*100L)
-            assertFalse(r.confirmed);assertEquals(.5,r.point.first,0.0)
+            assertFalse(r.confirmed);assertTrue(abs(r.point.first-.5)<.17)
         }
     }
     @Test fun resetDoesNotReusePreviousFixation() {
@@ -36,6 +39,62 @@ class GazeStabilizerTest {
             val state=TrackingStatus(phase,"reason")
             assertEquals("reason",trackingOverlayLabel(state,false,false,false,""))
             assertEquals("",trackingOverlayLabel(state,false,true,false,""))
+        }
+    }
+
+    @Test fun repeatedSmallNoiseDoesNotEnableFastFollow() {
+        for (interval in listOf(33L, 66L)) {
+            val f=GazeStabilizer(); f.update(.5 to .5,0)
+            var total=0.0
+            for (i in 1..120) {
+                val raw=.5 + if ((i/2)%2==0) .04 else -.04
+                val p=f.update(raw to .5, i*interval).point
+                total+=abs(p.first-.5)
+            }
+            assertTrue("paired jitter must remain damped at $interval ms",total/120 < .02)
+        }
+    }
+    @Test fun smallIntentionalMoveStillConverges() {
+        val f=GazeStabilizer(); f.update(.5 to .5,0)
+        var p=.5 to .5
+        for(i in 1..12) p=f.update(.55 to .5,i*66L).point
+        assertTrue(p.first>.545)
+    }
+    @Test fun diagonalInputsDoNotCreateAnAxisOnlyDetour() {
+        val f=GazeStabilizer();f.update(.5 to .5,0)
+        val p=f.update(.46 to .54,66).point
+        assertEquals("both coordinates stay on the input segment",1.0,p.first+p.second,1e-9)
+    }
+    @Test fun stableResponseStillTracksAndSettlesAfterSustainedMotion() {
+        val f=GazeStabilizer();f.update(.2 to .5,0)
+        var p=.2 to .5
+        for(i in 1..30) p=f.update((.2+i*.015) to .5,i*66L).point
+        // v36 intentionally restores the pre-v33 stability response; do not demand
+        // the removed fast-follow latency while checking that it never freezes.
+        assertTrue("motion continues within the smoothing range",.65-p.first<.08)
+        for (i in 31..42) p=f.update(.65 to .5,i*66L).point
+        assertTrue("settles at the destination",abs(.65-p.first)<.006)
+    }
+    @Test fun matchesV14InterpolationAtOriginalCadence() {
+        val f=GazeStabilizer(); f.update(.5 to .5,0)
+        var legacy=.5
+        for(i in 1..30) {
+            val raw=if(i<10) .9 else if(i<20) .1 else .7
+            legacy+=.28*(raw-legacy)
+            assertEquals(legacy,f.update(raw to .5,i*66L).point.first,1e-9)
+        }
+    }
+    @Test fun everyCornerRemainsReachableWithNoDisplacementLock() {
+        for (interval in listOf(33L,66L)) {
+            val f=GazeStabilizer();f.update(.5 to .5,0)
+            var time=0L
+            for(target in listOf(0.0 to 0.0,1.0 to 0.0,1.0 to 1.0,0.0 to 1.0)) {
+                var result=GazeStabilizer.Result(.5 to .5,false)
+                repeat((1_500/interval).toInt()) { time+=interval;result=f.update(target,time) }
+                assertEquals(target.first,result.point.first,.002)
+                assertEquals(target.second,result.point.second,.002)
+                assertTrue(result.confirmed)
+            }
         }
     }
 }

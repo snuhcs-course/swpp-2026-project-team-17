@@ -40,6 +40,10 @@ fun trackingStatus(running: Boolean, controls: Boolean, collecting: Boolean,
         if (eye == EyeState.CLOSED) "눈 감김 감지 · 시선 입력 대기" else "눈 상태를 확인하고 있어요")
     if (!calibrated) return TrackingStatus(TrackingPhase.NEEDS_CALIBRATION,
         "시선 보정이 필요해요", "눈이 검출되면 ‘다시 보정하기’를 선택해 주세요.")
+    // A corroboration frame or post-blink settling period is not a failed mapping.
+    // Actions remain gated by quality; do not flash a face-position error on a saccade.
+    if (sample.quality == TrackingQuality.UNCERTAIN) return TrackingStatus(TrackingPhase.EYES_PENDING,
+        "시선 이동 확인 중이에요")
     if (sample.toScreenGaze()?.valid != true) return TrackingStatus(TrackingPhase.COORDINATES_UNAVAILABLE,
         "시선 좌표를 사용할 수 없어요", "보정할 때의 얼굴 위치를 확인해 주세요. 필요하면 직접 다시 보정할 수 있어요.")
     return TrackingStatus(TrackingPhase.TRACKING, "정상 추적 중이에요",

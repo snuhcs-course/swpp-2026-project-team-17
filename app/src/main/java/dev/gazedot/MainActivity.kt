@@ -635,7 +635,7 @@ class MainActivity : ComponentActivity() {
             if (closed || report || index >= targets.size || width == 0 || height == 0) return
             val now = SystemClock.uptimeMillis()
             val elapsed = now - since
-            val point = sample?.point
+            val point = sample?.calibrationCheckPoint(now, since, settleMs)
             if (sample == null || sample.quality != TrackingQuality.TRACKING ||
                 now - sample.timestampMs !in 0..250 || sample.timestampMs <= lastSampleAt ||
                 point == null || !point.first.isFinite() || !point.second.isFinite()) {

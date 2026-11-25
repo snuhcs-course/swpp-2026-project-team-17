@@ -55,4 +55,29 @@ class MediaPipeComparisonTest {
         assertEquals(EyeState.LEFT_WINK,sample.state)
         assertNull(sample.features)
     }
+    @Test fun ninePointMedianCalibrationAndDisplayReachAllScreenEdges() {
+        fun features(x:Double,y:Double,n:Double=0.0):EyeFeatures {
+            val lx=(x-.5)*.24+.02+n;val rx=(x-.5)*.32-.03+n
+            val ly=(y-.5)*.18+n;val ry=(y-.5)*.22+n
+            return EyeFeatures((lx+rx)/2,(ly+ry)/2,.5,.5,.3,lx,ly,rx,ry)
+        }
+        val groups=listOf(.08,.5,.92).flatMap { x -> listOf(.08,.5,.92).map { y ->
+            CalibrationFixation((0 until 22).map { i -> features(x,y,if(i%2==0) .0002 else -.0002) },x,y)
+        } }
+        val audit=CalibrationAudit.fit(groups)
+        assertNotNull(audit.report,audit.model)
+        for(interval in listOf(33L,66L)) {
+            val pipeline=GazePipeline(); var time=1_000L
+            for((x,y) in listOf(.01 to .01,.99 to .01,.99 to .99,.01 to .99,.5 to .5)) {
+                var sample:GazeSample?=null
+                repeat((1_500/interval).toInt()) {
+                    time+=interval
+                    sample=pipeline.process(time,time,EyeObservation(EyeState.OPEN,features(x,y),.22,.22),audit.model,false)
+                }
+                assertEquals(TrackingQuality.TRACKING,sample!!.quality)
+                assertEquals(x,sample!!.point!!.first,.015)
+                assertEquals(y,sample!!.point!!.second,.015)
+            }
+        }
+    }
 }

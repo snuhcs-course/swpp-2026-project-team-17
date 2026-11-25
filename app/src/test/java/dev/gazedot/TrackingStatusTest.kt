@@ -47,4 +47,12 @@ class TrackingStatusTest {
         assertEquals(TrackingPhase.MISSING, status(calibrated = false,
             result = sample(TrackingQuality.LOST, null), eye = EyeState.LOST).phase)
     }
+    @Test fun movingBetweenValidTargetsDoesNotFlashCoordinateFailure() {
+        for (i in 0..20) {
+            val quality = if (i % 2 == 0) TrackingQuality.TRACKING else TrackingQuality.UNCERTAIN
+            val result = status(result = sample(quality))
+            assertNotEquals(TrackingPhase.COORDINATES_UNAVAILABLE, result.phase)
+            assertEquals("", result.overlayMessage)
+        }
+    }
 }

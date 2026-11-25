@@ -12,6 +12,13 @@ data class GazeSample(
     val actions: List<EyeAction>,
     val scrollMode: Boolean = false,
 ) {
+    /** Bias calibration must not learn display smoothing or pre-settle queued frames. */
+    fun calibrationCheckPoint(nowMs: Long, targetAtMs: Long, settleMs: Long = 900): Pair<Double, Double>? =
+        rawPoint?.takeIf {
+            quality == TrackingQuality.TRACKING && nowMs-timestampMs in 0..250 &&
+                timestampMs-targetAtMs >= settleMs && it.first.isFinite() && it.second.isFinite()
+        }
+
     fun calibrationFeatures(nowMs: Long, after: Long, maxAgeMs: Long = 250): EyeFeatures? = features?.takeIf {
         timestampMs > after && nowMs - timestampMs in 0..maxAgeMs &&
             quality in listOf(TrackingQuality.TRACKING, TrackingQuality.OUT_OF_RANGE)
@@ -66,11 +73,15 @@ class GazePipeline(private val trackingMaxAgeMs: Long = 500, private val actionM
         val held = closureAt != null && timestampMs-closureAt!! <= 1200
         if (observation.state == EyeState.OPEN && !settling) { closureAt=null; reopenedAt=null }
         val features = observation.features.takeIf { observation.state == EyeState.OPEN && !settling }
-        val position = features?.let { predictor?.predict(it) }
-        val filtered = position?.let { stabilizer.update(it, timestampMs) }
+        val position = features?.let { predictor?.predictForFiltering(it) }
+        // Modest offscreen overscan avoids inward clipping bias. Bound extreme
+        // extrapolations so one bad frame cannot leave a long filter tail.
+        val filtered = position?.let { stabilizer.update(
+            it.first.coerceIn(-.25,1.25) to it.second.coerceIn(-.25,1.25), timestampMs) }
         smoothed = if (filtered != null) filtered.point else if (held) smoothed else {
             stabilizer.reset(); null
         }
+        val screenPoint=smoothed?.let { it.first.coerceIn(0.0,1.0) to it.second.coerceIn(0.0,1.0) }
         val quality = when {
             settling || filtered?.confirmed == false -> TrackingQuality.UNCERTAIN
             features != null -> if (position == null) TrackingQuality.OUT_OF_RANGE else TrackingQuality.TRACKING
@@ -81,12 +92,12 @@ class GazePipeline(private val trackingMaxAgeMs: Long = 500, private val actionM
         val actions = if (actionsEnabled && predictor != null && nowMs-timestampMs in 0..actionMaxAgeMs) {
             // Coordinate conversion failure is not face loss: pause movement without clearing the mode.
             val eye = observation.state
-            interaction.update(timestampMs, eye, if (quality == TrackingQuality.TRACKING) smoothed else null, targetKey = if (quality == TrackingQuality.TRACKING) smoothed?.let { targetKey?.invoke(it) } else null, receivedAt = nowMs)
+            interaction.update(timestampMs, eye, if (quality == TrackingQuality.TRACKING) screenPoint else null, targetKey = if (quality == TrackingQuality.TRACKING) screenPoint?.let { targetKey?.invoke(it) } else null, receivedAt = nowMs)
         } else {
             val hadDwell = pending
             cancelInteraction()
             if (hadDwell) listOf(EyeAction.Cancel) else emptyList()
         }
-        return GazeSample(timestampMs, quality, features, position, smoothed, interaction.progress, actions, interaction.scrollMode)
+        return GazeSample(timestampMs, quality, features, position, screenPoint, interaction.progress, actions, interaction.scrollMode)
     }
 }

@@ -71,14 +71,24 @@ class EyeGestureDetector {
     }
 }
 
-/** Shared by the tutorial animation and accessibility swipes. */
+/** One straight accessibility stroke, exactly as handed to dispatchGesture(). */
+data class ScrollSwipe(val from: Pair<Double, Double>, val to: Pair<Double, Double>, val durationMs: Long)
+
+/** Zones and timing are shared by the tutorial animation and accessibility swipes. */
 object ScrollSettings {
     const val TOP_BOUNDARY = 1.0 / 3.0
     const val BOTTOM_BOUNDARY = 2.0 / 3.0
     const val DIRECTION_HOLD_MS = 350L
+    // Tutorial animation distance/duration (both axes) and external vertical swipes.
     const val DISTANCE_FRACTION = 0.15
     const val DURATION_MS = 650L
     const val INTERVAL_MS = 1_100L
+
+    // External LEFT/RIGHT swipes only. Paged views (e.g. launcher home screens) usually snap back
+    // unless the drag is long or fast; a short slow drag only moves the page temporarily.
+    // These are starting values; physical-device validation is pending.
+    const val HORIZONTAL_SWIPE_FRACTION = 0.5
+    const val HORIZONTAL_SWIPE_DURATION_MS = 300L
 
     fun direction(point: Pair<Double, Double>): ScrollDirection? {
         val (x, y) = point
@@ -97,11 +107,14 @@ object ScrollSettings {
         return if (horizontal != null && (vertical == null || kotlin.math.abs(x - .5) > kotlin.math.abs(y - .5))) horizontal else vertical
     }
 
-    fun swipe(direction: ScrollDirection, width: Int, height: Int): Pair<Pair<Double, Double>, Pair<Double, Double>> {
-        val dx = direction.dx * width * DISTANCE_FRACTION / 2
-        val dy = direction.dy * height * DISTANCE_FRACTION / 2
-        return (width / 2.0 + dx to height / 2.0 + dy) to
-            (width / 2.0 - dx to height / 2.0 - dy)
+    /** Centered stroke; the finger moves opposite to the direction whose content is revealed. */
+    fun swipe(direction: ScrollDirection, width: Int, height: Int): ScrollSwipe {
+        val horizontal = direction.dx != 0
+        val fraction = if (horizontal) HORIZONTAL_SWIPE_FRACTION else DISTANCE_FRACTION
+        val dx = direction.dx * width * fraction / 2
+        val dy = direction.dy * height * fraction / 2
+        return ScrollSwipe(width / 2.0 + dx to height / 2.0 + dy, width / 2.0 - dx to height / 2.0 - dy,
+            if (horizontal) HORIZONTAL_SWIPE_DURATION_MS else DURATION_MS)
     }
 }
 

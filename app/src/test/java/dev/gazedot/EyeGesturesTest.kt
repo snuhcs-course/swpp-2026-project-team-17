@@ -121,8 +121,9 @@ class EyeGesturesTest {
         val height = 2_000
         for (direction in ScrollDirection.entries) {
             val (from, to) = ScrollSettings.swipe(direction, width, height)
-            assertEquals(-direction.dx * width * ScrollSettings.DISTANCE_FRACTION, to.first - from.first, .001)
-            assertEquals(-direction.dy * height * ScrollSettings.DISTANCE_FRACTION, to.second - from.second, .001)
+            // The finger moves against the requested content direction, on that axis only.
+            assertEquals(-direction.dx.toDouble(), Math.signum(to.first - from.first), 0.0)
+            assertEquals(-direction.dy.toDouble(), Math.signum(to.second - from.second), 0.0)
         }
     }
 

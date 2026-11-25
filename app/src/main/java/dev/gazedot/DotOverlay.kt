@@ -39,13 +39,26 @@ class DotOverlay(context: Context) {
             val d=resources.displayMetrics.density
             getLocationOnScreen(viewOrigin)
             barDirection?.let {
-                val by=(displayBounds.height()*(if(it==ScrollDirection.UP) .09 else .91)-viewOrigin[1]).toFloat()
-                val l=(displayBounds.width()*.1-viewOrigin[0]).toFloat()
-                val r=(displayBounds.width()*.9-viewOrigin[0]).toFloat()
+                val vertical=it==ScrollDirection.LEFT || it==ScrollDirection.RIGHT
+                val thickness=3*d
+                val box=if(vertical) {
+                    val screenX=if(it==ScrollDirection.LEFT) 4*d else displayBounds.width()-4*d
+                    val x=(screenX-viewOrigin[0]).coerceIn(thickness,(width-thickness).coerceAtLeast(thickness))
+                    RectF(x-thickness,(displayBounds.height()*.1-viewOrigin[1]).toFloat(),
+                        x+thickness,(displayBounds.height()*.9-viewOrigin[1]).toFloat())
+                } else {
+                    val screenY=if(it==ScrollDirection.UP) 4*d else displayBounds.height()-4*d
+                    val y=(screenY-viewOrigin[1]).coerceIn(thickness,(height-thickness).coerceAtLeast(thickness))
+                    RectF((displayBounds.width()*.1-viewOrigin[0]).toFloat(),y-thickness,
+                        (displayBounds.width()*.9-viewOrigin[0]).toFloat(),y+thickness)
+                }
                 paint.color=Color.rgb(140,160,185)
-                canvas.drawRoundRect(l,by-3*d,r,by+3*d,3*d,3*d,paint)
+                canvas.drawRoundRect(box,thickness,thickness,paint)
+                val filled=RectF(box)
+                if(vertical) filled.bottom=box.top+box.height()*barProgress
+                else filled.right=box.left+box.width()*barProgress
                 paint.color=Color.rgb(6,108,236)
-                canvas.drawRoundRect(l,by-3*d,l+(r-l)*barProgress,by+3*d,3*d,3*d,paint)
+                canvas.drawRoundRect(filled,thickness,thickness,paint)
             }
             val p = position ?: return
             val x = (p.first.coerceIn(0.0,1.0) * displayBounds.width() - viewOrigin[0]).toFloat()

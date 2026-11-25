@@ -30,6 +30,7 @@ class TrackingService : LifecycleService() {
     @Volatile private var trackingEpoch = 0L
     private val worker = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
+    private val frameDelivery = LatestFrameDelivery({ main.post(it); Unit }, { main.removeCallbacks(it) })
     @Volatile private var closing = false
     private var landmarker: FaceLandmarker? = null
     private var cameraProvider: ProcessCameraProvider? = null
@@ -227,7 +228,7 @@ class TrackingService : LifecycleService() {
         val epoch = trackingEpoch
         try {
             val now = SystemClock.uptimeMillis()
-            if (closing || now - lastFrame < 66) return
+            if (closing || now - lastFrame < 33) return
             lastFrame = now
             raw = frame.toBitmap()
             val matrix = Matrix().apply { postRotate(frame.imageInfo.rotationDegrees.toFloat()) }
@@ -241,21 +242,27 @@ class TrackingService : LifecycleService() {
             val transform=result?.facialTransformationMatrixes()?.orElse(null)?.firstOrNull()
             val blends=result?.faceBlendshapes()?.orElse(null)?.firstOrNull()?.associate { it.categoryName() to it.score() } ?: emptyMap()
             val face=landmarks?.let { FaceGeometry.extract(it,upright.width,upright.height,now,transform,blends) }
-            val hasBlinkScores = blends.containsKey("eyeBlinkLeft") && blends.containsKey("eyeBlinkRight")
-            val eyeProfile = naturalEyes.add(face, hasBlinkScores)
+            val eyeProfile = naturalEyes.add(face, blends.containsKey("eyeBlinkLeft") && blends.containsKey("eyeBlinkRight"))
             val landmarkObservation = landmarks?.let {
-                EyeObservations.observe(it, upright.width, upright.height, face, eyeProfile, hasBlinkScores,
-                    if (hasBlinkScores) blends.getValue("eyeBlinkLeft").toDouble() to blends.getValue("eyeBlinkRight").toDouble() else null)
+                EyeObservations.observe(it, upright.width, upright.height,face,eyeProfile,
+                    blends.containsKey("eyeBlinkLeft") && blends.containsKey("eyeBlinkRight"),
+                    if(blends.containsKey("eyeBlinkLeft") && blends.containsKey("eyeBlinkRight"))
+                        blends.getValue("eyeBlinkLeft").toDouble() to blends.getValue("eyeBlinkRight").toDouble() else null)
             } ?: EyeObservation(EyeState.LOST, null, 0.0, 0.0)
             val observation = landmarkObservation
-            main.post {
-                if (closing || epoch != trackingEpoch || cameraFault != null) return@post
+            frameDelivery.submit(observation.state == EyeState.OPEN) {
+                if (closing || epoch != trackingEpoch || cameraFault != null) return@submit
                 val at = SystemClock.uptimeMillis()
                 TrackerState.eyeProfile = eyeProfile
                 GazeTrace.record(now,at-now,observation.state,observation.features,TrackerState.model)
                 TrackerState.inferenceStatus=if(observation.features!=null)
                     "MediaPipe 양안 · 전체 %d ms%s".format(at-now,if(at-now>500) " · 지연: 조작 대기" else "")
                     else "MediaPipe 대기 · 눈/얼굴 검출 확인 중"
+                if (observation.features == null) {
+                    TrackerState.inferenceStatus="눈 열림 L %.3f / R %.3f · 깜빡임 L %.2f / R %.2f · 개인 기준 %s".format(
+                        observation.leftOpen,observation.rightOpen,face?.leftBlink ?: -1.0,face?.rightBlink ?: -1.0,
+                        if(eyeProfile==null) "준비 중" else "있음")
+                }
                 if (TrackerState.collecting) {
                     lastResult=at
                     TrackerState.faceFrame=face
@@ -265,13 +272,13 @@ class TrackingService : LifecycleService() {
                     TrackerState.publishSample(GazeSample(now,
                         if(valid && observation.features!=null) TrackingQuality.OUT_OF_RANGE else TrackingQuality.UNCERTAIN,
                         if(valid) observation.features else null,null,null,0f,emptyList()),TrackerState.inferenceStatus)
-                    return@post
+                    return@submit
                 }
                 if (at - now > 500) {
                     resetTracking()
                     TrackerState.signalPending = true
                     TrackerState.publish(null, "영상 처리가 지연됩니다 · 조작 일시 대기")
-                    return@post
+                    return@submit
                 }
                 lastResult = at
                 TrackerState.signalPending = false

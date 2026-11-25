@@ -10,16 +10,18 @@ class NaiveGazePipelineTest {
     })!!
     private fun observation(f: EyeFeatures?) = EyeObservation(if (f == null) EyeState.LOST else EyeState.OPEN, f, .2, .2)
 
-    @Test fun isolatedSpikeIsHeldAndCannotTriggerAnAction() {
+    @Test fun isolatedSpikeCannotTriggerAnActionWhileDisplayRemainsContinuous() {
         val m=model();val p=GazePipeline()
         val initial=p.process(1000,1000,observation(eye(0.0,0.0)),m,true)
         val spike=p.process(1100,1100,observation(eye(.05,.04)),m,true)
-        assertEquals(initial.point,spike.point)
+        assertNotNull(spike.point)
         assertEquals(TrackingQuality.UNCERTAIN,spike.quality)
         assertFalse(spike.actions.any { it is EyeAction.Click || it is EyeAction.Scroll })
         val recovered=p.process(1200,1200,observation(eye(0.0,0.0)),m,true)
-        assertEquals(initial.point,recovered.point)
-        assertEquals(TrackingQuality.TRACKING,recovered.quality)
+        assertNotNull(recovered.point)
+        assertEquals(TrackingQuality.UNCERTAIN,recovered.quality)
+        val confirmed=p.process(1300,1300,observation(eye(0.0,0.0)),m,true)
+        assertEquals(TrackingQuality.TRACKING,confirmed.quality)
     }
     @Test fun calibrationIsRequiredButFreshFeaturesRemainAvailable() {
         val f = eye(0.0, 0.0)
@@ -28,20 +30,23 @@ class NaiveGazePipelineTest {
         assertTrue(sample.actions.isEmpty())
         assertEquals(f, sample.calibrationFeatures(1000, 0))
     }
-    @Test fun faceTranslationKeepsValidMappingAndScreenClampingIsPreserved() {
-        val model = model()
-        val pipeline = GazePipeline(250,250)
-        val outside = pipeline.process(1000, 1000, observation(eye(.2, -.2)), model, false)
-        assertEquals(1.0, outside.point!!.first, 0.0)
-        assertEquals(0.0, outside.point.second, 0.0)
-        pipeline.reset()
-        val center = pipeline.process(1033, 1033, observation(eye(0.0, 0.0)), model, true)
-        val moved = eye(0.0, 0.0).copy(faceX = .7)
-        val sample = pipeline.process(1066, 1066, observation(moved), model, true)
-        assertEquals(TrackingQuality.TRACKING, sample.quality)
-        assertEquals(center.point, sample.point)
-        assertTrue(sample.actions.isEmpty())
-        assertEquals(moved, sample.calibrationFeatures(1066, 1000))
+    @Test fun handheldTranslationDoesNotDiscardValidCoordinatesOrRestartFixation() {
+        val m = model()
+        val pipeline = GazePipeline()
+        val actions = mutableListOf<EyeAction>()
+        for (i in 0..20) {
+            val f=eye(0.0,0.0).copy(faceX=if(i%2==0) .37 else .63,
+                faceY=if(i%2==0) .36 else .64, scale=if(i%2==0) .21 else .39)
+            val t=1000L+i*66
+            val sample=pipeline.process(t,t,observation(f),m,true)
+            assertEquals(TrackingQuality.TRACKING,sample.quality)
+            assertEquals(.5,sample.point!!.first,.01)
+            actions+=sample.actions
+        }
+        assertTrue(actions.any{it is EyeAction.Click})
+        val outside=GazePipeline().process(3000,3000,observation(eye(.2,-.2)),m,false)
+        assertEquals(1.0,outside.point!!.first,0.0)
+        assertEquals(0.0,outside.point.second,0.0)
     }
     @Test fun delayedFramesCannotClickOrLeakCoordinates() {
         val model = model()
@@ -90,11 +95,47 @@ class NaiveGazePipelineTest {
         frame(1600,EyeState.LEFT_WINK,null)
         val enabled=frame(1900,EyeState.OPEN)
         assertTrue(enabled.scrollMode)
-        val missing=frame(2100,EyeState.OPEN,eye(0.0,0.0).copy(scale=0.0))
+        val missing=frame(2100,EyeState.OPEN,eye(Double.NaN,0.0))
         assertEquals(TrackingQuality.OUT_OF_RANGE,missing.quality)
         assertTrue(missing.scrollMode)
         assertFalse(missing.actions.any{it is EyeAction.Scroll || it is EyeAction.Click})
         assertTrue(frame(2300,EyeState.OPEN).scrollMode)
         assertFalse(frame(2400,EyeState.LOST,null).scrollMode)
+    }
+    @Test fun boundaryNoiseIsSmoothedBeforeClippingInsteadOfPulledInwards() {
+        val m=model()
+        for (edge in listOf(0.0,1.0)) for (vertical in listOf(false,true)) {
+            val pipeline=GazePipeline()
+            var previousClipped=edge
+            var correctedError=0.0;var clippedError=0.0
+            for(i in 0..120) {
+                val desired=edge+if(i%2==0) .04 else -.04
+                val f=if(vertical) eye(0.0,(desired-.5)/7) else eye((desired-.5)/6,0.0)
+                val raw=m.predictForFiltering(f)!!
+                val axis=if(vertical) raw.second else raw.first
+                previousClipped+=.28*(axis.coerceIn(0.0,1.0)-previousClipped)
+                val at=1000L+i*66
+                val sample=pipeline.process(at,at,observation(f),m,false)
+                val output=if(vertical) sample.point!!.second else sample.point!!.first
+                assertTrue(output in 0.0..1.0)
+                if(i>40) {
+                    correctedError+=kotlin.math.abs(output-edge)
+                    clippedError+=kotlin.math.abs(previousClipped-edge)
+                }
+            }
+            assertTrue("both axes and both edges avoid clipping bias",correctedError<clippedError*.5)
+        }
+    }
+    @Test fun extremeOffscreenPredictionCannotLeaveAnUnboundedFilterTail() {
+        val pipeline=GazePipeline();val m=model()
+        pipeline.process(1000,1000,observation(eye(100.0,100.0)),m,false)
+        var sample:GazeSample?=null
+        for(i in 1..20) {
+            val at=1000L+i*66
+            sample=pipeline.process(at,at,observation(eye(0.0,0.0)),m,false)
+            assertTrue(sample.point!!.first in 0.0..1.0)
+        }
+        assertEquals(.5,sample!!.point!!.first,.003)
+        assertEquals(.5,sample!!.point!!.second,.003)
     }
 }

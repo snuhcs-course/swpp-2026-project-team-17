@@ -15,11 +15,13 @@ class EdgeScrollBar {
         if(at<=lastAt || now-at !in 0..500 || eye!=EyeState.OPEN || p==null) { reset();return null }
         if(lastAt>0 && at-lastAt>500)reset()
         lastAt=at
-        val next=if(p.first in .1.. .9) when {
-            p.second in .04.. .14 -> ScrollDirection.UP
-            p.second in .86.. .96 -> ScrollDirection.DOWN
-            else -> null
-        } else null
+        val next=when {
+            p.first in .1.. .9 && p.second in 0.0.. .06 -> ScrollDirection.UP
+            p.first in .1.. .9 && p.second in .94.. 1.0 -> ScrollDirection.DOWN
+            p.second in .1.. .9 && p.first in 0.0.. .06 -> ScrollDirection.LEFT
+            p.second in .1.. .9 && p.first in .94.. 1.0 -> ScrollDirection.RIGHT
+            else -> null // corners deliberately have no competing directions
+        }
         ownsInput=next!=null
         if(next==null){candidate=null;progress=0f;if(now-lastInside>500)direction=null;return null}
         lastInside=now

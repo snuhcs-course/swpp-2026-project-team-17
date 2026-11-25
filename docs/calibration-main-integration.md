@@ -1,5 +1,15 @@
 # Calibration integration into main — 2026-11-25
 
+## Follow-up: restore the v46 runtime and horizontal bars
+
+The initial selective integration below left main's old frame delivery, filter and vertical-only bar controller in place. This did not reproduce the full v46 tracking behavior. The follow-up copies `GazePipeline`, `GazeStabilizer`, `TrackingService`, `TrackingStatus`, `LatestFrameDelivery`, `EdgeScrollBar`, `DotOverlay`, `EyeGestures` and `ControlAccessibilityService` directly from `a02db2b`. Calibration acquisition, per-eye models and eye classification also match that revision. No new tracking algorithm is introduced.
+
+Main retains its existing retargeting navigation and UI. Retargeting sampling now calls v46's `calibrationCheckPoint`, using fresh pre-display-filter coordinates instead of learning display lag. Texting/server code and main's logo remain unchanged. The four edge strips are the existing v46 implementation, including the longer horizontal swipe from `fix/horizontal-scrolling`.
+
+Validation: 206 JVM tests passed with zero failures/errors/skips; debug compilation and lint passed. Physical-device accuracy remains unverified. No APK was packaged for this integration.
+
+## Initial selective integration (historical)
+
 Source: `gaze-response-fix` at `a02db2b` (v46). Target baseline: `main` at `06f3899`.
 This selectively ports calibration, not the whole source branch.
 
