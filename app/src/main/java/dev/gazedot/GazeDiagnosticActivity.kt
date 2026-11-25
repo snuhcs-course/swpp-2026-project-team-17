@@ -62,7 +62,7 @@ class GazeDiagnosticActivity: ComponentActivity() {
                 .put("mapped_unclipped",r.mapped?.let{JSONArray(listOf(it.first,it.second))} ?: JSONObject.NULL)
                 .put("head",r.head?.let{JSONArray(it)} ?: JSONObject.NULL) }))
             .put("filtered",JSONArray(filtered)).put("calibration",getSharedPreferences("personal",MODE_PRIVATE).getString("calibration_audit_v30","없음"))
-        json.put("calibration_samples",runCatching { JSONObject(java.io.File(filesDir,"last-calibration-audit-v30.json").readText()) }.getOrNull() ?: JSONObject.NULL)
+        json.put("calibration_samples",runCatching { JSONObject(java.io.File(filesDir,"last-calibration-v44.json").readText()) }.getOrNull() ?: JSONObject.NULL)
         val data=json.toString(2)
         runCatching { java.io.File(filesDir,"last-gaze-diagnostic-v30.json").writeText(data) }
         getSharedPreferences("personal",MODE_PRIVATE).edit().putString("gaze_diagnostic_v30",data).apply()

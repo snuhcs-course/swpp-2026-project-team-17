@@ -21,6 +21,7 @@ class GazeModel private constructor(
     val headCorrection: HeadCorrection? = null,
     private val screenCorrectionX: Double = 0.0,
     private val screenCorrectionY: Double = 0.0,
+    private val leftWeight: Double = .5,
 ) {
     /** Largest singular value of the raw-centimetre to screen mapping (before clipping). */
     val mappingGain: Double get() {
@@ -39,12 +40,17 @@ class GazeModel private constructor(
         val result=corrected.first+screenCorrectionX to corrected.second+screenCorrectionY
         return result.takeIf { it.first.isFinite() && it.second.isFinite() }
     }
-    fun withCorrection(value: ResidualCorrection?) = GazeModel(meanX,meanY,stdX,stdY,wx,wy,reference,fitError,value,leftModel,rightModel,headCorrection,screenCorrectionX,screenCorrectionY)
-    fun withHeadCorrection(value: HeadCorrection?) = GazeModel(meanX,meanY,stdX,stdY,wx,wy,reference,fitError,null,leftModel,rightModel,value,screenCorrectionX,screenCorrectionY)
+    fun withCorrection(value: ResidualCorrection?) = GazeModel(meanX,meanY,stdX,stdY,wx,wy,reference,fitError,value,leftModel,rightModel,headCorrection,screenCorrectionX,screenCorrectionY,leftWeight)
+    fun withHeadCorrection(value: HeadCorrection?) = GazeModel(meanX,meanY,stdX,stdY,wx,wy,reference,fitError,null,leftModel,rightModel,value,screenCorrectionX,screenCorrectionY,leftWeight)
     fun withScreenCorrection(dx: Double, dy: Double): GazeModel? {
         if (!dx.isFinite() || !dy.isFinite()) return null
         return GazeModel(meanX,meanY,stdX,stdY,wx,wy,reference,fitError,correction,leftModel,rightModel,headCorrection,
-            screenCorrectionX + dx,screenCorrectionY + dy)
+            screenCorrectionX + dx,screenCorrectionY + dy,leftWeight)
+    }
+    internal fun withEyeWeight(weight: Double): GazeModel {
+        require(weight in 0.0..1.0)
+        return GazeModel(meanX,meanY,stdX,stdY,wx,wy,reference,fitError,correction,
+            leftModel,rightModel,headCorrection,screenCorrectionX,screenCorrectionY,weight)
     }
     fun predictUncorrected(f: EyeFeatures): Pair<Double, Double>? {
         val raw=predictBase(f) ?: return null
@@ -60,25 +66,26 @@ class GazeModel private constructor(
         if (leftModel != null && rightModel != null) {
             val left = leftModel.predictUncorrected(f.copy(x=f.leftX, y=f.leftY)) ?: return null
             val right = rightModel.predictUncorrected(f.copy(x=f.rightX, y=f.rightY)) ?: return null
-            return (left.first+right.first)/2 to (left.second+right.second)/2
+            return left.first*leftWeight+right.first*(1-leftWeight) to left.second*leftWeight+right.second*(1-leftWeight)
         }
         val v = doubleArrayOf(1.0, (f.x - meanX) / stdX, (f.y - meanY) / stdY)
         return dot(wx, v) to dot(wy, v)
     }
 
     companion object {
-        fun fit(anchors: List<Anchor>): GazeModel? {
+        fun fit(anchors: List<Anchor>, ridge: Double = .006): GazeModel? {
+            if (anchors.isEmpty() || !ridge.isFinite() || ridge < 0) return null
             if(anchors.map{it.eye.source}.distinct().size != 1)return null
             // The pretrained CNN has already fused both eyes and face information.
-            if(anchors.first().eye.source == GazeSource.ITRACKER)return fitSingle(anchors)
-            // Fit each eye once, then average SCREEN coordinates. An unused third fit
+            if(anchors.first().eye.source == GazeSource.ITRACKER)return fitSingle(anchors, ridge)
+            // Fit each eye once, then combine SCREEN coordinates. An unused third fit
             // on averaged eye features can cancel valid signals and reject both eyes.
-            val left = fitSingle(anchors.map { it.copy(eye=it.eye.copy(x=it.eye.leftX,y=it.eye.leftY)) }) ?: return null
-            val right = fitSingle(anchors.map { it.copy(eye=it.eye.copy(x=it.eye.rightX,y=it.eye.rightY)) }) ?: return null
+            val left = fitSingle(anchors.map { it.copy(eye=it.eye.copy(x=it.eye.leftX,y=it.eye.leftY)) }, ridge) ?: return null
+            val right = fitSingle(anchors.map { it.copy(eye=it.eye.copy(x=it.eye.rightX,y=it.eye.rightY)) }, ridge) ?: return null
             return GazeModel(left.meanX,left.meanY,left.stdX,left.stdY,left.wx,left.wy,left.reference,
                 maxOf(left.fitError,right.fitError),leftModel=left,rightModel=right)
         }
-        private fun fitSingle(anchors: List<Anchor>): GazeModel? {
+        private fun fitSingle(anchors: List<Anchor>, ridge: Double): GazeModel? {
             if (anchors.size < 5 || anchors.any { a ->
                 !listOf(a.eye.x, a.eye.y, a.eye.faceX, a.eye.faceY, a.eye.scale, a.x, a.y).all { it.isFinite() }
             }) return null
@@ -89,8 +96,8 @@ class GazeModel private constructor(
             val cnn = anchors.first().eye.source == GazeSource.ITRACKER
             if (sx < (if(cnn) .15 else .008) || sy < (if(cnn) .15 else .006)) return null
             val rows = anchors.map { doubleArrayOf(1.0, (it.eye.x - mx) / sx, (it.eye.y - my) / sy) }
-            val wx = solve(rows, anchors.map { it.x }) ?: return null
-            val wy = solve(rows, anchors.map { it.y }) ?: return null
+            val wx = solve(rows, anchors.map { it.x }, ridge) ?: return null
+            val wy = solve(rows, anchors.map { it.y }, ridge) ?: return null
             val error = sqrt(rows.indices.map { i ->
                 (dot(wx, rows[i]) - anchors[i].x).pow(2) + (dot(wy, rows[i]) - anchors[i].y).pow(2)
             }.average())
@@ -100,10 +107,10 @@ class GazeModel private constructor(
             return GazeModel(mx, my, sx, sy, wx, wy, f, error)
         }
         private fun dot(a: DoubleArray, b: DoubleArray) = a.indices.sumOf { a[it] * b[it] }
-        private fun solve(rows: List<DoubleArray>, targets: List<Double>): DoubleArray? {
+        private fun solve(rows: List<DoubleArray>, targets: List<Double>, ridge: Double): DoubleArray? {
             val a = Array(3) { i -> DoubleArray(4) { j ->
                 if (j == 3) rows.indices.sumOf { rows[it][i] * targets[it] }
-                else rows.sumOf { it[i] * it[j] } + if (i == j && i != 0) 0.006 * rows.size else 0.0
+                else rows.sumOf { it[i] * it[j] } + if (i == j && i != 0) ridge * rows.size else 0.0
             } }
             for (col in 0..2) {
                 val pivot = (col..2).maxBy { abs(a[it][col]) }

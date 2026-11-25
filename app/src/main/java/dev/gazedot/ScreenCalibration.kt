@@ -61,9 +61,9 @@ internal class ScreenCalibration(startAt: Long) {
     companion object {
         fun fit(groups:List<CalibrationFixation>):Review {
             require(groups.size==9 && groups.all { it.samples.size>=24 })
-            // Each target gets one equal-weight robust anchor. Later frames are not fitted.
+            // Representatives remain available for diagnostics; fit and selection use separate frames.
             val anchors=groups.map { Anchor(medianFeatures(it.samples.take(16)),it.x,it.y) }
-            val model=GazeModel.fit(anchors)
+            val model=CalibrationMapping.fit(groups)
             if(model==null) {
                 val spread=groups.map { g -> val m=medianFeatures(g.samples)
                     g.samples.map { hypot(it.x-m.x,it.y-m.y) }.average() }
@@ -72,7 +72,7 @@ internal class ScreenCalibration(startAt: Long) {
                 return Review(null,"점별 눈 좌표를 화면 위치와 연결하지 못했습니다.\n눈 좌표 범위 X %.3f / Y %.3f\n${worst+1}번 점을 다시 측정하거나 전체 측정을 다시 할 수 있어요."
                     .format(xs.max()-xs.min(),ys.max()-ys.min()),worst)
             }
-            val perTarget=groups.map { g -> g.samples.drop(16).map { f ->
+            val perTarget=groups.map { g -> g.samples.subList(20,24).map { f ->
                 val p=model.predictBase(f)!!;hypot(p.first-g.x,p.second-g.y)
             } }
             val worst=perTarget.indices.maxBy { perTarget[it].average() }
@@ -80,7 +80,7 @@ internal class ScreenCalibration(startAt: Long) {
             val maxError=perTarget[worst].average()
             val report="9개 점의 보정 모델을 계산했습니다.\n후반 표본 오차 RMS %.1f%% · 최대 %.1f%%\n오차가 가장 큰 점: ${worst+1}번\n같은 점에서의 내부 검사이며 실제 사용 정확도는 별도 확인이 필요합니다."
                 .format(rms*100,maxError*100)
-            // Report uncertainty; do not destroy the session on a universal quality cutoff.
+            // Untouched final frames report uncertainty without changing the existing apply/retry flow.
             return Review(model,report,worst,rms,maxError)
         }
     }
