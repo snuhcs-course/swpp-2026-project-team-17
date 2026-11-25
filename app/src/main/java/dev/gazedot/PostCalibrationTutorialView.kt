@@ -32,7 +32,7 @@ internal class PostCalibrationTutorialView(
     private val displayWidth: Int,
     private val displayHeight: Int,
     private val onRecalibrate: () -> Unit,
-    private val onFinished: () -> Unit,
+    private val onFinished: (completed: Boolean) -> Unit,
 ) : FrameLayout(context) {
     private enum class Step { CALIBRATED, BUTTON, SCROLL, FINISHED }
     private var step = Step.CALIBRATED
@@ -40,7 +40,7 @@ internal class PostCalibrationTutorialView(
     private var lastFrameAt=0L
     private val exitButton = Button(context).apply {
         text="튜토리얼 건너뛰기"
-        setOnClickListener { close(); onFinished() }
+        setOnClickListener { close(); onFinished(step == Step.FINISHED) }
     }
     private val dwell = TutorialDwell()
     private val exitDwell = TutorialDwell()

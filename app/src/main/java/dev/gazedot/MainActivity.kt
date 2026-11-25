@@ -72,7 +72,16 @@ class MainActivity : ComponentActivity() {
         if(!TrackerState.running) { showHome(); return }
         val bounds=DisplaySpace.bounds(this)
         tutorial=PostCalibrationTutorialView(this,bounds.width(),bounds.height(),
-            onRecalibrate={startCalibration()},onFinished={window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); showHome()})
+            onRecalibrate={startCalibration()}, onFinished={ completed ->
+                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                showHome()
+                if (completed) {
+                    startActivity(Intent(Intent.ACTION_MAIN).apply {
+                        addCategory(Intent.CATEGORY_HOME)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    })
+                }
+            })
         setContentView(tutorial)
     }
     private val accessibilitySettings = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
