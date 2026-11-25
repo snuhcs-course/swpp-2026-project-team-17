@@ -19,6 +19,7 @@ private data class CalibrationCheckResult(
     val dotY: Double,
     val madX: Double,
     val madY: Double,
+    val residual: RetargetingResidual,
 )
 
 class MainActivity : ComponentActivity() {
@@ -677,7 +678,10 @@ class MainActivity : ComponentActivity() {
                 val targetY = (targetLocation[1] + height * target.second) / displayHeight
                 CalibrationCheckResult(targetX, targetY, medianX, medianY,
                     median(xs.map { kotlin.math.abs(it - medianX) }),
-                    median(ys.map { kotlin.math.abs(it - medianY) }))
+                    median(ys.map { kotlin.math.abs(it - medianY) }),
+                    RetargetingResidual(
+                        median(xs.take(xs.size/2))-targetX to median(ys.take(ys.size/2))-targetY,
+                        median(xs.drop(xs.size/2))-targetX to median(ys.drop(ys.size/2))-targetY))
             }
             results += result
             index++
@@ -692,11 +696,10 @@ class MainActivity : ComponentActivity() {
             val valid = results.filterNotNull()
             if (valid.size < minCorrectionPoints) return
             val model = TrackerState.model ?: return
-            val biasX = valid.map { it.dotX - it.targetX }.average()
-            val biasY = valid.map { it.dotY - it.targetY }.average()
-            correctionX = (-biasX).coerceIn(-maxCorrection, maxCorrection)
-            correctionY = (-biasY).coerceIn(-maxCorrection, maxCorrection)
-            correctionLimited = correctionX != -biasX || correctionY != -biasY
+            val offset = RetargetingOffset.choose(valid.map { it.residual }, maxCorrection) ?: return
+            correctionX = offset.first
+            correctionY = offset.second
+            correctionLimited = kotlin.math.abs(correctionX) >= maxCorrection || kotlin.math.abs(correctionY) >= maxCorrection
             TrackerState.model = model.withScreenCorrection(correctionX, correctionY) ?: return
             correctionApplied = true
         }
@@ -761,7 +764,8 @@ class MainActivity : ComponentActivity() {
                     "(+ 오른쪽/아래 · − 왼쪽/위)", "",
                     if (correctionApplied) "적용한 위치 보정" else "자동 위치 보정 미적용",
                     if (correctionApplied) "가로 ${percent(correctionX, true)} · 세로 ${percent(correctionY, true)}"
-                    else "표본이 ${minCorrectionPoints}곳 미만입니다.",
+                    else if (valid.size < minCorrectionPoints) "표본이 ${minCorrectionPoints}곳 미만입니다."
+                    else "검증에서 개선이 확인되지 않아 기존 보정을 유지합니다.",
                     if (correctionLimited) "큰 편차는 8% 이내로 제한했습니다." else "", "",
                     "시선 고정 중 중앙 편차", "가로 ${percent(madX)} · 세로 ${percent(madY)}",
                     "화면 너비/높이 기준 · ${valid.size}/${targets.size}곳 측정")
