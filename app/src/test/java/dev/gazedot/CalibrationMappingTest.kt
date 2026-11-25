@@ -11,6 +11,49 @@ class CalibrationMappingTest {
             leftX=(x-.5)*.3+leftNoise,leftY=(y-.5)*.2+leftNoise,
             rightX=(x-.5)*.3,rightY=(y-.5)*.2)
 
+    @Test fun commonLeftwardOffsetIsLearnedFromKnownTargetsWithoutHardCodingDirection() {
+        for (shift in listOf(-.024,.024)) {
+            val groups=targets.map { (x,y) -> CalibrationFixation(List(24) { i ->
+                val f=features(x,y)
+                if(i<16) f else f.copy(x=f.x+shift,leftX=f.leftX+shift,rightX=f.rightX+shift)
+            },x,y) }
+            val old=GazeModel.fit(groups.map { Anchor(medianFeatures(it.samples.take(16)),it.x,it.y) })!!
+            val corrected=CalibrationMapping.fit(groups)!!
+            val center=features(.5,.5).let { it.copy(x=it.x+shift,leftX=it.leftX+shift,rightX=it.rightX+shift) }
+            assertTrue(abs(old.predictBase(center)!!.first-.5)>.07)
+            assertEquals(.5,corrected.predictBase(center)!!.first,.015)
+            for (g in groups) {
+                val p=corrected.predictBase(g.samples.last())!!
+                assertEquals(g.x,p.first,.025);assertEquals(g.y,p.second,.025)
+            }
+        }
+    }
+
+    @Test fun axisAlignedMappingDoesNotTurnVerticalNoiseIntoHorizontalMotion() {
+        val anchors=targets.map { (x,y) -> Anchor(features(x,y).let {
+            it.copy(leftX=it.leftX+.012*(y-.5),rightX=it.rightX+.012*(y-.5))
+        },x,y) }
+        val full=GazeModel.fit(anchors)!!
+        val aligned=GazeModel.fit(anchors,axisAligned=true)!!
+        val center=features(.5,.5)
+        val verticalNoise=center.copy(leftY=.01,rightY=.01,y=.01)
+        assertTrue(abs(full.predictBase(center)!!.first-full.predictBase(verticalNoise)!!.first)>.001)
+        assertEquals(aligned.predictBase(center)!!.first,aligned.predictBase(verticalNoise)!!.first,1e-12)
+        assertTrue(aligned.predictBase(features(.92,.5))!!.first>.90)
+        assertTrue(aligned.predictBase(features(.08,.5))!!.first<.10)
+    }
+
+    @Test fun mappingOffsetDoesNotMutateTheSourceOrDisappearDuringRetargeting() {
+        val base=GazeModel.fit(targets.map { (x,y)->Anchor(features(x,y),x,y) })!!
+        val f=features(.5,.5); val before=base.predictBase(f)!!
+        val shifted=base.withMappingOffset(.08,-.03)
+        assertEquals(before,base.predictBase(f))
+        assertEquals(before.first+.08,shifted.predictBase(f)!!.first,1e-9)
+        val retargeted=shifted.withScreenCorrection(-.02,.01)!!
+        assertEquals(before.first+.06,retargeted.predictForFiltering(f)!!.first,1e-9)
+        assertEquals(before.second-.02,retargeted.predictForFiltering(f)!!.second,1e-9)
+    }
+
     @Test fun unstableEyeDoesNotShiftTheStableEyesMapping() {
         val groups=targets.map { (x,y) -> CalibrationFixation((0 until 24).map { i ->
             features(x,y,if(i<16) .012*sin(i*1.7) else .018+.004*sin(i*1.7))

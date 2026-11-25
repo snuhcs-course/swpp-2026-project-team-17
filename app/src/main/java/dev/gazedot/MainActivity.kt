@@ -538,7 +538,9 @@ class MainActivity : ComponentActivity() {
             close()
             calibration = null
             if (saved.getOrDefault(false) && TrackerState.running) {
-                if (returnToRecovery) this@MainActivity.finish() else showCalibrationTutorial()
+                val bounds = DisplaySpace.bounds(this@MainActivity)
+                calibrationCheck = CalibrationCheckView(bounds.width(), bounds.height(), returnToRecovery)
+                setContentView(calibrationCheck)
             } else if (returnToRecovery) finish() else {
                 showHome()
                 android.app.AlertDialog.Builder(this@MainActivity)

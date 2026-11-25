@@ -23,18 +23,32 @@ internal object CalibrationMapping {
         }
         fun score(model: GazeModel): Double {
             val errors = groups.map { group ->
-                group.samples.subList(16, 20).map { f ->
-                    val p = model.predictBase(f) ?: return Double.POSITIVE_INFINITY
-                    (p.first-group.x).pow(2) + (p.second-group.y).pow(2)
-                }.average()
+                val points = group.samples.subList(16, 20).map { f ->
+                    model.predictBase(f) ?: return Double.POSITIVE_INFINITY
+                }
+                val mx=points.map { it.first }.average(); val my=points.map { it.second }.average()
+                val variance=points.map { (it.first-mx).pow(2)+(it.second-my).pow(2) }.average()
+                // Score position error AND within-target amplification, before any display filter.
+                (mx-group.x).pow(2)+(my-group.y).pow(2)+2*variance
             }
-            // Every target has equal weight; do not improve the center at the expense of an edge.
             return errors.average() + .25 * errors.max()
         }
-        val candidates = listOf(.006, .03, .1).mapNotNull { GazeModel.fit(training, it) }
-            .flatMap { model -> listOf(.5, .25, .75, 0.0, 1.0).map(model::withEyeWeight) }
-        val best = candidates.minByOrNull(::score) ?: return baseline
-        // Keep the established mapping unless independent selection frames show a useful gain.
+        fun debias(model: GazeModel): GazeModel {
+            val residuals=groups.map { g ->
+                val points=g.samples.subList(16,20).map { model.predictBase(it)!! }
+                g.x-points.map { it.first }.average() to g.y-points.map { it.second }.average()
+            }
+            fun median(values: List<Double>)=values.sorted()[values.size/2]
+            // A robust common intercept from known targets, not a hard-coded rightward shift.
+            val dx=median(residuals.map { it.first }).coerceIn(-.15,.15)
+            val dy=median(residuals.map { it.second }).coerceIn(-.15,.15)
+            return model.withMappingOffset(dx,dy)
+        }
+        val candidates = listOf(false,true).flatMap { axisAligned ->
+            listOf(.006, .03, .1, .3).mapNotNull { GazeModel.fit(training, it, axisAligned) }
+        }.flatMap { model -> listOf(.5, .25, .75, 0.0, 1.0).map(model::withEyeWeight) }
+        val pool=(listOfNotNull(baseline)+candidates).flatMap { listOf(it,debias(it)) }
+        val best = pool.minByOrNull(::score) ?: return baseline
         return if (baseline == null || score(best) < .95 * score(baseline)) best else baseline
     }
 }
