@@ -43,6 +43,7 @@ internal class PostCalibrationTutorialView(
         setOnClickListener { close(); onFinished() }
     }
     private val dwell = TutorialDwell()
+    private val exitDwell = TutorialDwell()
     private val retryGesture = EyeGestureDetector()
     private val scrolling = ScrollController(useBars=true)
     private var practice = ScrollPractice()
@@ -64,9 +65,10 @@ internal class PostCalibrationTutorialView(
     }
     private val freshnessCheck = object : Runnable {
         override fun run() {
-            if (closed || step != Step.BUTTON) return
+            if (closed) return
             dwell.expire(SystemClock.uptimeMillis())
-            TrackerState.localDwellProgress = dwell.progress
+            exitDwell.expire(SystemClock.uptimeMillis())
+            TrackerState.localDwellProgress = maxOf(dwell.progress, exitDwell.progress)
             target?.setProgress(dwell.progress)
             postDelayed(this, 50)
         }
@@ -99,7 +101,7 @@ internal class PostCalibrationTutorialView(
         closed = true
         removeCallbacks(advance); removeCallbacks(freshnessCheck)
         animation?.cancel(); animation = null
-        dwell.reset(); retryGesture.reset(); scrolling.reset()
+        dwell.reset(); exitDwell.reset(); retryGesture.reset(); scrolling.reset()
         TrackerState.localDwellProgress = 0f
         TrackerState.localScrollMode = false
         TrackerState.localBarDirection=null;TrackerState.localBarProgress=0f
@@ -107,10 +109,10 @@ internal class PostCalibrationTutorialView(
     }
 
     fun onFrame(sample: GazeSample?, eye: EyeState) {
-        if (closed || step !in listOf(Step.BUTTON, Step.SCROLL)) return
+        if (closed) return
         val now = SystemClock.uptimeMillis()
         if (sample == null || now - sample.timestampMs !in 0..500 || !TrackerState.running || !TrackerState.controls) {
-            dwell.reset(); retryGesture.reset(); scrolling.reset()
+            dwell.reset(); exitDwell.reset(); retryGesture.reset(); scrolling.reset()
             animation?.cancel(); animation = null
             TrackerState.localDwellProgress = 0f
             TrackerState.localScrollMode = false
@@ -121,6 +123,31 @@ internal class PostCalibrationTutorialView(
         }
         if(sample.timestampMs<=lastFrameAt)return
         lastFrameAt=sample.timestampMs
+        // The app handles its tutorial locally: accessibility gestures are disabled here.
+        // Check the existing exit button in every step, including the completion screen.
+        val gaze = sample.toScreenGaze()
+        val exitLocation = IntArray(2)
+        exitButton.getLocationOnScreen(exitLocation)
+        val exitVisible = Rect()
+        val overExit = eye == EyeState.OPEN && gaze != null && gaze.fresh(now) &&
+            exitButton.isShown && exitButton.isEnabled && exitButton.getLocalVisibleRect(exitVisible) &&
+            exitVisible.contains((gaze.x * displayWidth - exitLocation[0]).toInt(),
+                (gaze.y * displayHeight - exitLocation[1]).toInt()) &&
+            TutorialButtonBounds(exitLocation[0], exitLocation[1], exitButton.width, exitButton.height)
+                .contains(gaze, displayWidth, displayHeight, rounded = false)
+        val exitSelected = exitDwell.update(overExit, sample.timestampMs, now)
+        if (overExit) {
+            dwell.reset(); retryGesture.reset(); scrolling.reset()
+            target?.setProgress(0f)
+            animation?.cancel(); animation = null
+            TrackerState.localDwellProgress = exitDwell.progress
+            TrackerState.localScrollMode = false
+            TrackerState.localBarDirection = null; TrackerState.localBarProgress = 0f
+            if (exitSelected) exitButton.performClick()
+            return
+        }
+        TrackerState.localDwellProgress = dwell.progress
+        if (step !in listOf(Step.BUTTON, Step.SCROLL)) return
         if (step == Step.SCROLL) {
             if (eye != EyeState.OPEN || sample.point == null) { animation?.cancel(); animation = null }
             val result = scrolling.update(sample.timestampMs, now, eye, sample.point)
@@ -138,7 +165,6 @@ internal class PostCalibrationTutorialView(
             onRecalibrate()
             return
         }
-        val gaze = sample.toScreenGaze()
         val button = target ?: return
         val location = IntArray(2)
         button.getLocationOnScreen(location)
@@ -251,7 +277,7 @@ internal class PostCalibrationTutorialView(
         exitButton.text=if(next==Step.FINISHED) "메인으로 돌아가기" else "튜토리얼 건너뛰기"
         removeCallbacks(advance); removeCallbacks(freshnessCheck)
         animation?.cancel(); animation = null
-        dwell.reset(); retryGesture.reset(); scrolling.reset()
+        dwell.reset(); exitDwell.reset(); retryGesture.reset(); scrolling.reset()
         TrackerState.localDwellProgress = 0f
         TrackerState.localScrollMode = false
         TrackerState.localBarDirection=null;TrackerState.localBarProgress=0f
@@ -277,7 +303,6 @@ internal class PostCalibrationTutorialView(
                 target = GazeButton(context).also {
                     column.addView(it, LinearLayout.LayoutParams(BUTTON_WIDTH, BUTTON_HEIGHT))
                 }
-                post(freshnessCheck)
             }
             Step.SCROLL -> {
                 practice = ScrollPractice()
@@ -328,6 +353,7 @@ internal class PostCalibrationTutorialView(
                 text("이제 직접 사용해 봅시다", 23)
             }
         }
+        post(freshnessCheck)
         updateLayout()
         if (isAttachedToWindow) announceForAccessibility(when (next) {
             Step.CALIBRATED -> "시선 보정이 완료되었습니다!"
@@ -339,7 +365,7 @@ internal class PostCalibrationTutorialView(
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        updateLayout(); dwell.reset(); TrackerState.localDwellProgress = 0f
+        updateLayout(); dwell.reset(); exitDwell.reset(); TrackerState.localDwellProgress = 0f
         target?.setProgress(0f)
     }
 
