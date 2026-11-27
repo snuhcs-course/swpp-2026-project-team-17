@@ -8,7 +8,6 @@ internal class ScreenCalibration(startAt: Long) {
         .08 to .08, .92 to .08, .92 to .92, .08 to .92)
     private val groups = MutableList<CalibrationFixation?>(targets.size) { null }
     private val samples = mutableListOf<EyeFeatures>()
-    private var pendingMove: EyeFeatures? = null
     private var readyAt = startAt + 600
     private var lastSeen = -1L
     private var lastValid = startAt
@@ -34,7 +33,6 @@ internal class ScreenCalibration(startAt: Long) {
                 listOf(it.x,it.y,it.leftX,it.leftY,it.rightX,it.rightY,it.faceX,it.faceY,it.scale).all(Double::isFinite)
         }
         if(f==null) {
-            pendingMove=null
             interrupted=true
             if(now-lastValid>1500) samples.clear()
             hint="$missingReason · $count/24개 보관"
@@ -44,24 +42,6 @@ internal class ScreenCalibration(startAt: Long) {
         lastValid=now
         if(interrupted) { readyAt=max(readyAt,sample.timestampMs+150);interrupted=false }
         if(sample.timestampMs<readyAt) { hint="점 가운데에 시선을 잠시 멈춰 주세요";return }
-        if(samples.size>=4) {
-            val reference=medianFeatures(samples.takeLast(4))
-            val lx=f.leftX-reference.leftX;val ly=f.leftY-reference.leftY
-            val rx=f.rightX-reference.rightX;val ry=f.rightY-reference.rightY
-            // Treat a sustained binocular shift >2% of eye width as a fixation change.
-            // Require a second agreeing frame before replacing the current fixation.
-            val moved=hypot(lx,ly)>.02 && hypot(rx,ry)>.02 && lx*rx+ly*ry>0
-            if(moved) {
-                val previous=pendingMove
-                if(previous!=null && hypot(f.leftX-previous.leftX,f.leftY-previous.leftY)<.008 &&
-                    hypot(f.rightX-previous.rightX,f.rightY-previous.rightY)<.008) {
-                    samples.clear();pendingMove=null;readyAt=sample.timestampMs+150
-                } else pendingMove=f
-                hint="점 가운데에 시선을 잠시 멈춰 주세요"
-                return
-            }
-        }
-        pendingMove=null
         samples += f
         hint="눈 표본 $count/24개 · 같은 점을 바라보세요"
         if(count<24) return
@@ -75,15 +55,15 @@ internal class ScreenCalibration(startAt: Long) {
     }
     fun restart(now: Long) { groups.indices.forEach { groups[it]=null };review=null;begin(0,now) }
     private fun begin(target:Int,now:Long) {
-        index=target;samples.clear();pendingMove=null;readyAt=now+600;lastValid=now;interrupted=false
+        index=target;samples.clear();readyAt=now+600;lastValid=now;interrupted=false
         hint="${target+1}번 점을 바라보세요 · 완료 $completedCount/9"
     }
     companion object {
         fun fit(groups:List<CalibrationFixation>):Review {
             require(groups.size==9 && groups.all { it.samples.size>=24 })
-            // Representatives remain available for diagnostics; fit and selection use separate frames.
+            // Each target gets one equal-weight robust anchor. Later frames are not fitted.
             val anchors=groups.map { Anchor(medianFeatures(it.samples.take(16)),it.x,it.y) }
-            val model=CalibrationMapping.fit(groups)
+            val model=GazeModel.fit(anchors)
             if(model==null) {
                 val spread=groups.map { g -> val m=medianFeatures(g.samples)
                     g.samples.map { hypot(it.x-m.x,it.y-m.y) }.average() }
@@ -92,7 +72,7 @@ internal class ScreenCalibration(startAt: Long) {
                 return Review(null,"점별 눈 좌표를 화면 위치와 연결하지 못했습니다.\n눈 좌표 범위 X %.3f / Y %.3f\n${worst+1}번 점을 다시 측정하거나 전체 측정을 다시 할 수 있어요."
                     .format(xs.max()-xs.min(),ys.max()-ys.min()),worst)
             }
-            val perTarget=groups.map { g -> g.samples.subList(20,24).map { f ->
+            val perTarget=groups.map { g -> g.samples.drop(16).map { f ->
                 val p=model.predictBase(f)!!;hypot(p.first-g.x,p.second-g.y)
             } }
             val worst=perTarget.indices.maxBy { perTarget[it].average() }
@@ -100,7 +80,7 @@ internal class ScreenCalibration(startAt: Long) {
             val maxError=perTarget[worst].average()
             val report="9개 점의 보정 모델을 계산했습니다.\n후반 표본 오차 RMS %.1f%% · 최대 %.1f%%\n오차가 가장 큰 점: ${worst+1}번\n같은 점에서의 내부 검사이며 실제 사용 정확도는 별도 확인이 필요합니다."
                 .format(rms*100,maxError*100)
-            // Untouched final frames report uncertainty without changing the existing apply/retry flow.
+            // Report uncertainty; do not destroy the session on a universal quality cutoff.
             return Review(model,report,worst,rms,maxError)
         }
     }

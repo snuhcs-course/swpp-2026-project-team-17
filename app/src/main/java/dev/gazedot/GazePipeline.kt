@@ -32,7 +32,6 @@ class GazePipeline(private val trackingMaxAgeMs: Long = 500, private val actionM
     private val stabilizer = GazeStabilizer()
     private var smoothed: Pair<Double, Double>? = null
     private var lastTimestamp: Long? = null
-    private var lastPositionAt: Long? = null
     private var model: GazeModel? = null
     private var closureAt: Long? = null
     private var reopenedAt: Long? = null
@@ -45,7 +44,6 @@ class GazePipeline(private val trackingMaxAgeMs: Long = 500, private val actionM
         smoothed = null
         stabilizer.reset()
         lastTimestamp = null
-        lastPositionAt = null
         model = null
         closureAt = null; reopenedAt = null
     }
@@ -66,7 +64,7 @@ class GazePipeline(private val trackingMaxAgeMs: Long = 500, private val actionM
         model = predictor
         lastTimestamp = timestampMs
         if (observation.state == EyeState.LOST) {
-            closureAt = null; reopenedAt = null; smoothed = null
+            closureAt = null; reopenedAt = null; smoothed = null; stabilizer.reset()
         } else if (observation.state != EyeState.OPEN) {
             if (closureAt == null) closureAt = timestampMs
             reopenedAt = null
@@ -76,18 +74,13 @@ class GazePipeline(private val trackingMaxAgeMs: Long = 500, private val actionM
         if (observation.state == EyeState.OPEN && !settling) { closureAt=null; reopenedAt=null }
         val features = observation.features.takeIf { observation.state == EyeState.OPEN && !settling }
         val position = features?.let { predictor?.predictForFiltering(it) }
-        // Keep interpolation history across brief detector dropouts, not displayed coordinates.
-        // A missing frame still has no gaze point and cannot authorize an action.
-        if (lastPositionAt?.let { timestampMs - it > trackingMaxAgeMs } == true) {
-            stabilizer.reset()
-            lastPositionAt = null
-        }
         // Modest offscreen overscan avoids inward clipping bias. Bound extreme
         // extrapolations so one bad frame cannot leave a long filter tail.
         val filtered = position?.let { stabilizer.update(
             it.first.coerceIn(-.25,1.25) to it.second.coerceIn(-.25,1.25), timestampMs) }
-        if (filtered != null) lastPositionAt = timestampMs
-        smoothed = if (filtered != null) filtered.point else if (held) smoothed else null
+        smoothed = if (filtered != null) filtered.point else if (held) smoothed else {
+            stabilizer.reset(); null
+        }
         val screenPoint=smoothed?.let { it.first.coerceIn(0.0,1.0) to it.second.coerceIn(0.0,1.0) }
         val quality = when {
             settling || filtered?.confirmed == false -> TrackingQuality.UNCERTAIN

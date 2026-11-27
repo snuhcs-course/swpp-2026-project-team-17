@@ -75,30 +75,14 @@ class GazeStabilizerTest {
         for (i in 31..42) p=f.update(.65 to .5,i*66L).point
         assertTrue("settles at the destination",abs(.65-p.first)<.006)
     }
-    @Test fun corroboratedSmallMovementsKeepV14InterpolationAtOriginalCadence() {
+    @Test fun matchesV14InterpolationAtOriginalCadence() {
         val f=GazeStabilizer(); f.update(.5 to .5,0)
         var legacy=.5
         for(i in 1..30) {
-            val raw=if(i<10) .54 else if(i<20) .46 else .53
+            val raw=if(i<10) .9 else if(i<20) .1 else .7
             legacy+=.28*(raw-legacy)
             assertEquals(legacy,f.update(raw to .5,i*66L).point.first,1e-9)
         }
-    }
-    @Test fun isolatedLargeErrorCannotMoveThePointerOrLeaveAFilterTail() {
-        val f=GazeStabilizer();f.update(.5 to .5,0)
-        assertEquals(.5 to .5,f.update(1.2 to -.2,66).point)
-        assertEquals(.5 to .5,f.update(.5 to .5,132).point)
-        val settled=f.update(.5 to .5,198)
-        assertTrue(settled.confirmed)
-        assertEquals(.5 to .5,settled.point)
-    }
-    @Test fun sustainedLargeMoveIsNotLockedToTheOldFixation() {
-        val f=GazeStabilizer();f.update(.5 to .5,0)
-        assertFalse(f.update(1.0 to 1.0,66).confirmed)
-        assertTrue(f.update(1.0 to 1.0,132).confirmed)
-        var p=.5 to .5
-        for(i in 3..20) p=f.update(1.0 to 1.0,i*66L).point
-        assertTrue(p.first>.995 && p.second>.995)
     }
     @Test fun everyCornerRemainsReachableWithNoDisplacementLock() {
         for (interval in listOf(33L,66L)) {

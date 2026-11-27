@@ -1,7 +1,6 @@
 package dev.gazedot
 
 import kotlin.math.abs
-import kotlin.math.ln
 
 /** Circular angles and a single session reference prevent pose changes becoming eye labels. */
 object CalibrationPose {
@@ -15,6 +14,7 @@ object CalibrationPose {
         abs(angle(value.yaw,reference.yaw)) <= 4 &&
         abs(angle(value.pitch,reference.pitch)) <= 4 &&
         abs(angle(value.roll,reference.roll)) <= 4 &&
-        abs(value.x-reference.x) <= .025 && abs(value.y-reference.y) <= .025 &&
-        abs(ln(value.iris/reference.iris)) <= .10
+        // Projected iris diameter changes with gaze; it is not a head-motion gate.
+        // Face-scale consistency is checked independently by CalibrationAudit.
+        abs(value.x-reference.x) <= .025 && abs(value.y-reference.y) <= .025
 }
