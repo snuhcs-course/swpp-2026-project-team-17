@@ -22,13 +22,14 @@ class GazeModel private constructor(
     private val screenCorrectionX: Double = 0.0,
     private val screenCorrectionY: Double = 0.0,
     private val leftWeight: Double = .5,
+    private val calibrationWarp: CalibrationWarp? = null,
 ) {
     /** Largest singular value of the raw-centimetre to screen mapping (before clipping). */
     val mappingGain: Double get() {
-        if (leftModel != null && rightModel != null) return maxOf(leftModel.mappingGain,rightModel.mappingGain)
+        if (leftModel != null && rightModel != null) return maxOf(leftModel.mappingGain,rightModel.mappingGain) * (calibrationWarp?.maxGain ?: 1.0)
         val a=wx[1]/stdX;val b=wx[2]/stdY;val c=wy[1]/stdX;val d=wy[2]/stdY
         val trace=a*a+b*b+c*c+d*d;val determinant=(a*d-b*c).pow(2)
-        return sqrt((trace+sqrt(max(0.0,trace*trace-4*determinant)))/2)
+        return sqrt((trace+sqrt(max(0.0,trace*trace-4*determinant)))/2) * (calibrationWarp?.maxGain ?: 1.0)
     }
     fun predict(f: EyeFeatures): Pair<Double, Double>? = predictForFiltering(f)?.let {
         it.first.coerceIn(0.0,1.0) to it.second.coerceIn(0.0,1.0)
@@ -40,17 +41,17 @@ class GazeModel private constructor(
         val result=corrected.first+screenCorrectionX to corrected.second+screenCorrectionY
         return result.takeIf { it.first.isFinite() && it.second.isFinite() }
     }
-    fun withCorrection(value: ResidualCorrection?) = GazeModel(meanX,meanY,stdX,stdY,wx,wy,reference,fitError,value,leftModel,rightModel,headCorrection,screenCorrectionX,screenCorrectionY,leftWeight)
-    fun withHeadCorrection(value: HeadCorrection?) = GazeModel(meanX,meanY,stdX,stdY,wx,wy,reference,fitError,null,leftModel,rightModel,value,screenCorrectionX,screenCorrectionY,leftWeight)
+    fun withCorrection(value: ResidualCorrection?) = GazeModel(meanX,meanY,stdX,stdY,wx,wy,reference,fitError,value,leftModel,rightModel,headCorrection,screenCorrectionX,screenCorrectionY,leftWeight,calibrationWarp)
+    fun withHeadCorrection(value: HeadCorrection?) = GazeModel(meanX,meanY,stdX,stdY,wx,wy,reference,fitError,null,leftModel,rightModel,value,screenCorrectionX,screenCorrectionY,leftWeight,calibrationWarp)
     fun withScreenCorrection(dx: Double, dy: Double): GazeModel? {
         if (!dx.isFinite() || !dy.isFinite()) return null
         return GazeModel(meanX,meanY,stdX,stdY,wx,wy,reference,fitError,correction,leftModel,rightModel,headCorrection,
-            screenCorrectionX + dx,screenCorrectionY + dy,leftWeight)
+            screenCorrectionX + dx,screenCorrectionY + dy,leftWeight,calibrationWarp)
     }
     internal fun withEyeWeight(weight: Double): GazeModel {
         require(weight in 0.0..1.0)
         return GazeModel(meanX,meanY,stdX,stdY,wx,wy,reference,fitError,correction,
-            leftModel,rightModel,headCorrection,screenCorrectionX,screenCorrectionY,weight)
+            leftModel,rightModel,headCorrection,screenCorrectionX,screenCorrectionY,weight,calibrationWarp)
     }
     /** Fixed calibration intercept, applied to both eye mappings; never a runtime drift update. */
     internal fun withMappingOffset(dx: Double, dy: Double): GazeModel {
@@ -59,13 +60,15 @@ class GazeModel private constructor(
         val shiftedY = wy.copyOf().also { it[0] += dy }
         return GazeModel(meanX,meanY,stdX,stdY,shiftedX,shiftedY,reference,fitError,correction,
             leftModel?.withMappingOffset(dx,dy),rightModel?.withMappingOffset(dx,dy),
-            headCorrection,screenCorrectionX,screenCorrectionY,leftWeight)
+            headCorrection,screenCorrectionX,screenCorrectionY,leftWeight,calibrationWarp)
     }
     fun predictUncorrected(f: EyeFeatures): Pair<Double, Double>? {
         val raw=predictBase(f) ?: return null
         return if(headCorrection==null) raw else headCorrection.apply(f.head ?: return null,raw)
     }
-    fun predictBase(f: EyeFeatures): Pair<Double, Double>? {
+    internal fun withCalibrationWarp(value: CalibrationWarp) = GazeModel(meanX,meanY,stdX,stdY,wx,wy,reference,fitError,correction,leftModel,rightModel,headCorrection,screenCorrectionX,screenCorrectionY,leftWeight,value)
+    fun predictBase(f: EyeFeatures): Pair<Double, Double>? = predictAffine(f)?.let { calibrationWarp?.map(it) ?: it }
+    private fun predictAffine(f: EyeFeatures): Pair<Double, Double>? {
         if(f.source != reference.source)return null
         if (!listOf(f.x, f.y, f.faceX, f.faceY, f.scale).all { it.isFinite() }) return null
         // Iris coordinates are relative to eye corners, not the face's image location.

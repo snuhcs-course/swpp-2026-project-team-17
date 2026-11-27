@@ -49,6 +49,24 @@ internal object CalibrationMapping {
         }.flatMap { model -> listOf(.5, .25, .75, 0.0, 1.0).map(model::withEyeWeight) }
         val pool=(listOfNotNull(baseline)+candidates).flatMap { listOf(it,debias(it)) }
         val best = pool.minByOrNull(::score) ?: return baseline
-        return if (baseline == null || score(best) < .95 * score(baseline)) best else baseline
+        val affine = if (baseline == null || score(best) < .95 * score(baseline)) best else baseline
+        if (groups.size != 9) return affine
+        val source = groups.map { g ->
+            val points=g.samples.take(16).map { affine.predictBase(it) ?: return affine }
+            points.map { it.first }.sorted()[8] to points.map { it.second }.sorted()[8]
+        }
+        val warp=CalibrationWarp.fit(source,groups.map { it.x to it.y }) ?: return affine
+        val spatial=affine.withCalibrationWarp(warp)
+        // The final four frames remain an independent audit. Never fit to audit results.
+        val stable=groups.all { g ->
+            fun stats(model: GazeModel): Pair<Double,Double> {
+                val points=g.samples.subList(16,20).map { model.predictBase(it)!! }
+                val x=points.map { it.first }.average();val y=points.map { it.second }.average()
+                return hypot(x-g.x,y-g.y) to sqrt(points.map { (it.first-x).pow(2)+(it.second-y).pow(2) }.average())
+            }
+            val before=stats(affine);val after=stats(spatial)
+            after.first <= before.first+.04 && after.second <= max(.012,before.second*1.25)
+        }
+        return if (stable && score(spatial)<score(affine)*.8) spatial else affine
     }
 }
