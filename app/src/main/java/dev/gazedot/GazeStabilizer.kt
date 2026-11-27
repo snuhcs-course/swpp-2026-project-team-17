@@ -3,8 +3,9 @@ package dev.gazedot
 import kotlin.math.*
 
 /** v14 display interpolation, normalized to its 66 ms frame interval.
- * Large uncorroborated samples can move the display but never authorize an action.
- * In particular, displacement from a lagging cursor must not freeze its range.
+ * A large single-frame jump must be corroborated before moving the display.
+ * Compare consecutive raw measurements, never displacement from a lagging cursor,
+ * so a sustained intentional move can still reach every screen edge.
  */
 class GazeStabilizer {
     data class Result(val point: Pair<Double, Double>, val confirmed: Boolean)
@@ -17,9 +18,11 @@ class GazeStabilizer {
         if(old==null) { point=raw; at=time; previousRaw=raw; return Result(raw,true) }
         val confirmed=previousRaw?.let { hypot(raw.first-it.first,raw.second-it.second)<=.15 } ?: false
         val dt=(time-(at?:time)).coerceIn(0,250).toDouble()
+        previousRaw=raw
+        if (!confirmed) return Result(old,false)
         val alpha=1-(1-.28).pow(dt/66.0)
         val next=old.first+alpha*(raw.first-old.first) to old.second+alpha*(raw.second-old.second)
-        point=next; at=time; previousRaw=raw
+        point=next; at=time
         return Result(next,confirmed)
     }
 }

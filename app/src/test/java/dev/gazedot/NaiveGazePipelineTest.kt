@@ -18,9 +18,13 @@ class NaiveGazePipelineTest {
         assertFalse(lost.actions.any { it is EyeAction.Click || it is EyeAction.Scroll })
         val raw=m.predictForFiltering(eye(.04,.02))!!
         val recovered=p.process(1132,1132,observation(eye(.04,.02)),m,true)
-        assertTrue(recovered.point!!.first > initial.first)
-        assertTrue(recovered.point.first < raw.first)
+        // A large first recovery sample is not yet corroborated. It must neither
+        // snap to raw nor move the pointer before the following frame agrees.
+        assertEquals(initial,recovered.point)
         assertFalse(recovered.actions.any { it is EyeAction.Click || it is EyeAction.Scroll })
+        val confirmed=p.process(1198,1198,observation(eye(.04,.02)),m,true)
+        assertTrue(confirmed.point!!.first > initial.first)
+        assertTrue(confirmed.point.first < raw.first)
     }
     @Test fun prolongedDetectionLossDiscardsOldDisplayHistory() {
         val p=GazePipeline(); val m=model()

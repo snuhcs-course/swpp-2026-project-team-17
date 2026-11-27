@@ -5,11 +5,11 @@ import kotlin.math.*
 /** Main-thread, bounded numeric diagnostics. No camera images or message content. */
 object GazeTrace {
     data class Row(val at:Long,val latency:Long,val eye:String,val raw:Pair<Double,Double>?,
-        val mapped:Pair<Double,Double>?,val head:List<Double>?)
+        val mapped:Pair<Double,Double>?,val head:List<Double>?,val features:EyeFeatures?=null)
     private val rows=ArrayDeque<Row>()
     fun record(at:Long,latency:Long,eye:EyeState,f:EyeFeatures?,model:GazeModel?) {
         rows.addLast(Row(at,latency,eye.name,f?.let{it.x to it.y},f?.let{model?.predictUncorrected(it)},
-            f?.head?.let{listOf(it.yaw,it.pitch,it.roll,it.x,it.y,it.iris)}))
+            f?.head?.let{listOf(it.yaw,it.pitch,it.roll,it.x,it.y,it.iris)},f))
         while(rows.size>300)rows.removeFirst()
     }
     fun since(at:Long)=rows.filter{it.at>=at}
