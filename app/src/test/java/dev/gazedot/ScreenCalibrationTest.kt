@@ -4,6 +4,25 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ScreenCalibrationTest {
+    @Test fun confirmedMidFixationMovementCannotMixTwoEyePositions() {
+        val c=ScreenCalibration(0);val target=.5 to .5
+        for(t in 650L..1000L step 50) c.observe(sample(t,.5,.5),t,target,"missing")
+        c.observe(sample(1050,.7,.7),1050,target,"missing")
+        assertEquals(8,c.count)
+        c.observe(sample(1100,.7,.7),1100,target,"missing")
+        assertEquals(0,c.count)
+        var t=1250L
+        repeat(24) { c.observe(sample(t,.7,.7),t,target,"missing");t+=50 }
+        assertEquals(1,c.completedCount)
+        assertTrue(c.fixations()[0].samples.all { it.leftX>.05 && it.rightX>.05 })
+    }
+    @Test fun oneLargeLandmarkErrorDoesNotEraseCollectedFixation() {
+        val c=ScreenCalibration(0);val target=.5 to .5
+        for(t in 650L..1000L step 50) c.observe(sample(t,.5,.5),t,target,"missing")
+        c.observe(sample(1050,.9,.9),1050,target,"missing")
+        c.observe(sample(1100,.5,.5),1100,target,"missing")
+        assertEquals(9,c.count)
+    }
     @Test fun futureFrameCannotLockOutNormalCameraFrames() {
         val c=ScreenCalibration(0);val target=.5 to .5
         c.observe(sample(999999,.5,.5),650,target,"missing")

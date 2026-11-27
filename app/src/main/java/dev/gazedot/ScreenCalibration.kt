@@ -8,6 +8,7 @@ internal class ScreenCalibration(startAt: Long) {
         .08 to .08, .92 to .08, .92 to .92, .08 to .92)
     private val groups = MutableList<CalibrationFixation?>(targets.size) { null }
     private val samples = mutableListOf<EyeFeatures>()
+    private var pendingMove: EyeFeatures? = null
     private var readyAt = startAt + 600
     private var lastSeen = -1L
     private var lastValid = startAt
@@ -33,6 +34,7 @@ internal class ScreenCalibration(startAt: Long) {
                 listOf(it.x,it.y,it.leftX,it.leftY,it.rightX,it.rightY,it.faceX,it.faceY,it.scale).all(Double::isFinite)
         }
         if(f==null) {
+            pendingMove=null
             interrupted=true
             if(now-lastValid>1500) samples.clear()
             hint="$missingReason · $count/24개 보관"
@@ -42,6 +44,24 @@ internal class ScreenCalibration(startAt: Long) {
         lastValid=now
         if(interrupted) { readyAt=max(readyAt,sample.timestampMs+150);interrupted=false }
         if(sample.timestampMs<readyAt) { hint="점 가운데에 시선을 잠시 멈춰 주세요";return }
+        if(samples.size>=4) {
+            val reference=medianFeatures(samples.takeLast(4))
+            val lx=f.leftX-reference.leftX;val ly=f.leftY-reference.leftY
+            val rx=f.rightX-reference.rightX;val ry=f.rightY-reference.rightY
+            // Treat a sustained binocular shift >2% of eye width as a fixation change.
+            // Require a second agreeing frame before replacing the current fixation.
+            val moved=hypot(lx,ly)>.02 && hypot(rx,ry)>.02 && lx*rx+ly*ry>0
+            if(moved) {
+                val previous=pendingMove
+                if(previous!=null && hypot(f.leftX-previous.leftX,f.leftY-previous.leftY)<.008 &&
+                    hypot(f.rightX-previous.rightX,f.rightY-previous.rightY)<.008) {
+                    samples.clear();pendingMove=null;readyAt=sample.timestampMs+150
+                } else pendingMove=f
+                hint="점 가운데에 시선을 잠시 멈춰 주세요"
+                return
+            }
+        }
+        pendingMove=null
         samples += f
         hint="눈 표본 $count/24개 · 같은 점을 바라보세요"
         if(count<24) return
@@ -55,7 +75,7 @@ internal class ScreenCalibration(startAt: Long) {
     }
     fun restart(now: Long) { groups.indices.forEach { groups[it]=null };review=null;begin(0,now) }
     private fun begin(target:Int,now:Long) {
-        index=target;samples.clear();readyAt=now+600;lastValid=now;interrupted=false
+        index=target;samples.clear();pendingMove=null;readyAt=now+600;lastValid=now;interrupted=false
         hint="${target+1}번 점을 바라보세요 · 완료 $completedCount/9"
     }
     companion object {
