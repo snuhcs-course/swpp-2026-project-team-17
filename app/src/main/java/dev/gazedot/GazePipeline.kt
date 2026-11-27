@@ -81,12 +81,7 @@ class GazePipeline(private val trackingMaxAgeMs: Long = 500, private val actionM
         smoothed = if (filtered != null) filtered.point else if (held) smoothed else {
             stabilizer.reset(); null
         }
-        // Controlled range experiment: preserve the center and horizontal coordinate.
-        // Expand only the final vertical output; do not change calibration or filter history.
-        // The same screenPoint is used for the pointer, target lookup and all interactions.
-        val screenPoint=smoothed?.let {
-            it.first.coerceIn(0.0,1.0) to (.5+(it.second-.5)*1.10).coerceIn(0.0,1.0)
-        }
+        val screenPoint=smoothed?.let { it.first.coerceIn(0.0,1.0) to it.second.coerceIn(0.0,1.0) }
         val quality = when {
             settling || filtered?.confirmed == false -> TrackingQuality.UNCERTAIN
             features != null -> if (position == null) TrackingQuality.OUT_OF_RANGE else TrackingQuality.TRACKING
