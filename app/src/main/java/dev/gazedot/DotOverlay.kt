@@ -186,8 +186,6 @@ class DotOverlay(context: Context) {
             }
         }
         column.addView(RecoveryUi.text(overlayContext, overlayContext.getString(R.string.recognition_help_title), 22f))
-        column.addView(RecoveryUi.text(overlayContext,
-            overlayContext.getString(R.string.recognition_help_body)))
         fun button(label: String, action: () -> Unit) {
             column.addView(RecoveryUi.button(overlayContext, label, action),
                 LinearLayout.LayoutParams(-1, -2).apply { topMargin = RecoveryUi.dp(overlayContext, 12) })

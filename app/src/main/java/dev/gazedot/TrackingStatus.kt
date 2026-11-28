@@ -50,7 +50,21 @@ fun trackingStatus(running: Boolean, controls: Boolean, collecting: Boolean,
         "시선 위치가 맞지 않으면 ‘다시 보정하기’를 선택해 주세요.")
 }
 
-object RecognitionHelpSettings { const val LOSS_HELP_DELAY_MS = 20_000L }
+object RecognitionHelpSettings {
+    const val LOSS_HELP_DELAY_MS = 20_000L
+    const val RECOVERY_DISMISS_DELAY_MS = 2_000L
+}
+
+/** Keep the recovery choices available until tracking has stayed stable. */
+internal class RecognitionRecoveryDelay {
+    private var since: Long? = null
+    fun reset() { since = null }
+    fun update(now: Long, tracking: Boolean): Boolean {
+        if (!tracking) { reset(); return false }
+        if (since == null) since = now
+        return now - since!! >= RecognitionHelpSettings.RECOVERY_DISMISS_DELAY_MS
+    }
+}
 
 /** Advances only on fresh LOST observations, never on a lack of camera results. */
 class RecognitionLossPolicy(private val delayMs: Long = RecognitionHelpSettings.LOSS_HELP_DELAY_MS) {

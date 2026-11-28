@@ -44,6 +44,7 @@ class TrackingService : LifecycleService() {
     private var initialSize = ""
     private var receiverRegistered = false
     private val lossHelp = RecognitionLossPolicy()
+    private val recoveryDismiss = RecognitionRecoveryDelay()
     private var startedAt = 0L
     private var recoveryOpenedAt = 0L
     private var cameraFault: TrackingFault? = null
@@ -381,6 +382,7 @@ class TrackingService : LifecycleService() {
     }
 
     private fun clearHelp(resetEpisode: Boolean = false) {
+        recoveryDismiss.reset()
         helpGeneration++
         val wasVisible = TrackerState.helpVisible
         TrackerState.helpVisible = false
@@ -394,8 +396,20 @@ class TrackingService : LifecycleService() {
         val eligible = !closing && TrackerState.recognitionHelpEligible(ControlAccessibilityService.instance != null)
         val missing = state.phase == TrackingPhase.MISSING
         val sampleAt = TrackerState.sample?.timestampMs
-        if (!eligible || !missing) {
-            if (TrackerState.helpVisible) clearHelp()
+        if (TrackerState.helpVisible) {
+            // A visible card still blocks gaze actions while the user chooses.
+            // Camera silence must not dismiss it or count as recovered tracking.
+            val waitingForSignal = TrackerState.signalPending && !closing &&
+                TrackerState.running && TrackerState.controls && TrackerState.interactionAllowed &&
+                !TrackerState.collecting && !TrackerState.precisionTraining && !TrackerState.speaking &&
+                !TrackerState.recoveryOpening && !TrackerState.writingOwnsInput &&
+                TrackerState.model != null && TrackerState.fault == null &&
+                ControlAccessibilityService.instance != null
+            if ((!eligible && !waitingForSignal) ||
+                recoveryDismiss.update(now, state.phase == TrackingPhase.TRACKING)) {
+                clearHelp()
+            }
+            return
         }
         if (lossHelp.update(now, sampleAt, missing, eligible)) {
             val session = ++helpGeneration
