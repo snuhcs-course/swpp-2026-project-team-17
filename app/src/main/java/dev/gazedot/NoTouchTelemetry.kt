@@ -28,11 +28,13 @@ object NoTouchTelemetry {
     val connected get() = analytics != null
     fun initialize(context: Context) {
         this.context = context.applicationContext
-        enabled = context.getSharedPreferences("telemetry", Context.MODE_PRIVATE).getBoolean("enabled", false)
+        // Default-on for team testing; preserve an explicit opt-out across restarts/upgrades.
+        enabled = context.getSharedPreferences("telemetry", Context.MODE_PRIVATE).getBoolean("enabled", true)
         analytics = runCatching {
             if (FirebaseApp.initializeApp(context) != null) FirebaseAnalytics.getInstance(context) else null
         }.getOrNull()
         runCatching { analytics?.setAnalyticsCollectionEnabled(enabled) }
+        event("telemetry_started")
     }
     fun setEnabled(value: Boolean) {
         enabled = value

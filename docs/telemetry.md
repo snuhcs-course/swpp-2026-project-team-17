@@ -15,7 +15,7 @@ before building a telemetry-connected APK. Pulling main alone is not sufficient.
 2. Register the exact Android package `dev.gazedot`.
 3. Download `google-services.json` to `app/google-services.json` (ignored by Git).
 4. Run `./gradlew :app:assembleDebug`. A build without the JSON is allowed, but does **not** upload telemetry.
-5. In the existing developer settings, enable **테스트 사용 기록 수집 (Firebase)** and accept the disclosure.
+5. From v63, collection starts by default when the app opens; no developer-settings setup is required. An explicitly saved opt-out remains respected. The existing switch can still disable collection.
 6. Enable DebugView on the test device:
 
 ```sh
@@ -35,7 +35,8 @@ No OpenAI API key or prediction-server change is involved. Firebase configuratio
 
 | Event | Meaning |
 | --- | --- |
-| `telemetry_enabled` | Explicit opt-in in settings |
+| `telemetry_started` | Collection active when the app process starts |
+| `telemetry_enabled` | Collection re-enabled in settings |
 | `tracking_start`, `tracking_stop` | Camera tracking service lifecycle |
 | `gaze_sample` | At most one delivered sample/second: normalized displayed x/y, pre-filter mapped raw_x/raw_y when available, eye state, quality, phase, latency |
 | `gaze_window` | Delivered frames per 10-second window, open/stale/missing-point counts, p95 processing/delivery latency, maximum capture timestamp gap, successive point jumps >0.15 normalized units |
@@ -57,7 +58,7 @@ Each event has app_build, trace_session (random per process/opt-in), sequence, a
 - Compare app_build, eye/quality, raw vs displayed coordinates and latency to investigate freezes followed by jumps.
 - Snapshot sampling does not retain every transition. Existing six-second GazeTrace diagnostics remain available for higher-resolution investigation.
 - Local fallback keeps only the latest 300 events in memory; use **최근 테스트 기록 공유** before closing the process. This is not durable storage. Firebase upload/report display may be delayed and requires connectivity/configuration.
-- Collection is off by default. Turning it off stops future collection and clears local events/SDK local analytics state; it does not delete events already uploaded to the team's Analytics property.
+- From v63, collection is on by default for team testing; explicit opt-outs persist. Turning it off stops future collection and clears local events/SDK local analytics state; it does not delete events already uploaded to the team's Analytics property.
 - No advertising ID or automatic screen-name collection is requested. Update the team's store/privacy disclosure before a public telemetry-enabled release.
 
 ## Real-device acceptance checklist (pending)
@@ -71,8 +72,8 @@ receipt and device overhead are not yet tested (no device connected).
 Firebase BoM is pinned to 33.16.0 for the existing Kotlin 2.1 compiler; Fragment
 1.8.6 prevents Analytics' transitive dependency from breaking Activity Result compatibility.
 
-1. Fresh install: no custom telemetry before opt-in.
-2. Opt in; confirm `telemetry_enabled` and matching app_build in DebugView.
+1. Fresh install or upgrade without an explicit preference: collection starts automatically.
+2. Confirm `telemetry_started` and matching app_build in DebugView; explicitly disable and restart to verify opt-out persists.
 3. Start camera, calibrate, run 20 seconds: check gaze_sample/window and calibration stages.
 4. Execute click and all four scroll directions: inspect requested and terminal callback separately.
 5. Briefly close eyes/cover camera: inspect eye/quality and waiting events; do not label this accuracy failure.
@@ -80,3 +81,5 @@ Firebase BoM is pinned to 33.16.0 for the existing Kotlin 2.1 compiler; Fragment
 7. Missing config/offline: app must keep operating; share bounded local trace, and never claim remote receipt.
 
 Sources: https://firebase.google.com/docs/android/setup and https://firebase.google.com/docs/analytics/android/configure-data-collection
+
+v63 validation (2026-11-28): testDebugUnitTest, assembleDebug and lintDebug passed; 212 tests, zero failures/errors, zero lint errors. Actual device receipt remains pending.
