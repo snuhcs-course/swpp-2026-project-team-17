@@ -5,6 +5,12 @@ This is observation only; it does not alter calibration, prediction, smoothing o
 
 ## Setup
 
+Team project: `notouch-team-17`, Android package: `dev.gazedot`.
+Console: https://console.firebase.google.com/project/notouch-team-17/overview
+The configuration is installed on the maintainer's machine. It is intentionally
+ignored by Git: teammates must also download/copy `app/google-services.json`
+before building a telemetry-connected APK. Pulling main alone is not sufficient.
+
 1. Create a team Firebase project with Google Analytics enabled.
 2. Register the exact Android package `dev.gazedot`.
 3. Download `google-services.json` to `app/google-services.json` (ignored by Git).
@@ -56,9 +62,12 @@ Each event has app_build, trace_session (random per process/opt-in), sequence, a
 
 ## Real-device acceptance checklist (pending)
 
-Local verification (2026-11-28): `:app:testDebugUnitTest :app:lintDebug` passed,
-212 tests / 0 failures / 0 errors, lint 0 errors. These checks used no Firebase
-project configuration. Actual DebugView receipt and device overhead are not yet tested.
+Local verification (2026-11-28): `:app:testDebugUnitTest :app:assembleDebug :app:lintDebug`
+passed with the team's Firebase Android configuration: 212 tests / 0 failures / 0 errors,
+lint 0 errors. v62 (`0.16.2-telemetry`) is an arm64 debug APK with the existing signing
+certificate. Generated Firebase project/app resources match the supplied configuration;
+the packaged manifest keeps Analytics collection off by default. Actual DebugView
+receipt and device overhead are not yet tested (no device connected).
 Firebase BoM is pinned to 33.16.0 for the existing Kotlin 2.1 compiler; Fragment
 1.8.6 prevents Analytics' transitive dependency from breaking Activity Result compatibility.
 
