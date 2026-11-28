@@ -24,8 +24,27 @@ class DeveloperSettingsActivity : ComponentActivity() {
         }
         status = TextView(this).apply { textSize = 18f; text = TrackerState.status }
         root.addView(status)
+        root.addView(Switch(this).apply {
+            text="테스트 사용 기록 수집 (Firebase)"
+            isChecked=NoTouchTelemetry.enabled
+            setOnCheckedChangeListener { _, checked ->
+                if(!checked) NoTouchTelemetry.setEnabled(false)
+                else android.app.AlertDialog.Builder(this@DeveloperSettingsActivity)
+                    .setTitle("테스트 기록 수집")
+                    .setMessage("추정 시선 좌표, 눈 검출 상태, 처리 지연, 보정·클릭·스크롤 결과와 앱/기기 정보를 Firebase Analytics로 전송합니다. 영상·음성·입력 문장·다른 앱의 화면 내용은 수집하지 않습니다. 실제 응시 위치나 정확도를 자동으로 알 수는 없습니다. 끄면 수집을 중단합니다.")
+                    .setPositiveButton("동의하고 켜기") { _, _ -> NoTouchTelemetry.setEnabled(true)
+                        status.text=if(NoTouchTelemetry.connected) "수집 켜짐 · Firebase 연결 설정 있음" else "수집 켜짐 · Firebase 설정 없음: 이 실행 중 최근 300개 기록만 보관" }
+                    .setNegativeButton("취소") { _, _ -> isChecked=false }
+                    .setOnCancelListener { isChecked=false }.show()
+            }
+        })
         fun button(label: String, action: () -> Unit) {
             root.addView(Button(this).apply { text = label; setOnClickListener { action() } })
+        }
+        button("최근 테스트 기록 공유") {
+            startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
+                type="text/plain"; putExtra(Intent.EXTRA_TEXT,NoTouchTelemetry.export())
+            },"테스트 기록 공유"))
         }
         button("도움 · 인식 문제 해결하기") { startActivity(Intent(this, RecoveryActivity::class.java)) }
         button("시선 모델 상태 · MediaPipe") { status.text=TrackerState.inferenceStatus+"\n양쪽 눈을 따로 보정 · 9점 화면 좌표 맞춤" }

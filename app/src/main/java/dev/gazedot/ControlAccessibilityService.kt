@@ -99,25 +99,29 @@ class ControlAccessibilityService : AccessibilityService() {
     }
     private fun allowed()=TrackerState.externalActionsAllowed() && !TrackerState.speaking
     fun tap(x: Float, y: Float): Boolean {
-        if(!allowed() || busy) return false
-        return gesture(Path().apply { moveTo(x,y) },80)
+        if(!allowed() || busy) { NoTouchTelemetry.event("control_result",mapOf("action" to "click","result" to "blocked")); return false }
+        return gesture(Path().apply { moveTo(x,y) },80,"click")
     }
     fun scroll(direction: ScrollDirection, width: Int, height: Int): Boolean {
-        if(!allowed() || busy) return false
+        if(!allowed() || busy) { NoTouchTelemetry.event("control_result",mapOf("action" to "scroll","result" to "blocked","direction" to direction.name)); return false }
         val swipe = ScrollSettings.swipe(direction, width, height)
         return gesture(Path().apply {
             moveTo(swipe.from.first.toFloat(), swipe.from.second.toFloat())
             lineTo(swipe.to.first.toFloat(), swipe.to.second.toFloat())
-        }, swipe.durationMs)
+        }, swipe.durationMs,"scroll",direction.name)
     }
-    private fun gesture(path: Path, duration: Long): Boolean {
+    private fun gesture(path: Path, duration: Long, action: String, direction: String = "none"): Boolean {
+        val began=android.os.SystemClock.uptimeMillis()
+        fun record(result:String) { NoTouchTelemetry.event("control_result",mapOf("action" to action,
+            "direction" to direction,"result" to result,"duration_ms" to (android.os.SystemClock.uptimeMillis()-began))) }
+        record("requested")
         val description=GestureDescription.Builder().addStroke(GestureDescription.StrokeDescription(path,0,duration)).build()
         busy=true
         val accepted=runCatching { dispatchGesture(description,object : GestureResultCallback() {
-            override fun onCompleted(g: GestureDescription?) { busy=false }
-            override fun onCancelled(g: GestureDescription?) { busy=false; TrackerState.actionStatus="시스템에서 동작을 취소했습니다" }
+            override fun onCompleted(g: GestureDescription?) { busy=false; record("completed") }
+            override fun onCancelled(g: GestureDescription?) { busy=false; record("cancelled"); TrackerState.actionStatus="시스템에서 동작을 취소했습니다" }
         },handler) }.getOrDefault(false)
-        if(!accepted) busy=false
+        if(!accepted) { busy=false; record("rejected") }
         return accepted
     }
     @Suppress("DEPRECATION")

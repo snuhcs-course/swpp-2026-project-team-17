@@ -446,6 +446,7 @@ class MainActivity : ComponentActivity() {
         tutorial = null
         homeDwell.reset()
         val session = TrackerState.beginCalibration()
+        NoTouchTelemetry.event("calibration_start")
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         // Capture navigation intent for this session, before a new model is applied.
         calibration = CalibrationView(session, fromRecovery && TrackerState.model != null)
@@ -483,6 +484,8 @@ class MainActivity : ComponentActivity() {
             if(acquisition.review!=null && !reportSaved) {
                 reportSaved=true
                 val result=acquisition.review!!
+                NoTouchTelemetry.event("calibration_review", mapOf("fit_available" to if(result.model!=null) 1L else 0L,
+                    "internal_rms" to (result.rms ?: -1.0)))
                 getSharedPreferences("personal",MODE_PRIVATE).edit().putString("calibration_audit_v30",result.report).apply()
                 val rows=acquisition.fixations().flatMap { g -> g.samples.map { f ->
                     listOf(g.x,g.y,f.leftX,f.leftY,f.rightX,f.rightY,f.faceX,f.faceY,f.scale)
@@ -506,6 +509,7 @@ class MainActivity : ComponentActivity() {
                 TrackerState.finishCalibration(session, model)
             }
             TrackerState.status = saved.exceptionOrNull()?.let { "보정 적용 실패: ${it.message}" } ?: message
+            NoTouchTelemetry.event("calibration_apply",mapOf("applied" to if(saved.getOrDefault(false)) 1L else 0L))
             close()
             calibration = null
             if (saved.getOrDefault(false) && TrackerState.running) {

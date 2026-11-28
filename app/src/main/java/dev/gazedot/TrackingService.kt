@@ -80,6 +80,7 @@ class TrackingService : LifecycleService() {
             }
             val waiting = if (lastResult == 0L) now - startedAt > 3_000 else now - lastResult > 500
             if (waiting && !TrackerState.signalPending) {
+                NoTouchTelemetry.event("tracking_wait", mapOf("gap_ms" to (now-lastResult)))
                 resetTracking()
                 TrackerState.signalPending = true
                 TrackerState.publish(null, "영상 입력을 기다리고 있어요")
@@ -154,6 +155,7 @@ class TrackingService : LifecycleService() {
             TrackerState.controls = true
             TrackerState.running = true
             startedAt = SystemClock.uptimeMillis()
+            NoTouchTelemetry.event("tracking_start")
             TrackerState.publish(null, "카메라·눈 검출 모델 준비 중…")
             TrackerState.actionStatus = "눈 조작 준비 · 접근성 권한을 허용하고 연습 화면에서 확인하세요"
             main.postDelayed(watchdog, 100)
@@ -268,12 +270,14 @@ class TrackingService : LifecycleService() {
                     TrackerState.eyeState=observation.state
                     TrackerState.signalPending=at-now>750
                     val valid=at-now in 0..750 && observation.state==EyeState.OPEN
+                    NoTouchTelemetry.frame(now,at-now,observation.state,null,"CALIBRATING",true)
                     TrackerState.publishSample(GazeSample(now,
                         if(valid && observation.features!=null) TrackingQuality.OUT_OF_RANGE else TrackingQuality.UNCERTAIN,
                         if(valid) observation.features else null,null,null,0f,emptyList()),TrackerState.inferenceStatus)
                     return@submit
                 }
                 if (at - now > 500) {
+                    NoTouchTelemetry.frame(now,at-now,observation.state,null,"STALE",false)
                     resetTracking()
                     TrackerState.signalPending = true
                     TrackerState.publish(null, "영상 처리가 지연됩니다 · 조작 일시 대기")
@@ -289,6 +293,7 @@ class TrackingService : LifecycleService() {
                     !TrackerState.speaking && ControlAccessibilityService.instance != null
                 val sample = pipeline.process(now, at, observation, model, enabled,
                     ControlAccessibilityService.instance?.let { service -> { p -> service.dwellTargetKey(p) } })
+                NoTouchTelemetry.frame(now,at-now,observation.state,sample.point,sample.quality.name,false,sample.rawPoint)
                 val message = when (sample.quality) {
                     TrackingQuality.LOST -> "얼굴 검출 대기"
                     TrackingQuality.CLOSED -> "눈 감김 감지"
@@ -309,6 +314,7 @@ class TrackingService : LifecycleService() {
             val detail="$stage · ${e.javaClass.simpleName}: ${e.message.orEmpty().take(400)}"
             android.util.Log.e("NoTouchFrame",detail,e)
             main.post { if (!closing && epoch == trackingEpoch) {
+                NoTouchTelemetry.event("frame_error",mapOf("error_type" to e.javaClass.simpleName))
                 TrackerState.inferenceStatus=detail
                 getSharedPreferences("personal",MODE_PRIVATE).edit().putString("last_frame_error",detail).apply()
                 fail("$stage 오류 · ${e.javaClass.simpleName}")
@@ -485,6 +491,8 @@ class TrackingService : LifecycleService() {
         if (rotation() != initialRotation || sizeKey() != initialSize) fail("화면 변경 · 앱에서 다시 보정해 주세요")
     }
     override fun onDestroy() {
+        NoTouchTelemetry.flush()
+        NoTouchTelemetry.event("tracking_stop")
         closing = true
         TrackerState.contextChanged = null
         TrackerState.raiseGazeOverlay = null
